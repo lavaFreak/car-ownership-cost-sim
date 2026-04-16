@@ -76,10 +76,15 @@ instance ToJSON CostBreakdown
 
 data SimulationSummary = SimulationSummary
   { summaryIterations :: Int,
+    summaryTotalMilesDriven :: Double,
     summaryMeanTotalCost :: Double,
     summaryMedianTotalCost :: Double,
     summaryP10TotalCost :: Double,
     summaryP90TotalCost :: Double,
+    summaryMeanCostPerMile :: Maybe Double,
+    summaryMedianCostPerMile :: Maybe Double,
+    summaryP10CostPerMile :: Maybe Double,
+    summaryP90CostPerMile :: Maybe Double,
     summaryMinTotalCost :: Double,
     summaryMaxTotalCost :: Double
   }

@@ -29,8 +29,12 @@ simulateMany requestedIterations simulationInput seed =
 simulateRequestWithSeed :: Int -> SimulationRequest -> SimulationResponse
 simulateRequestWithSeed seed request =
   let iterations = max 1 (requestIterations request)
+      simulationInput = requestInput request
       samples = simulateMany iterations (requestInput request) seed
       totals = map costTotal samples
+      totalMilesDriven =
+        max 0 (simulationAnnualMiles simulationInput)
+          * fromIntegral (max 1 (simulationYearsOwned simulationInput))
       exampleBreakdown =
         case samples of
           sampleBreakdown : _ -> sampleBreakdown
@@ -48,7 +52,7 @@ simulateRequestWithSeed seed request =
               }
    in SimulationResponse
         { responseSeedUsed = seed,
-          responseSummary = summarizeTotals iterations totals,
+          responseSummary = summarizeTotals iterations totalMilesDriven totals,
           responseSampleTotals = totals,
           responseExampleBreakdown = exampleBreakdown
         }
@@ -61,14 +65,19 @@ validateSimulationRequest request =
       validateSimulationInput (requestInput request)
     ]
 
-summarizeTotals :: Int -> [Double] -> SimulationSummary
-summarizeTotals iterations totals =
+summarizeTotals :: Int -> Double -> [Double] -> SimulationSummary
+summarizeTotals iterations totalMilesDriven totals =
   SimulationSummary
     { summaryIterations = iterations,
+      summaryTotalMilesDriven = totalMilesDriven,
       summaryMeanTotalCost = mean totals,
       summaryMedianTotalCost = percentile 0.5 totals,
       summaryP10TotalCost = percentile 0.1 totals,
       summaryP90TotalCost = percentile 0.9 totals,
+      summaryMeanCostPerMile = costPerMile totalMilesDriven (mean totals),
+      summaryMedianCostPerMile = costPerMile totalMilesDriven (percentile 0.5 totals),
+      summaryP10CostPerMile = costPerMile totalMilesDriven (percentile 0.1 totals),
+      summaryP90CostPerMile = costPerMile totalMilesDriven (percentile 0.9 totals),
       summaryMinTotalCost =
         case totals of
           [] -> 0
@@ -78,6 +87,11 @@ summarizeTotals iterations totals =
           [] -> 0
           values -> maximum values
     }
+
+costPerMile :: Double -> Double -> Maybe Double
+costPerMile totalMilesDriven totalCost
+  | totalMilesDriven <= 0 = Nothing
+  | otherwise = Just (totalCost / totalMilesDriven)
 
 simulateCostBreakdown :: SimulationInput -> StdGen -> (CostBreakdown, StdGen)
 simulateCostBreakdown simulationInput initialGen =

@@ -16,6 +16,13 @@ const currency = new Intl.NumberFormat("en-US", {
   maximumFractionDigits: 0,
 });
 
+const preciseCurrency = new Intl.NumberFormat("en-US", {
+  style: "currency",
+  currency: "USD",
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
+});
+
 let hasSuccessfulRun = false;
 
 function fieldValue(name) {
@@ -130,6 +137,8 @@ function renderSummaryPlaceholder(averageLabel) {
     { label: "Median cost", value: "Middle outcome" },
     { label: "10th percentile", value: "Lower band" },
     { label: "90th percentile", value: "Upper band" },
+    { label: "Average cost per mile", value: "After a run" },
+    { label: "Median cost per mile", value: "After a run" },
     { label: "Lowest sample", value: "Best-case edge" },
     { label: "Highest sample", value: "Expensive tail" },
   ]);
@@ -420,6 +429,14 @@ function setSubmitState(isRunning) {
   submitButton.textContent = isRunning ? "Running simulation..." : "Run simulation";
 }
 
+function formatCostPerMile(value) {
+  if (value === null || value === undefined) {
+    return "N/A";
+  }
+
+  return `${preciseCurrency.format(value)}/mi`;
+}
+
 function renderSummary(response) {
   const summary = response.responseSummary;
   renderCards(summaryGrid, [
@@ -427,6 +444,8 @@ function renderSummary(response) {
     { label: "Median cost", value: currency.format(summary.summaryMedianTotalCost) },
     { label: "10th percentile", value: currency.format(summary.summaryP10TotalCost) },
     { label: "90th percentile", value: currency.format(summary.summaryP90TotalCost) },
+    { label: "Average cost per mile", value: formatCostPerMile(summary.summaryMeanCostPerMile) },
+    { label: "Median cost per mile", value: formatCostPerMile(summary.summaryMedianCostPerMile) },
     { label: "Lowest sample", value: currency.format(summary.summaryMinTotalCost) },
     { label: "Highest sample", value: currency.format(summary.summaryMaxTotalCost) },
   ]);

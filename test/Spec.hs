@@ -61,12 +61,15 @@ deterministicCashPurchaseTest =
                   }
             }
         response = simulateRequestWithSeed 7 request
+        summary = responseSummary response
         totalCost =
           case responseSampleTotals response of
             value : _ -> value
             [] -> 0
         expectedCost = 12000 / 30 * 4 + 500 + 1000 + 200
     assertClose "deterministic operating cost" expectedCost totalCost
+    assertEqual "total miles driven is tracked" 12000 (summaryTotalMilesDriven summary)
+    assertMaybeClose "deterministic cost per mile" (expectedCost / 12000) (summaryMeanCostPerMile summary)
 
 summaryOrderingTest :: Test
 summaryOrderingTest =
@@ -83,6 +86,8 @@ summaryOrderingTest =
     assertBool "minimum stays below maximum" (summaryMinTotalCost summary <= summaryMaxTotalCost summary)
     assertBool "mean total cost stays positive" (summaryMeanTotalCost summary > 0)
     assertClose "example breakdown matches the first sample" firstTotal (costTotal (responseExampleBreakdown response))
+    assertBool "mean cost per mile is available" (summaryMeanCostPerMile summary /= Nothing)
+    assertBool "median cost per mile is available" (summaryMedianCostPerMile summary /= Nothing)
 
 invalidInputValidationTest :: Test
 invalidInputValidationTest =
@@ -140,3 +145,9 @@ assertClose label expected actual =
    in assertBool
         (label <> ": expected " <> show expected <> ", got " <> show actual)
         (abs (expected - actual) <= tolerance)
+
+assertMaybeClose :: String -> Double -> Maybe Double -> Assertion
+assertMaybeClose label expected maybeActual =
+  case maybeActual of
+    Nothing -> assertFailure (label <> ": expected a value, got Nothing")
+    Just actual -> assertClose label expected actual
