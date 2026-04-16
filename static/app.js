@@ -62,6 +62,9 @@ function collectFormValues() {
     fuelStdDev: numericValue("fuelStdDev"),
     maintenanceMean: numericValue("maintenanceMean"),
     maintenanceStdDev: numericValue("maintenanceStdDev"),
+    repairShockProbabilityPercent: numericValue("repairShockProbabilityPercent"),
+    repairShockMean: numericValue("repairShockMean"),
+    repairShockStdDev: numericValue("repairShockStdDev"),
     depreciationMeanPercent: numericValue("depreciationMeanPercent"),
     depreciationStdDevPercent: numericValue("depreciationStdDevPercent"),
     iterations: numericValue("iterations"),
@@ -98,6 +101,13 @@ function buildRequestPayload(values) {
       simulationAnnualInflationRate: values.annualInflationPercent / 100,
       simulationLoanApr: values.loanAprPercent / 100,
       simulationLoanTermMonths: values.loanTermMonths,
+      simulationRepairShockProbability: values.repairShockProbabilityPercent / 100,
+      simulationRepairShockCost: buildBoundedNormal(
+        values.repairShockMean,
+        values.repairShockStdDev,
+        Math.max(0, values.repairShockMean - values.repairShockStdDev * 2),
+        values.repairShockMean + values.repairShockStdDev * 4
+      ),
       simulationFuelPrice: buildBoundedNormal(
         values.fuelMean,
         values.fuelStdDev,
@@ -160,6 +170,7 @@ function renderBreakdownPlaceholder() {
     { label: "Loan balance at sale", value: "After a run" },
     { label: "Fuel", value: "After a run" },
     { label: "Maintenance", value: "After a run" },
+    { label: "Repair shocks", value: "After a run" },
     { label: "Insurance", value: "After a run" },
     { label: "Registration", value: "After a run" },
     { label: "Resale value", value: "After a run" },
@@ -175,6 +186,7 @@ function renderYearlyBreakdownPlaceholder() {
             <div><dt>Annual totals</dt><dd>After a run</dd></div>
             <div><dt>Year 1 purchase costs</dt><dd>After a run</dd></div>
             <div><dt>Inflation factor</dt><dd>After a run</dd></div>
+            <div><dt>Repair shocks</dt><dd>After a run</dd></div>
             <div><dt>Ending value</dt><dd>After a run</dd></div>
             <div><dt>Remaining loan</dt><dd>After a run</dd></div>
             <div><dt>Estimated equity</dt><dd>After a run</dd></div>
@@ -358,6 +370,35 @@ function validateFormValues(values) {
   }
 
   if (
+    validateRequiredNumber(errors, values, "repairShockProbabilityPercent", "Repair shock chance") &&
+    (values.repairShockProbabilityPercent < 0 || values.repairShockProbabilityPercent > 100)
+  ) {
+    pushValidationError(
+      errors,
+      "repairShockProbabilityPercent",
+      "Repair shock chance must be between 0% and 100%."
+    );
+  }
+
+  if (
+    validateRequiredNumber(errors, values, "repairShockMean", "Repair shock mean") &&
+    values.repairShockMean < 0
+  ) {
+    pushValidationError(errors, "repairShockMean", "Repair shock mean cannot be negative.");
+  }
+
+  if (
+    validateRequiredNumber(errors, values, "repairShockStdDev", "Repair shock standard deviation") &&
+    values.repairShockStdDev < 0
+  ) {
+    pushValidationError(
+      errors,
+      "repairShockStdDev",
+      "Repair shock standard deviation cannot be negative."
+    );
+  }
+
+  if (
     validateRequiredNumber(errors, values, "depreciationMeanPercent", "Depreciation mean") &&
     (values.depreciationMeanPercent < 0 || values.depreciationMeanPercent > 100)
   ) {
@@ -511,6 +552,7 @@ function renderBreakdown(response) {
     { label: "Loan balance at sale", value: currency.format(sample.costRemainingLoanBalance) },
     { label: "Fuel", value: currency.format(sample.costFuel) },
     { label: "Maintenance", value: currency.format(sample.costMaintenance) },
+    { label: "Repair shocks", value: currency.format(sample.costRepairShocks) },
     { label: "Insurance", value: currency.format(sample.costInsurance) },
     { label: "Registration", value: currency.format(sample.costRegistration) },
     { label: "Resale value", value: currency.format(sample.costResaleValue) },
@@ -535,6 +577,7 @@ function renderYearlyBreakdown(response) {
             <div><dt>Total for year</dt><dd>${currency.format(year.yearlyTotalCost)}</dd></div>
             <div><dt>Year 1 purchase costs</dt><dd>${currency.format(year.yearlyPurchaseTax + year.yearlyUpfrontFees)}</dd></div>
             <div><dt>Inflation factor</dt><dd>${year.yearlyInflationMultiplier.toFixed(2)}x</dd></div>
+            <div><dt>Repair shocks</dt><dd>${currency.format(year.yearlyRepairShocks)}</dd></div>
             <div><dt>Loan payments</dt><dd>${currency.format(year.yearlyLoanPayments)}</dd></div>
             <div><dt>Depreciation loss</dt><dd>${currency.format(year.yearlyDepreciationLoss)}</dd></div>
             <div><dt>Ending value</dt><dd>${currency.format(year.yearlyEndingVehicleValue)}</dd></div>

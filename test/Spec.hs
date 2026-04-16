@@ -17,6 +17,7 @@ tests =
     [ TestLabel "deterministic cash purchase keeps only operating costs" deterministicCashPurchaseTest,
       TestLabel "purchase taxes and fees are included" purchaseTaxAndFeesTest,
       TestLabel "inflation raises later-year recurring costs" inflationTest,
+      TestLabel "repair shocks add tail-risk costs" repairShockTest,
       TestLabel "summary statistics stay ordered" summaryOrderingTest,
       TestLabel "invalid input is rejected" invalidInputValidationTest
     ]
@@ -42,6 +43,14 @@ deterministicCashPurchaseTest =
                     simulationAnnualRegistration = 200,
                     simulationLoanApr = 0,
                     simulationLoanTermMonths = 0,
+                    simulationRepairShockProbability = 0,
+                    simulationRepairShockCost =
+                      BoundedNormal
+                        { boundedNormalMean = 0,
+                          boundedNormalStdDev = 0,
+                          boundedNormalLowerBound = 0,
+                          boundedNormalUpperBound = Just 0
+                        },
                     simulationFuelPrice =
                       BoundedNormal
                         { boundedNormalMean = 4,
@@ -108,6 +117,14 @@ purchaseTaxAndFeesTest =
                     simulationAnnualRegistration = 0,
                     simulationLoanApr = 0,
                     simulationLoanTermMonths = 12,
+                    simulationRepairShockProbability = 0,
+                    simulationRepairShockCost =
+                      BoundedNormal
+                        { boundedNormalMean = 0,
+                          boundedNormalStdDev = 0,
+                          boundedNormalLowerBound = 0,
+                          boundedNormalUpperBound = Just 0
+                        },
                     simulationFuelPrice =
                       BoundedNormal
                         { boundedNormalMean = 4,
@@ -165,6 +182,14 @@ inflationTest =
                     simulationAnnualRegistration = 50,
                     simulationLoanApr = 0,
                     simulationLoanTermMonths = 0,
+                    simulationRepairShockProbability = 0,
+                    simulationRepairShockCost =
+                      BoundedNormal
+                        { boundedNormalMean = 0,
+                          boundedNormalStdDev = 0,
+                          boundedNormalLowerBound = 0,
+                          boundedNormalUpperBound = Just 0
+                        },
                     simulationFuelPrice =
                       BoundedNormal
                         { boundedNormalMean = 1,
@@ -205,6 +230,69 @@ inflationTest =
         assertClose "year one total includes upfront purchase" 10750 (yearlyTotalCost yearOne)
         assertClose "year two total reflects inflation only" 825 (yearlyTotalCost yearTwo)
       _ -> assertFailure "Expected exactly two yearly breakdown rows."
+
+repairShockTest :: Test
+repairShockTest =
+  TestCase $ do
+    let request =
+          SimulationRequest
+            { requestIterations = 1,
+              requestSeed = Just 17,
+              requestInput =
+                SimulationInput
+                  { simulationPurchasePrice = 12000,
+                    simulationDownPayment = 0,
+                    simulationSalesTaxRate = 0,
+                    simulationUpfrontFees = 0,
+                    simulationAnnualInflationRate = 0,
+                    simulationYearsOwned = 1,
+                    simulationAnnualMiles = 0,
+                    simulationMilesPerGallon = 30,
+                    simulationAnnualInsurance = 0,
+                    simulationAnnualRegistration = 0,
+                    simulationLoanApr = 0,
+                    simulationLoanTermMonths = 0,
+                    simulationRepairShockProbability = 1,
+                    simulationRepairShockCost =
+                      BoundedNormal
+                        { boundedNormalMean = 1500,
+                          boundedNormalStdDev = 0,
+                          boundedNormalLowerBound = 1500,
+                          boundedNormalUpperBound = Just 1500
+                        },
+                    simulationFuelPrice =
+                      BoundedNormal
+                        { boundedNormalMean = 0,
+                          boundedNormalStdDev = 0,
+                          boundedNormalLowerBound = 0,
+                          boundedNormalUpperBound = Just 0
+                        },
+                    simulationAnnualMaintenance =
+                      BoundedNormal
+                        { boundedNormalMean = 0,
+                          boundedNormalStdDev = 0,
+                          boundedNormalLowerBound = 0,
+                          boundedNormalUpperBound = Just 0
+                        },
+                    simulationAnnualDepreciationRate =
+                      BoundedNormal
+                        { boundedNormalMean = 0,
+                          boundedNormalStdDev = 0,
+                          boundedNormalLowerBound = 0,
+                          boundedNormalUpperBound = Just 0
+                        }
+                  }
+            }
+        response = simulateRequestWithSeed 17 request
+        breakdown = responseExampleBreakdown response
+        yearlyBreakdown = responseExampleYearlyBreakdown response
+    assertClose "repair shock total is included" 1500 (costRepairShocks breakdown)
+    assertClose "ownership total includes repair shock net of resale" 1500 (costTotal breakdown)
+    case yearlyBreakdown of
+      [yearOne] -> do
+        assertClose "year one repair shock is tracked" 1500 (yearlyRepairShocks yearOne)
+        assertClose "year one total includes repair shock" 13500 (yearlyTotalCost yearOne)
+      _ -> assertFailure "Expected exactly one yearly breakdown row."
 
 summaryOrderingTest :: Test
 summaryOrderingTest =
@@ -249,6 +337,14 @@ invalidInputValidationTest =
                     simulationAnnualRegistration = 180,
                     simulationLoanApr = 1.2,
                     simulationLoanTermMonths = -12,
+                    simulationRepairShockProbability = 1.2,
+                    simulationRepairShockCost =
+                      BoundedNormal
+                        { boundedNormalMean = 1000,
+                          boundedNormalStdDev = -5,
+                          boundedNormalLowerBound = 0,
+                          boundedNormalUpperBound = Just 2000
+                        },
                     simulationFuelPrice =
                       BoundedNormal
                         { boundedNormalMean = 3.5,
@@ -278,6 +374,8 @@ invalidInputValidationTest =
     assertBool "sales tax is validated" ("Sales tax rate should be expressed as a decimal between 0 and 1." `elem` validationErrors)
     assertBool "upfront fees are validated" ("Upfront fees cannot be negative." `elem` validationErrors)
     assertBool "inflation is validated" ("Annual inflation rate should be expressed as a decimal between 0 and 1." `elem` validationErrors)
+    assertBool "repair shock probability is validated" ("Repair shock probability should be expressed as a decimal between 0 and 1." `elem` validationErrors)
+    assertBool "repair shock bounds are validated" ("Repair shock cost standard deviation cannot be negative." `elem` validationErrors)
     assertBool "years owned is validated" ("Years owned must be at least 1." `elem` validationErrors)
     assertBool "fuel efficiency is validated" ("Fuel efficiency must be greater than 0 MPG." `elem` validationErrors)
     assertBool "APR is validated" ("Loan APR should be expressed as a decimal between 0 and 1." `elem` validationErrors)

@@ -97,6 +97,7 @@ simulateDetailedCostBreakdown simulationInput initialGen =
       annualInflationRate = max 0 (simulationAnnualInflationRate simulationInput)
       annualInsuranceCost = max 0 (simulationAnnualInsurance simulationInput)
       annualRegistrationCost = max 0 (simulationAnnualRegistration simulationInput)
+      repairShockProbability = max 0 (simulationRepairShockProbability simulationInput)
       annualGallons =
         if simulationMilesPerGallon simulationInput <= 0
           then 0
@@ -108,6 +109,8 @@ simulateDetailedCostBreakdown simulationInput initialGen =
           annualGallons
           (simulationFuelPrice simulationInput)
           (simulationAnnualMaintenance simulationInput)
+          repairShockProbability
+          (simulationRepairShockCost simulationInput)
           (simulationAnnualDepreciationRate simulationInput)
           initialGen
       financing = buildFinancingSnapshot simulationInput
@@ -118,6 +121,7 @@ simulateDetailedCostBreakdown simulationInput initialGen =
           sampledYears
       fuelCost = sum (map yearlyFuel yearlyBreakdowns)
       maintenanceCost = sum (map yearlyMaintenance yearlyBreakdowns)
+      repairShockCost = sum (map yearlyRepairShocks yearlyBreakdowns)
       insuranceCost = sum (map yearlyInsurance yearlyBreakdowns)
       registrationCost = sum (map yearlyRegistration yearlyBreakdowns)
       resaleValue =
@@ -132,6 +136,7 @@ simulateDetailedCostBreakdown simulationInput initialGen =
           + financingRemainingBalance financing
           + fuelCost
           + maintenanceCost
+          + repairShockCost
           + insuranceCost
           + registrationCost
           - resaleValue
@@ -143,6 +148,7 @@ simulateDetailedCostBreakdown simulationInput initialGen =
             costRemainingLoanBalance = financingRemainingBalance financing,
             costFuel = fuelCost,
             costMaintenance = maintenanceCost,
+            costRepairShocks = repairShockCost,
             costInsurance = insuranceCost,
             costRegistration = registrationCost,
             costResaleValue = resaleValue,
@@ -155,6 +161,7 @@ simulateDetailedCostBreakdown simulationInput initialGen =
 data SampledYear = SampledYear
   { sampledYearFuelCost :: Double,
     sampledYearMaintenanceCost :: Double,
+    sampledYearRepairShockCost :: Double,
     sampledYearDepreciationLoss :: Double,
     sampledYearEndingVehicleValue :: Double
   }
@@ -165,26 +172,34 @@ simulateYears ::
   Double ->
   BoundedNormal ->
   BoundedNormal ->
+  Double ->
+  BoundedNormal ->
   BoundedNormal ->
   StdGen ->
   ([SampledYear], StdGen)
-simulateYears yearsRemaining carValue annualGallons fuelModel maintenanceModel depreciationModel =
+simulateYears yearsRemaining carValue annualGallons fuelModel maintenanceModel repairShockProbability repairShockModel depreciationModel =
   go yearsRemaining carValue []
   where
     go 0 _ acc gen = (reverse acc, gen)
     go remaining currentValue acc gen0 =
       let (fuelPrice, gen1) = sampleBoundedNormal fuelModel gen0
           (maintenanceCost, gen2) = sampleBoundedNormal maintenanceModel gen1
-          (depreciationRate, gen3) = sampleBoundedNormal depreciationModel gen2
+          (repairShockRoll, gen3) = randomR (0.0, 1.0 :: Double) gen2
+          (repairShockCost, gen4) =
+            if repairShockRoll < repairShockProbability
+              then sampleBoundedNormal repairShockModel gen3
+              else (0, gen3)
+          (depreciationRate, gen5) = sampleBoundedNormal depreciationModel gen4
           nextValue = max 0 (currentValue * (1 - depreciationRate))
           sampledYear =
             SampledYear
               { sampledYearFuelCost = annualGallons * fuelPrice,
                 sampledYearMaintenanceCost = maintenanceCost,
+                sampledYearRepairShockCost = repairShockCost,
                 sampledYearDepreciationLoss = max 0 (currentValue - nextValue),
                 sampledYearEndingVehicleValue = nextValue
               }
-       in go (remaining - 1) nextValue (sampledYear : acc) gen3
+       in go (remaining - 1) nextValue (sampledYear : acc) gen5
 
 data FinancingSnapshot = FinancingSnapshot
   { financingUpfrontPayment :: Double,
@@ -251,6 +266,7 @@ buildYearlyCostBreakdown financing purchaseTax upfrontFees annualInflationRate a
           else 0
       inflatedFuelCost = sampledYearFuelCost sampledYear * inflationMultiplier
       inflatedMaintenanceCost = sampledYearMaintenanceCost sampledYear * inflationMultiplier
+      inflatedRepairShockCost = sampledYearRepairShockCost sampledYear * inflationMultiplier
       inflatedInsuranceCost = annualInsuranceCost * inflationMultiplier
       inflatedRegistrationCost = annualRegistrationCost * inflationMultiplier
       loanPayments = loanPaymentsForYear financing yearIndex
@@ -263,6 +279,7 @@ buildYearlyCostBreakdown financing purchaseTax upfrontFees annualInflationRate a
           + loanPayments
           + inflatedFuelCost
           + inflatedMaintenanceCost
+          + inflatedRepairShockCost
           + inflatedInsuranceCost
           + inflatedRegistrationCost
           + sampledYearDepreciationLoss sampledYear
@@ -275,6 +292,7 @@ buildYearlyCostBreakdown financing purchaseTax upfrontFees annualInflationRate a
           yearlyLoanPayments = loanPayments,
           yearlyFuel = inflatedFuelCost,
           yearlyMaintenance = inflatedMaintenanceCost,
+          yearlyRepairShocks = inflatedRepairShockCost,
           yearlyInsurance = inflatedInsuranceCost,
           yearlyRegistration = inflatedRegistrationCost,
           yearlyDepreciationLoss = sampledYearDepreciationLoss sampledYear,
@@ -373,6 +391,9 @@ validateSimulationInput simulationInput =
       require (simulationLoanApr simulationInput >= 0) "Loan APR cannot be negative.",
       require (simulationLoanApr simulationInput <= 1) "Loan APR should be expressed as a decimal between 0 and 1.",
       require (simulationLoanTermMonths simulationInput >= 0) "Loan term cannot be negative.",
+      require (simulationRepairShockProbability simulationInput >= 0) "Repair shock probability cannot be negative.",
+      require (simulationRepairShockProbability simulationInput <= 1) "Repair shock probability should be expressed as a decimal between 0 and 1.",
+      validateBoundedNormal "Repair shock cost" False (simulationRepairShockCost simulationInput),
       validateBoundedNormal "Fuel price" False (simulationFuelPrice simulationInput),
       validateBoundedNormal "Annual maintenance" False (simulationAnnualMaintenance simulationInput),
       validateBoundedNormal "Annual depreciation rate" True (simulationAnnualDepreciationRate simulationInput)

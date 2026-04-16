@@ -40,6 +40,8 @@ data SimulationInput = SimulationInput
     simulationAnnualRegistration :: Double,
     simulationLoanApr :: Double,
     simulationLoanTermMonths :: Int,
+    simulationRepairShockProbability :: Double,
+    simulationRepairShockCost :: BoundedNormal,
     simulationFuelPrice :: BoundedNormal,
     simulationAnnualMaintenance :: BoundedNormal,
     simulationAnnualDepreciationRate :: BoundedNormal
@@ -69,6 +71,7 @@ data CostBreakdown = CostBreakdown
     costRemainingLoanBalance :: Double,
     costFuel :: Double,
     costMaintenance :: Double,
+    costRepairShocks :: Double,
     costInsurance :: Double,
     costRegistration :: Double,
     costResaleValue :: Double,
@@ -89,6 +92,7 @@ data YearlyCostBreakdown = YearlyCostBreakdown
     yearlyLoanPayments :: Double,
     yearlyFuel :: Double,
     yearlyMaintenance :: Double,
+    yearlyRepairShocks :: Double,
     yearlyInsurance :: Double,
     yearlyRegistration :: Double,
     yearlyDepreciationLoss :: Double,
@@ -155,6 +159,14 @@ exampleSimulationRequest =
             simulationAnnualRegistration = 220,
             simulationLoanApr = 0.061,
             simulationLoanTermMonths = 60,
+            simulationRepairShockProbability = 0.12,
+            simulationRepairShockCost =
+              BoundedNormal
+                { boundedNormalMean = 1800,
+                  boundedNormalStdDev = 900,
+                  boundedNormalLowerBound = 400,
+                  boundedNormalUpperBound = Just 6000
+                },
             simulationFuelPrice =
               BoundedNormal
                 { boundedNormalMean = 3.75,
