@@ -75,6 +75,9 @@ the core simulation code.
   Defines the normalized local vehicle catalog and shared catalog-facing types.
 - `src/CarOwnershipCostSim/VehicleCatalogImport.hs`
   Parses official `vPIC` and `FuelEconomy.gov` payloads into catalog entries.
+- `src/CarOwnershipCostSim/WebApp.hs`
+  Defines the Scotty routes in a testable form so the API and static assets can
+  be exercised without booting a separate server process.
 - `app/Main.hs`
   Runs the Scotty server and exposes the web routes and API endpoints.
 - `app/BuildCatalog.hs`
@@ -210,7 +213,9 @@ suite. The current app can now model taxes and fees, inflation, repair-shock
 tail risk, yearly sample traces, and catalog-backed vehicle presets while
 keeping the web layer lightweight. It also now includes a first importer layer
 that uses curated source seeds plus official `vPIC` and `FuelEconomy.gov`
-payloads to refresh the local vehicle catalog.
+payloads to refresh the local vehicle catalog. The automated checks now cover
+simulation invariants, API routes, and a lightweight in-process smoke test for
+the web assets.
 
 The repository also includes a basic GitHub Actions workflow that runs the main
 build and test checks on pushes and pull requests.

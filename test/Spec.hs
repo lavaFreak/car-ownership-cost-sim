@@ -1,3 +1,5 @@
+{-# LANGUAGE OverloadedStrings #-}
+
 module Main (main) where
 
 import CarOwnershipCostSim.Simulation (simulateRequestWithSeed, validateSimulationRequest)
@@ -23,7 +25,16 @@ import CarOwnershipCostSim.VehicleCatalogImport
     parseFuelEconomyVehicleRecord,
   )
 import CarOwnershipCostSim.VehiclePresets (VehiclePreset (..), vehiclePresetsFromCatalog)
+import CarOwnershipCostSim.WebApp (buildApplication)
+import Data.Aeson (FromJSON (..), eitherDecode, encode, withObject, (.:))
+import qualified Data.ByteString as BS
+import qualified Data.ByteString.Lazy as BL
+import qualified Data.ByteString.Lazy.Char8 as BL8
 import Data.List (find, isInfixOf)
+import Network.HTTP.Types (Header, hContentType, methodGet, methodPost, status200, status400)
+import qualified Network.Wai as Wai
+import Network.Wai (Application)
+import Network.Wai.Test (SRequest (..), SResponse (..), defaultRequest, runSession, setPath, srequest)
 import Paths_car_ownership_cost_sim (getDataFileName)
 import Test.HUnit
 
@@ -48,6 +59,13 @@ tests =
       TestLabel "FuelEconomy fixtures decode vehicle details" fuelEconomyFixtureDecodingTest,
       TestLabel "source seeds build catalog entries from official fixtures" sourceSeedCatalogBuildTest,
       TestLabel "source seed validation rejects wrong vPIC model matches" sourceSeedValidationFailureTest,
+      TestLabel "API example route returns a valid simulation request" apiExampleRouteTest,
+      TestLabel "web asset routes boot successfully" webAssetRoutesSmokeTest,
+      TestLabel "API catalog and preset routes stay aligned" apiCatalogAndPresetsRouteTest,
+      TestLabel "API simulate route returns a valid simulation response" apiSimulateRouteTest,
+      TestLabel "API simulate rejects malformed and invalid input" apiSimulateErrorRoutesTest,
+      TestLabel "simulation is deterministic for a fixed seed" simulationDeterminismTest,
+      TestLabel "simulation invariants hold across many seeds" simulationInvariantsAcrossSeedsTest,
       TestLabel "summary statistics stay ordered" summaryOrderingTest,
       TestLabel "invalid input is rejected" invalidInputValidationTest
     ]
@@ -492,6 +510,111 @@ sourceSeedValidationFailureTest =
       Right _ ->
         assertFailure "Expected the source seed validation to reject the wrong base model."
 
+apiExampleRouteTest :: Test
+apiExampleRouteTest =
+  TestCase $ do
+    testApplication <- buildTestApplication
+    response <- runRequest testApplication methodGet "/api/example" BL.empty []
+    assertEqual "example route returns 200" status200 (simpleStatus response)
+    decodedRequest <-
+      either
+        (\decodeError -> assertFailure ("Example route did not return a valid simulation request: " <> decodeError) >> pure exampleSimulationRequest)
+        pure
+        (eitherDecode (simpleBody response))
+    assertEqual "example route stays in sync with the example request" exampleSimulationRequest decodedRequest
+
+apiCatalogAndPresetsRouteTest :: Test
+apiCatalogAndPresetsRouteTest =
+  TestCase $ do
+    testApplication <- buildTestApplication
+    expectedVehicleCatalog <- loadDefaultVehicleCatalog
+    catalogResponse <- runRequest testApplication methodGet "/api/catalog" BL.empty []
+    presetsResponse <- runRequest testApplication methodGet "/api/presets" BL.empty []
+    assertEqual "catalog route returns 200" status200 (simpleStatus catalogResponse)
+    assertEqual "presets route returns 200" status200 (simpleStatus presetsResponse)
+    decodedVehicleCatalog <-
+      either
+        (\decodeError -> assertFailure ("Catalog route did not return valid JSON: " <> decodeError) >> pure [])
+        pure
+        (eitherDecode (simpleBody catalogResponse))
+    decodedPresetArray <-
+      either
+        (\decodeError -> assertFailure ("Presets route did not return valid JSON: " <> decodeError) >> pure ([] :: [VehiclePreset]))
+        pure
+        (eitherDecode (simpleBody presetsResponse))
+    assertEqual "catalog route returns the loaded bundled catalog" expectedVehicleCatalog decodedVehicleCatalog
+    assertEqual "preset route count stays aligned with catalog entries" (length expectedVehicleCatalog) (length decodedPresetArray)
+
+webAssetRoutesSmokeTest :: Test
+webAssetRoutesSmokeTest =
+  TestCase $ do
+    testApplication <- buildTestApplication
+    homeResponse <- runRequest testApplication methodGet "/" BL.empty []
+    stylesResponse <- runRequest testApplication methodGet "/styles.css" BL.empty []
+    scriptResponse <- runRequest testApplication methodGet "/app.js" BL.empty []
+    let homeBody = BL8.unpack (simpleBody homeResponse)
+        stylesBody = BL8.unpack (simpleBody stylesResponse)
+        scriptBody = BL8.unpack (simpleBody scriptResponse)
+    assertEqual "home route returns 200" status200 (simpleStatus homeResponse)
+    assertEqual "styles route returns 200" status200 (simpleStatus stylesResponse)
+    assertEqual "script route returns 200" status200 (simpleStatus scriptResponse)
+    assertBool "home route contains the simulation form" ("sim-form" `contains` homeBody)
+    assertBool "styles route serves CSS" ("body" `contains` stylesBody)
+    assertBool "script route serves the frontend bootstrap" ("loadVehiclePresets" `contains` scriptBody)
+
+apiSimulateRouteTest :: Test
+apiSimulateRouteTest =
+  TestCase $ do
+    testApplication <- buildTestApplication
+    let requestPayload = encode exampleSimulationRequest {requestSeed = Just 20260416}
+    response <- runRequest testApplication methodPost "/api/simulate" requestPayload [(hContentType, "application/json")]
+    assertEqual "simulate route returns 200" status200 (simpleStatus response)
+    decodedResponse <-
+      either
+        (\decodeError -> assertFailure ("Simulate route did not return a valid simulation response: " <> decodeError) >> pure (simulateRequestWithSeed 20260416 exampleSimulationRequest))
+        pure
+        (eitherDecode (simpleBody response))
+    assertEqual "simulate route uses the provided seed" 20260416 (responseSeedUsed decodedResponse)
+    assertEqual "simulate route preserves iteration count" (requestIterations exampleSimulationRequest) (summaryIterations (responseSummary decodedResponse))
+    assertEqual "simulate route returns one yearly row per modeled year" (simulationYearsOwned (requestInput exampleSimulationRequest)) (length (responseExampleYearlyBreakdown decodedResponse))
+
+apiSimulateErrorRoutesTest :: Test
+apiSimulateErrorRoutesTest =
+  TestCase $ do
+    testApplication <- buildTestApplication
+    malformedResponse <- runRequest testApplication methodPost "/api/simulate" "{not valid json" [(hContentType, "application/json")]
+    invalidResponse <- runRequest testApplication methodPost "/api/simulate" (encode invalidSimulationRequest) [(hContentType, "application/json")]
+    assertEqual "malformed JSON returns 400" status400 (simpleStatus malformedResponse)
+    assertEqual "invalid input returns 400" status400 (simpleStatus invalidResponse)
+    malformedError <-
+      either
+        (\decodeError -> assertFailure ("Malformed error payload was not valid JSON: " <> decodeError) >> pure fallbackErrorPayload)
+        pure
+        (eitherDecode (simpleBody malformedResponse))
+    invalidError <-
+      either
+        (\decodeError -> assertFailure ("Validation error payload was not valid JSON: " <> decodeError) >> pure fallbackErrorPayload)
+        pure
+        (eitherDecode (simpleBody invalidResponse))
+    assertEqual "malformed JSON response uses the expected message" "Invalid JSON payload" (errorPayloadMessage malformedError)
+    assertEqual "validation response uses the expected message" "Invalid simulation input" (errorPayloadMessage invalidError)
+    assertBool "validation details include iteration guidance" ("Iterations must be at least 1." `elem` errorPayloadDetails invalidError)
+
+simulationDeterminismTest :: Test
+simulationDeterminismTest =
+  TestCase $ do
+    let fixedSeed = 20260416
+        firstResponse = simulateRequestWithSeed fixedSeed exampleSimulationRequest
+        secondResponse = simulateRequestWithSeed fixedSeed exampleSimulationRequest
+        changedSeedResponse = simulateRequestWithSeed (fixedSeed + 1) exampleSimulationRequest
+    assertEqual "running the same seed twice gives the same response" firstResponse secondResponse
+    assertBool "changing the seed changes the sample totals for the uncertain model" (responseSampleTotals firstResponse /= responseSampleTotals changedSeedResponse)
+
+simulationInvariantsAcrossSeedsTest :: Test
+simulationInvariantsAcrossSeedsTest =
+  TestCase $
+    mapM_ assertResponseInvariants [1 .. 25]
+
 summaryOrderingTest :: Test
 summaryOrderingTest =
   TestCase $ do
@@ -622,6 +745,47 @@ loadDefaultVehicleSourceSeeds = do
   sourceSeedPath <- getDataFileName defaultVehicleCatalogSourceSeedsRelativePath
   loadVehicleCatalogSourceSeeds sourceSeedPath
 
+loadDefaultVehicleCatalog :: IO [VehicleCatalogEntry]
+loadDefaultVehicleCatalog = do
+  catalogPath <- getDataFileName defaultVehicleCatalogRelativePath
+  loadVehicleCatalog catalogPath
+
+buildTestApplication :: IO Application
+buildTestApplication = do
+  vehicleCatalog <- loadDefaultVehicleCatalog
+  buildApplication vehicleCatalog
+
+runRequest ::
+  Application ->
+  BS.ByteString ->
+  BS.ByteString ->
+  BL.ByteString ->
+  [Header] ->
+  IO SResponse
+runRequest testApplication requestMethod requestPath requestBody requestHeaders =
+  let testRequest =
+        (setPath defaultRequest requestPath)
+          { Wai.requestMethod = requestMethod,
+            Wai.requestHeaders = requestHeaders
+          }
+      sessionRequest = SRequest testRequest requestBody
+   in runSession (srequest sessionRequest) testApplication
+
+assertResponseInvariants :: Int -> Assertion
+assertResponseInvariants seed = do
+  let response = simulateRequestWithSeed seed exampleSimulationRequest
+      summary = responseSummary response
+      totals = responseSampleTotals response
+      totalMiles = summaryTotalMilesDriven summary
+      yearlyBreakdown = responseExampleYearlyBreakdown response
+  assertEqual "iteration count stays aligned" (requestIterations exampleSimulationRequest) (summaryIterations summary)
+  assertEqual "sample total count stays aligned" (requestIterations exampleSimulationRequest) (length totals)
+  assertEqual "yearly breakdown length stays aligned" (simulationYearsOwned (requestInput exampleSimulationRequest)) (length yearlyBreakdown)
+  assertBool "totals stay ordered from min to max" (summaryMinTotalCost summary <= summaryMeanTotalCost summary && summaryMeanTotalCost summary <= summaryMaxTotalCost summary)
+  assertBool "percentiles stay ordered" (summaryP10TotalCost summary <= summaryMedianTotalCost summary && summaryMedianTotalCost summary <= summaryP90TotalCost summary)
+  assertMaybeClose "mean cost per mile stays consistent with mean total cost" (summaryMeanTotalCost summary / totalMiles) (summaryMeanCostPerMile summary)
+  assertBool "all yearly totals stay non-negative" (all (\yearBreakdown -> yearlyTotalCost yearBreakdown >= 0) yearlyBreakdown)
+
 lookupVehicleSourceSeed :: String -> [VehicleCatalogSourceSeed] -> Maybe VehicleCatalogSourceSeed
 lookupVehicleSourceSeed sourceSeedId =
   find (\sourceSeed -> sourceCatalogId sourceSeed == sourceSeedId)
@@ -648,6 +812,77 @@ decodeFuelEconomyFixture fixturePath = do
 contains :: String -> String -> Bool
 contains needle haystack =
   needle `isInfixOf` haystack
+
+data ErrorPayload = ErrorPayload
+  { errorPayloadMessage :: String,
+    errorPayloadDetails :: [String]
+  }
+  deriving (Eq, Show)
+
+instance FromJSON ErrorPayload where
+  parseJSON =
+    withObject "ErrorPayload" $ \objectValue ->
+      ErrorPayload
+        <$> objectValue .: "error"
+        <*> objectValue .: "details"
+
+fallbackErrorPayload :: ErrorPayload
+fallbackErrorPayload =
+  ErrorPayload
+    { errorPayloadMessage = "fallback",
+      errorPayloadDetails = []
+    }
+
+invalidSimulationRequest :: SimulationRequest
+invalidSimulationRequest =
+  SimulationRequest
+    { requestIterations = 0,
+      requestSeed = Nothing,
+      requestInput =
+        SimulationInput
+          { simulationPurchasePrice = 20000,
+            simulationDownPayment = 25000,
+            simulationSalesTaxRate = 1.2,
+            simulationUpfrontFees = -1,
+            simulationAnnualInflationRate = 1.2,
+            simulationYearsOwned = 0,
+            simulationAnnualMiles = 12000,
+            simulationMilesPerGallon = 0,
+            simulationAnnualInsurance = 1500,
+            simulationAnnualRegistration = 180,
+            simulationLoanApr = 1.2,
+            simulationLoanTermMonths = -12,
+            simulationRepairShockProbability = 1.2,
+            simulationRepairShockCost =
+              BoundedNormal
+                { boundedNormalMean = 1000,
+                  boundedNormalStdDev = -5,
+                  boundedNormalLowerBound = 0,
+                  boundedNormalUpperBound = Just 2000
+                },
+            simulationFuelPrice =
+              BoundedNormal
+                { boundedNormalMean = 3.5,
+                  boundedNormalStdDev = 0.4,
+                  boundedNormalLowerBound = 2,
+                  boundedNormalUpperBound = Just 5
+                },
+            simulationAnnualMaintenance =
+              BoundedNormal
+                { boundedNormalMean = 800,
+                  boundedNormalStdDev = 200,
+                  boundedNormalLowerBound = 200,
+                  boundedNormalUpperBound = Just 2000
+                },
+            simulationAnnualDepreciationRate =
+              BoundedNormal
+                { boundedNormalMean = 1.1,
+                  boundedNormalStdDev = 0.1,
+                  boundedNormalLowerBound = 0,
+                  boundedNormalUpperBound = Just 1.2
+                }
+          }
+    }
 
 fallbackBoundedNormal :: BoundedNormal
 fallbackBoundedNormal =

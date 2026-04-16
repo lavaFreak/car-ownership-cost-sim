@@ -9,7 +9,7 @@ where
 
 import CarOwnershipCostSim.Types (BoundedNormal)
 import CarOwnershipCostSim.VehicleCatalog (VehicleCatalogEntry (..))
-import Data.Aeson (ToJSON)
+import Data.Aeson (FromJSON, ToJSON)
 import GHC.Generics (Generic)
 
 data VehiclePreset = VehiclePreset
@@ -26,6 +26,8 @@ data VehiclePreset = VehiclePreset
     presetRepairShockCost :: BoundedNormal
   }
   deriving (Eq, Show, Generic)
+
+instance FromJSON VehiclePreset
 
 instance ToJSON VehiclePreset
 
