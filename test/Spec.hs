@@ -2,6 +2,7 @@ module Main (main) where
 
 import CarOwnershipCostSim.Simulation (simulateRequestWithSeed, validateSimulationRequest)
 import CarOwnershipCostSim.Types
+import CarOwnershipCostSim.VehiclePresets (VehiclePreset (..), vehiclePresets)
 import Test.HUnit
 
 main :: IO ()
@@ -18,6 +19,7 @@ tests =
       TestLabel "purchase taxes and fees are included" purchaseTaxAndFeesTest,
       TestLabel "inflation raises later-year recurring costs" inflationTest,
       TestLabel "repair shocks add tail-risk costs" repairShockTest,
+      TestLabel "vehicle presets stay usable" vehiclePresetsTest,
       TestLabel "summary statistics stay ordered" summaryOrderingTest,
       TestLabel "invalid input is rejected" invalidInputValidationTest
     ]
@@ -294,6 +296,12 @@ repairShockTest =
         assertClose "year one total includes repair shock" 13500 (yearlyTotalCost yearOne)
       _ -> assertFailure "Expected exactly one yearly breakdown row."
 
+vehiclePresetsTest :: Test
+vehiclePresetsTest =
+  TestCase $ do
+    assertBool "at least three presets are available" (length vehiclePresets >= 3)
+    mapM_ assertVehiclePresetLooksUsable vehiclePresets
+
 summaryOrderingTest :: Test
 summaryOrderingTest =
   TestCase $ do
@@ -394,3 +402,10 @@ assertMaybeClose label expected maybeActual =
   case maybeActual of
     Nothing -> assertFailure (label <> ": expected a value, got Nothing")
     Just actual -> assertClose label expected actual
+
+assertVehiclePresetLooksUsable :: VehiclePreset -> Assertion
+assertVehiclePresetLooksUsable preset = do
+  assertBool "preset has a name" (not (null (presetName preset)))
+  assertBool "preset purchase price is positive" (presetPurchasePrice preset > 0)
+  assertBool "preset MPG is positive" (presetMilesPerGallon preset > 0)
+  assertBool "preset repair shock probability is in range" (presetRepairShockProbability preset >= 0 && presetRepairShockProbability preset <= 1)

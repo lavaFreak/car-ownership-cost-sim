@@ -4,6 +4,7 @@ module Main (main) where
 
 import CarOwnershipCostSim.Simulation (simulateRequestWithSeed, validateSimulationRequest)
 import CarOwnershipCostSim.Types (SimulationRequest (..), exampleSimulationRequest)
+import CarOwnershipCostSim.VehiclePresets (vehiclePresets)
 import Data.Aeson ((.=), eitherDecode, object)
 import Network.HTTP.Types.Status (status400)
 import System.Random (randomIO)
@@ -24,6 +25,9 @@ main = scotty 3000 $ do
 
   get "/api/example" $
     json exampleSimulationRequest
+
+  get "/api/presets" $
+    json vehiclePresets
 
   post "/api/simulate" $ do
     requestBody <- body

@@ -163,7 +163,8 @@ label:last-child {
   margin-bottom: 0;
 }
 
-input {
+input,
+select {
   width: 100%;
   padding: 0.85rem 0.95rem;
   border: 1px solid rgba(31, 38, 48, 0.14);
@@ -173,7 +174,8 @@ input {
   font: inherit;
 }
 
-input:focus {
+input:focus,
+select:focus {
   outline: 2px solid rgba(184, 95, 54, 0.25);
   outline-offset: 1px;
   border-color: rgba(184, 95, 54, 0.45);
@@ -212,6 +214,20 @@ button:disabled {
   cursor: wait;
   opacity: 0.78;
   transform: none;
+}
+
+.preset-shell {
+  margin-bottom: 1rem;
+  padding: 1rem;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.45);
+}
+
+.preset-description {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.5;
 }
 
 .feedback-panel {

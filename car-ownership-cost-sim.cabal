@@ -27,6 +27,7 @@ library
         CarOwnershipCostSim.Simulation
         CarOwnershipCostSim.Statistics
         CarOwnershipCostSim.Types
+        CarOwnershipCostSim.VehiclePresets
     build-depends:
         base >=4.18 && <4.21,
         aeson >=2.1 && <2.3,

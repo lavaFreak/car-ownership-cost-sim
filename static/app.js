@@ -1,4 +1,6 @@
 const form = document.getElementById("sim-form");
+const vehiclePresetSelect = document.getElementById("vehicle-preset");
+const presetDescription = document.getElementById("preset-description");
 const submitButton = form.querySelector('button[type="submit"]');
 const statusLine = document.getElementById("status-line");
 const formFeedback = document.getElementById("form-feedback");
@@ -25,6 +27,7 @@ const preciseCurrency = new Intl.NumberFormat("en-US", {
 });
 
 let hasSuccessfulRun = false;
+let vehiclePresets = [];
 
 function fieldValue(name) {
   return form.elements[name].value.trim();
@@ -42,6 +45,15 @@ function numericValue(name) {
 
 function optionalIntegerValue(name) {
   return numericValue(name);
+}
+
+function setNumericField(name, value) {
+  const field = form.elements[name];
+  if (!field || value === null || value === undefined || Number.isNaN(value)) {
+    return;
+  }
+
+  field.value = String(value);
 }
 
 function collectFormValues() {
@@ -79,6 +91,63 @@ function buildBoundedNormal(mean, stdDev, floor, ceiling) {
     boundedNormalLowerBound: floor,
     boundedNormalUpperBound: ceiling,
   };
+}
+
+function presetDescriptionText(preset) {
+  return `${preset.presetDescription} Prefills price, MPG, insurance, registration, maintenance, depreciation, and repair-risk assumptions.`;
+}
+
+function applyVehiclePreset(preset) {
+  setNumericField("purchasePrice", Math.round(preset.presetPurchasePrice));
+  setNumericField("milesPerGallon", preset.presetMilesPerGallon);
+  setNumericField("annualInsurance", Math.round(preset.presetAnnualInsurance));
+  setNumericField("annualRegistration", Math.round(preset.presetAnnualRegistration));
+  setNumericField("maintenanceMean", Math.round(preset.presetAnnualMaintenance.boundedNormalMean));
+  setNumericField("maintenanceStdDev", Math.round(preset.presetAnnualMaintenance.boundedNormalStdDev));
+  setNumericField("depreciationMeanPercent", (preset.presetAnnualDepreciationRate.boundedNormalMean * 100).toFixed(1));
+  setNumericField(
+    "depreciationStdDevPercent",
+    (preset.presetAnnualDepreciationRate.boundedNormalStdDev * 100).toFixed(1)
+  );
+  setNumericField("repairShockProbabilityPercent", Math.round(preset.presetRepairShockProbability * 100));
+  setNumericField("repairShockMean", Math.round(preset.presetRepairShockCost.boundedNormalMean));
+  setNumericField("repairShockStdDev", Math.round(preset.presetRepairShockCost.boundedNormalStdDev));
+
+  clearFieldErrors();
+  hideFeedback(formFeedback);
+  presetDescription.textContent = presetDescriptionText(preset);
+  statusLine.textContent = `Applied the ${preset.presetName} preset. Review the assumptions, then run the simulation.`;
+}
+
+function populateVehiclePresets(presets) {
+  vehiclePresetSelect.innerHTML = `
+    <option value="">Custom / starter assumptions</option>
+    ${presets
+      .map(
+        (preset) => `
+          <option value="${preset.presetId}">${preset.presetName}</option>
+        `
+      )
+      .join("")}
+  `;
+}
+
+async function loadVehiclePresets() {
+  try {
+    const response = await fetch("/api/presets");
+    const payload = await response.json();
+
+    if (!response.ok || !Array.isArray(payload)) {
+      throw new Error("Vehicle presets could not be loaded.");
+    }
+
+    vehiclePresets = payload;
+    populateVehiclePresets(vehiclePresets);
+  } catch (error) {
+    vehiclePresetSelect.innerHTML = '<option value="">Presets unavailable</option>';
+    presetDescription.textContent =
+      error.message || "Vehicle presets could not be loaded, so the starter assumptions are still available.";
+  }
 }
 
 function buildRequestPayload(values) {
@@ -760,5 +829,23 @@ form.addEventListener("submit", (event) => {
   runSimulation();
 });
 
+vehiclePresetSelect.addEventListener("change", (event) => {
+  const presetId = event.target.value;
+
+  if (!presetId) {
+    presetDescription.textContent =
+      "Pick a curated vehicle profile to prefill car-specific assumptions without changing your mileage or loan setup.";
+    return;
+  }
+
+  const preset = vehiclePresets.find((item) => item.presetId === presetId);
+  if (!preset) {
+    return;
+  }
+
+  applyVehiclePreset(preset);
+});
+
 renderInitialResultsState();
+loadVehiclePresets();
 runSimulation();
