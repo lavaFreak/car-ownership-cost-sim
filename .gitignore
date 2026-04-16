@@ -1,0 +1,17 @@
+dist-newstyle/
+.cabal-sandbox/
+cabal.project.local
+cabal.project.local~
+.ghc.environment.*
+*.hi
+*.hie
+*.o
+*.chi
+*.chs.h
+*.dyn_hi
+*.dyn_o
+*.prof
+*.aux
+*.hp
+*.eventlog
+.DS_Store

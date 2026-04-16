@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Car Ownership Cost Simulation</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <main class="page-shell">
+      <section class="hero panel">
+        <p class="eyebrow">Monte Carlo Cost Explorer</p>
+        <h1>Estimate what owning a car could really cost.</h1>
+        <p class="hero-copy">
+          This MVP simulates fuel prices, maintenance, and depreciation instead
+          of assuming one perfect future. Use it to see a realistic spread of
+          outcomes for the same vehicle.
+        </p>
+      </section>
+
+      <section class="workspace">
+        <section class="panel input-panel">
+          <div class="panel-heading">
+            <h2>Scenario Inputs</h2>
+            <p>Tune the assumptions, then run thousands of possible ownership paths.</p>
+          </div>
+
+          <form id="sim-form">
+            <fieldset>
+              <legend>Vehicle and usage</legend>
+
+              <label>
+                Purchase price
+                <input name="purchasePrice" type="number" min="0" step="100" value="32000" required />
+              </label>
+
+              <label>
+                Down payment
+                <input name="downPayment" type="number" min="0" step="100" value="5000" required />
+              </label>
+
+              <label>
+                Years owned
+                <input name="yearsOwned" type="number" min="1" step="1" value="5" required />
+              </label>
+
+              <label>
+                Annual miles
+                <input name="annualMiles" type="number" min="0" step="500" value="12000" required />
+              </label>
+
+              <label>
+                Fuel efficiency (MPG)
+                <input name="milesPerGallon" type="number" min="1" step="0.1" value="32" required />
+              </label>
+            </fieldset>
+
+            <fieldset>
+              <legend>Fixed annual costs</legend>
+
+              <label>
+                Insurance
+                <input name="annualInsurance" type="number" min="0" step="50" value="1800" required />
+              </label>
+
+              <label>
+                Registration
+                <input name="annualRegistration" type="number" min="0" step="10" value="220" required />
+              </label>
+            </fieldset>
+
+            <fieldset>
+              <legend>Financing</legend>
+
+              <label>
+                Loan APR (%)
+                <input name="loanAprPercent" type="number" min="0" max="100" step="0.1" value="6.1" required />
+              </label>
+
+              <label>
+                Loan term (months)
+                <input name="loanTermMonths" type="number" min="0" step="1" value="60" required />
+              </label>
+            </fieldset>
+
+            <fieldset>
+              <legend>Uncertainty assumptions</legend>
+
+              <label>
+                Fuel price mean ($/gal)
+                <input name="fuelMean" type="number" min="0" step="0.05" value="3.75" required />
+              </label>
+
+              <label>
+                Fuel price std dev
+                <input name="fuelStdDev" type="number" min="0" step="0.05" value="0.55" required />
+              </label>
+
+              <label>
+                Maintenance mean ($/year)
+                <input name="maintenanceMean" type="number" min="0" step="25" value="850" required />
+              </label>
+
+              <label>
+                Maintenance std dev
+                <input name="maintenanceStdDev" type="number" min="0" step="25" value="250" required />
+              </label>
+
+              <label>
+                Depreciation mean (%/year)
+                <input name="depreciationMeanPercent" type="number" min="0" max="60" step="0.5" value="16" required />
+              </label>
+
+              <label>
+                Depreciation std dev
+                <input name="depreciationStdDevPercent" type="number" min="0" max="30" step="0.5" value="4" required />
+              </label>
+            </fieldset>
+
+            <fieldset>
+              <legend>Simulation controls</legend>
+
+              <label>
+                Iterations
+                <input name="iterations" type="number" min="1" max="100000" step="100" value="2500" required />
+              </label>
+
+              <label>
+                Seed (optional)
+                <input name="seed" type="number" step="1" value="20260415" />
+              </label>
+            </fieldset>
+
+            <button type="submit">Run simulation</button>
+            <div id="form-feedback" class="feedback-panel" hidden aria-live="polite"></div>
+          </form>
+        </section>
+
+        <section class="panel results-panel">
+          <div class="panel-heading">
+            <h2>Results</h2>
+            <p id="status-line">Use the starter assumptions or model a car you already have in mind.</p>
+          </div>
+
+          <div class="results-callout">
+            <h3 id="results-callout-title">How to read the results</h3>
+            <p id="results-callout-copy">
+              Average cost is the across-run mean. Median is the middle outcome.
+              The 10th to 90th percentile band gives a practical low-to-high
+              range, not a guarantee.
+            </p>
+          </div>
+
+          <div id="results-feedback" class="feedback-panel" hidden aria-live="polite"></div>
+
+          <div id="summary-grid" class="summary-grid"></div>
+
+          <div class="chart-shell">
+            <canvas id="distribution-chart" width="800" height="320" aria-label="Simulated cost distribution"></canvas>
+          </div>
+
+          <div class="breakdown-shell">
+            <h3>One sampled scenario</h3>
+            <div id="breakdown-grid" class="breakdown-grid"></div>
+          </div>
+        </section>
+      </section>
+    </main>
+
+    <script src="/app.js" defer></script>
+  </body>
+</html>
