@@ -1,0 +1,134 @@
+[
+  {
+    "sourceCatalogId": "corolla-hybrid-2024",
+    "sourceDescription": "Efficient compact sedan with low operating costs and modest depreciation.",
+    "sourceYear": 2024,
+    "sourceMake": "Toyota",
+    "sourceCatalogModel": "Corolla Hybrid",
+    "sourceTrim": "LE",
+    "sourceBaseModel": "Corolla",
+    "sourceFuelEconomyVehicleId": 47339,
+    "sourcePurchasePrice": 25100,
+    "sourceAnnualInsurance": 1650,
+    "sourceAnnualRegistration": 220,
+    "sourceAnnualMaintenance": {
+      "boundedNormalMean": 520,
+      "boundedNormalStdDev": 140,
+      "boundedNormalLowerBound": 220,
+      "boundedNormalUpperBound": 1400
+    },
+    "sourceAnnualDepreciationRate": {
+      "boundedNormalMean": 0.13,
+      "boundedNormalStdDev": 0.03,
+      "boundedNormalLowerBound": 0.05,
+      "boundedNormalUpperBound": 0.24
+    },
+    "sourceRepairShockProbability": 0.08,
+    "sourceRepairShockCost": {
+      "boundedNormalMean": 1200,
+      "boundedNormalStdDev": 500,
+      "boundedNormalLowerBound": 300,
+      "boundedNormalUpperBound": 3200
+    },
+    "sourceSourceUpdatedAt": "2026-04-16"
+  },
+  {
+    "sourceCatalogId": "civic-hatchback-2024",
+    "sourceDescription": "Balanced compact daily driver with moderate maintenance and resale assumptions.",
+    "sourceYear": 2024,
+    "sourceMake": "Honda",
+    "sourceCatalogModel": "Civic Hatchback",
+    "sourceTrim": "EX-L",
+    "sourceBaseModel": "Civic",
+    "sourceFuelEconomyVehicleId": 47097,
+    "sourcePurchasePrice": 30100,
+    "sourceAnnualInsurance": 1780,
+    "sourceAnnualRegistration": 235,
+    "sourceAnnualMaintenance": {
+      "boundedNormalMean": 640,
+      "boundedNormalStdDev": 180,
+      "boundedNormalLowerBound": 260,
+      "boundedNormalUpperBound": 1800
+    },
+    "sourceAnnualDepreciationRate": {
+      "boundedNormalMean": 0.145,
+      "boundedNormalStdDev": 0.035,
+      "boundedNormalLowerBound": 0.06,
+      "boundedNormalUpperBound": 0.27
+    },
+    "sourceRepairShockProbability": 0.1,
+    "sourceRepairShockCost": {
+      "boundedNormalMean": 1500,
+      "boundedNormalStdDev": 650,
+      "boundedNormalLowerBound": 400,
+      "boundedNormalUpperBound": 4200
+    },
+    "sourceSourceUpdatedAt": "2026-04-16"
+  },
+  {
+    "sourceCatalogId": "rav4-hybrid-2024",
+    "sourceDescription": "Popular hybrid crossover with higher price, higher insurance, and strong MPG.",
+    "sourceYear": 2024,
+    "sourceMake": "Toyota",
+    "sourceCatalogModel": "RAV4 Hybrid",
+    "sourceTrim": "XLE",
+    "sourceBaseModel": "RAV4",
+    "sourceFuelEconomyVehicleId": 47392,
+    "sourcePurchasePrice": 34300,
+    "sourceAnnualInsurance": 1940,
+    "sourceAnnualRegistration": 250,
+    "sourceAnnualMaintenance": {
+      "boundedNormalMean": 760,
+      "boundedNormalStdDev": 230,
+      "boundedNormalLowerBound": 320,
+      "boundedNormalUpperBound": 2200
+    },
+    "sourceAnnualDepreciationRate": {
+      "boundedNormalMean": 0.15,
+      "boundedNormalStdDev": 0.035,
+      "boundedNormalLowerBound": 0.07,
+      "boundedNormalUpperBound": 0.28
+    },
+    "sourceRepairShockProbability": 0.12,
+    "sourceRepairShockCost": {
+      "boundedNormalMean": 1800,
+      "boundedNormalStdDev": 800,
+      "boundedNormalLowerBound": 450,
+      "boundedNormalUpperBound": 5200
+    },
+    "sourceSourceUpdatedAt": "2026-04-16"
+  },
+  {
+    "sourceCatalogId": "outback-2024",
+    "sourceDescription": "Wagon-style AWD option with higher fuel use and slightly heavier repair risk.",
+    "sourceYear": 2024,
+    "sourceMake": "Subaru",
+    "sourceCatalogModel": "Outback",
+    "sourceTrim": "Premium",
+    "sourceBaseModel": "Outback",
+    "sourceFuelEconomyVehicleId": 46541,
+    "sourcePurchasePrice": 32900,
+    "sourceAnnualInsurance": 2010,
+    "sourceAnnualRegistration": 245,
+    "sourceAnnualMaintenance": {
+      "boundedNormalMean": 880,
+      "boundedNormalStdDev": 260,
+      "boundedNormalLowerBound": 360,
+      "boundedNormalUpperBound": 2500
+    },
+    "sourceAnnualDepreciationRate": {
+      "boundedNormalMean": 0.155,
+      "boundedNormalStdDev": 0.04,
+      "boundedNormalLowerBound": 0.07,
+      "boundedNormalUpperBound": 0.3
+    },
+    "sourceRepairShockProbability": 0.15,
+    "sourceRepairShockCost": {
+      "boundedNormalMean": 2100,
+      "boundedNormalStdDev": 900,
+      "boundedNormalLowerBound": 500,
+      "boundedNormalUpperBound": 5800
+    },
+    "sourceSourceUpdatedAt": "2026-04-16"
+  }
+]

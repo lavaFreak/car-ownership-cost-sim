@@ -1,0 +1,49 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Set up GHC and Cabal
+        uses: haskell-actions/setup@v2
+        with:
+          ghc-version: "9.6.7"
+          cabal-version: "3.12.1.0"
+
+      - name: Cache cabal store
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cabal/packages
+            ~/.cabal/store
+            dist-newstyle
+          key: ${{ runner.os }}-ghc-9.6.7-cabal-${{ hashFiles('car-ownership-cost-sim.cabal') }}
+          restore-keys: |
+            ${{ runner.os }}-ghc-9.6.7-cabal-
+
+      - name: Update cabal package index
+        run: cabal update
+
+      - name: Build
+        run: cabal build
+
+      - name: Test
+        run: cabal test
+
+      - name: Check frontend script syntax
+        run: node --check static/app.js

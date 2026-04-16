@@ -71,12 +71,18 @@ the core simulation code.
   Contains the Monte Carlo engine and ownership cost calculations.
 - `src/CarOwnershipCostSim/Statistics.hs`
   Provides summary helpers such as mean and percentile calculations.
+- `src/CarOwnershipCostSim/VehicleCatalog.hs`
+  Defines the normalized local vehicle catalog and shared catalog-facing types.
+- `src/CarOwnershipCostSim/VehicleCatalogImport.hs`
+  Parses official `vPIC` and `FuelEconomy.gov` payloads into catalog entries.
 - `app/Main.hs`
   Runs the Scotty server and exposes the web routes and API endpoints.
+- `app/BuildCatalog.hs`
+  Rebuilds the local vehicle catalog from API-backed source seeds.
 - `static/`
   Contains the browser UI.
 - `test/Spec.hs`
-  Holds deterministic tests for the current model.
+  Holds deterministic tests for the simulation model and data-import pipeline.
 
 ## Current Cost Model
 
@@ -140,6 +146,24 @@ cabal run car-ownership-cost-sim
 
 Then open `http://localhost:3000`.
 
+For a quick local verification pass:
+
+```bash
+./scripts/run-checks.sh
+```
+
+To rebuild the local catalog from the current API-backed source seeds:
+
+```bash
+cabal run build-vehicle-catalog
+```
+
+To write a preview catalog somewhere else without touching the checked-in file:
+
+```bash
+cabal run build-vehicle-catalog -- /tmp/vehicle-catalog.json
+```
+
 ## Development Plan
 
 ### Phase 1: Core simulation
@@ -184,7 +208,12 @@ The repository already includes an initial simulation engine, a Scotty-based web
 server, a lightweight frontend, curated vehicle presets, and a growing test
 suite. The current app can now model taxes and fees, inflation, repair-shock
 tail risk, yearly sample traces, and catalog-backed vehicle presets while
-keeping the web layer lightweight.
+keeping the web layer lightweight. It also now includes a first importer layer
+that uses curated source seeds plus official `vPIC` and `FuelEconomy.gov`
+payloads to refresh the local vehicle catalog.
+
+The repository also includes a basic GitHub Actions workflow that runs the main
+build and test checks on pushes and pull requests.
 
 For current source research on where to obtain broad vehicle data, see
 `docs/vehicle-data-sourcing.md`.
@@ -195,4 +224,5 @@ For current source research on where to obtain broad vehicle data, see
 - support alternative probability distributions
 - improve the resale model so it is not driven only by annual depreciation
 - add state-specific taxes and registration rules
-- add importers for vPIC and FuelEconomy.gov into the local catalog
+- expand the importer beyond curated vehicle IDs into richer discovery flows
+- broaden automated testing with API-contract, route, and browser-level coverage

@@ -8,7 +8,7 @@
     "catalogModel": "Corolla Hybrid",
     "catalogTrim": "LE",
     "catalogFuelType": "hybrid-gasoline",
-    "catalogCombinedMpg": 47,
+    "catalogCombinedMpg": 50,
     "catalogCityMpg": 53,
     "catalogHighwayMpg": 46,
     "catalogPurchasePrice": 25100,
@@ -33,7 +33,7 @@
       "boundedNormalLowerBound": 300,
       "boundedNormalUpperBound": 3200
     },
-    "catalogSourceName": "catalog-seed",
+    "catalogSourceName": "vpic.nhtsa.dot.gov + fueleconomy.gov",
     "catalogSourceUpdatedAt": "2026-04-16"
   },
   {
@@ -70,7 +70,7 @@
       "boundedNormalLowerBound": 400,
       "boundedNormalUpperBound": 4200
     },
-    "catalogSourceName": "catalog-seed",
+    "catalogSourceName": "vpic.nhtsa.dot.gov + fueleconomy.gov",
     "catalogSourceUpdatedAt": "2026-04-16"
   },
   {
@@ -107,7 +107,7 @@
       "boundedNormalLowerBound": 450,
       "boundedNormalUpperBound": 5200
     },
-    "catalogSourceName": "catalog-seed",
+    "catalogSourceName": "vpic.nhtsa.dot.gov + fueleconomy.gov",
     "catalogSourceUpdatedAt": "2026-04-16"
   },
   {
@@ -119,7 +119,7 @@
     "catalogModel": "Outback",
     "catalogTrim": "Premium",
     "catalogFuelType": "gasoline",
-    "catalogCombinedMpg": 29,
+    "catalogCombinedMpg": 28,
     "catalogCityMpg": 26,
     "catalogHighwayMpg": 32,
     "catalogPurchasePrice": 32900,
@@ -144,7 +144,7 @@
       "boundedNormalLowerBound": 500,
       "boundedNormalUpperBound": 5800
     },
-    "catalogSourceName": "catalog-seed",
+    "catalogSourceName": "vpic.nhtsa.dot.gov + fueleconomy.gov",
     "catalogSourceUpdatedAt": "2026-04-16"
   }
 ]

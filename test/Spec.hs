@@ -11,7 +11,19 @@ import CarOwnershipCostSim.VehicleCatalog
     defaultVehicleCatalogRelativePath,
     loadVehicleCatalog,
   )
+import CarOwnershipCostSim.VehicleCatalogImport
+  ( FuelEconomyVehicleRecord (..),
+    VehicleCatalogSourceSeed (..),
+    VpicModelResult (..),
+    buildCatalogImportSeedFromSourceSeed,
+    buildVehicleCatalogEntryFromSourceSeed,
+    decodeVpicModelResults,
+    defaultVehicleCatalogSourceSeedsRelativePath,
+    loadVehicleCatalogSourceSeeds,
+    parseFuelEconomyVehicleRecord,
+  )
 import CarOwnershipCostSim.VehiclePresets (VehiclePreset (..), vehiclePresetsFromCatalog)
+import Data.List (find, isInfixOf)
 import Paths_car_ownership_cost_sim (getDataFileName)
 import Test.HUnit
 
@@ -31,6 +43,11 @@ tests =
       TestLabel "repair shocks add tail-risk costs" repairShockTest,
       TestLabel "vehicle catalog loads and drives presets" vehicleCatalogTest,
       TestLabel "catalog import seeds build normalized entries" catalogImportSeedTest,
+      TestLabel "vehicle source seeds load cleanly" vehicleSourceSeedLoadTest,
+      TestLabel "vPIC fixtures decode model listings" vpicFixtureDecodingTest,
+      TestLabel "FuelEconomy fixtures decode vehicle details" fuelEconomyFixtureDecodingTest,
+      TestLabel "source seeds build catalog entries from official fixtures" sourceSeedCatalogBuildTest,
+      TestLabel "source seed validation rejects wrong vPIC model matches" sourceSeedValidationFailureTest,
       TestLabel "summary statistics stay ordered" summaryOrderingTest,
       TestLabel "invalid input is rejected" invalidInputValidationTest
     ]
@@ -373,6 +390,108 @@ catalogImportSeedTest =
     assertClose "combined MPG is preserved" 57 (catalogCombinedMpg catalogEntry)
     assertClose "purchase price is preserved" 28900 (catalogPurchasePrice catalogEntry)
 
+vehicleSourceSeedLoadTest :: Test
+vehicleSourceSeedLoadTest =
+  TestCase $ do
+    sourceSeedPath <- getDataFileName defaultVehicleCatalogSourceSeedsRelativePath
+    sourceSeeds <- loadVehicleCatalogSourceSeeds sourceSeedPath
+    assertEqual "the starter source seed set stays at four vehicles" 4 (length sourceSeeds)
+    mapM_ assertVehicleSourceSeedLooksUsable sourceSeeds
+
+vpicFixtureDecodingTest :: Test
+vpicFixtureDecodingTest =
+  TestCase $ do
+    toyotaFixture <- loadFixture "test/fixtures/vpic/toyota-2024-models.json"
+    hondaFixture <- loadFixture "test/fixtures/vpic/honda-2024-models.json"
+    toyotaModels <-
+      either
+        (\decodeError -> assertFailure ("Toyota vPIC fixture did not decode: " <> decodeError) >> pure [])
+        pure
+        (decodeVpicModelResults toyotaFixture)
+    hondaModels <-
+      either
+        (\decodeError -> assertFailure ("Honda vPIC fixture did not decode: " <> decodeError) >> pure [])
+        pure
+        (decodeVpicModelResults hondaFixture)
+    assertBool "Toyota models include Corolla" (any ((== "Corolla") . vpicResultModelName) toyotaModels)
+    assertBool "Toyota models include RAV4" (any ((== "RAV4") . vpicResultModelName) toyotaModels)
+    assertBool "Honda models include Civic" (any ((== "Civic") . vpicResultModelName) hondaModels)
+
+fuelEconomyFixtureDecodingTest :: Test
+fuelEconomyFixtureDecodingTest =
+  TestCase $ do
+    corollaFixture <- loadFixture "test/fixtures/fueleconomy/vehicle-47339.xml"
+    civicFixture <- loadFixture "test/fixtures/fueleconomy/vehicle-47097.xml"
+    corollaVehicle <-
+      either
+        (\decodeError -> assertFailure ("Corolla FuelEconomy fixture did not decode: " <> decodeError) >> pure fallbackFuelEconomyVehicleRecord)
+        pure
+        (parseFuelEconomyVehicleRecord corollaFixture)
+    civicVehicle <-
+      either
+        (\decodeError -> assertFailure ("Civic FuelEconomy fixture did not decode: " <> decodeError) >> pure fallbackFuelEconomyVehicleRecord)
+        pure
+        (parseFuelEconomyVehicleRecord civicFixture)
+    assertEqual "Corolla base model is preserved" (Just "Corolla") (fuelEconomyVehicleBaseModel corollaVehicle)
+    assertClose "Corolla combined MPG comes from official data" 50 (fuelEconomyVehicleCombinedMpg corollaVehicle)
+    assertEqual "Civic make is preserved" "Honda" (fuelEconomyVehicleMake civicVehicle)
+    assertClose "Civic city MPG comes from official data" 31 (maybe 0 id (fuelEconomyVehicleCityMpg civicVehicle))
+
+sourceSeedCatalogBuildTest :: Test
+sourceSeedCatalogBuildTest =
+  TestCase $ do
+    sourceSeeds <- loadDefaultVehicleSourceSeeds
+    let maybeCorollaSourceSeed = lookupVehicleSourceSeed "corolla-hybrid-2024" sourceSeeds
+        maybeCivicSourceSeed = lookupVehicleSourceSeed "civic-hatchback-2024" sourceSeeds
+    corollaSourceSeed <-
+      maybe
+        (assertFailure "Corolla source seed was missing." >> pure fallbackVehicleSourceSeed)
+        pure
+        maybeCorollaSourceSeed
+    civicSourceSeed <-
+      maybe
+        (assertFailure "Civic source seed was missing." >> pure fallbackVehicleSourceSeed)
+        pure
+        maybeCivicSourceSeed
+    corollaVpicModels <- decodeVpicFixture "test/fixtures/vpic/toyota-2024-models.json"
+    hondaVpicModels <- decodeVpicFixture "test/fixtures/vpic/honda-2024-models.json"
+    corollaFuelEconomyVehicle <- decodeFuelEconomyFixture "test/fixtures/fueleconomy/vehicle-47339.xml"
+    civicFuelEconomyVehicle <- decodeFuelEconomyFixture "test/fixtures/fueleconomy/vehicle-47097.xml"
+    corollaCatalogEntry <-
+      either
+        (\decodeError -> assertFailure ("Corolla source seed did not build: " <> decodeError) >> pure fallbackVehicleCatalogEntry)
+        pure
+        (buildVehicleCatalogEntryFromSourceSeed corollaSourceSeed corollaVpicModels corollaFuelEconomyVehicle)
+    civicCatalogImportSeed <-
+      either
+        (\decodeError -> assertFailure ("Civic source seed did not build: " <> decodeError) >> pure fallbackCatalogImportSeed)
+        pure
+        (buildCatalogImportSeedFromSourceSeed civicSourceSeed hondaVpicModels civicFuelEconomyVehicle)
+    assertEqual "Corolla catalog name stays presentation-friendly" "2024 Toyota Corolla Hybrid LE" (catalogName corollaCatalogEntry)
+    assertClose "Corolla official combined MPG is carried through" 50 (catalogCombinedMpg corollaCatalogEntry)
+    assertEqual "Corolla fuel type is normalized from official data" "hybrid-gasoline" (catalogFuelType corollaCatalogEntry)
+    assertEqual "Civic import uses curated display model" "Civic Hatchback" (vpicModel (importIdentity civicCatalogImportSeed))
+    assertEqual "Civic import keeps official fuel type mapping" "gasoline" (fuelEconomyFuelType (importFuelEconomy civicCatalogImportSeed))
+
+sourceSeedValidationFailureTest :: Test
+sourceSeedValidationFailureTest =
+  TestCase $ do
+    corollaSourceSeeds <- loadDefaultVehicleSourceSeeds
+    corollaSourceSeed <-
+      maybe
+        (assertFailure "Corolla source seed was missing." >> pure fallbackVehicleSourceSeed)
+        pure
+        (lookupVehicleSourceSeed "corolla-hybrid-2024" corollaSourceSeeds)
+    toyotaVpicModels <- decodeVpicFixture "test/fixtures/vpic/toyota-2024-models.json"
+    corollaFuelEconomyVehicle <- decodeFuelEconomyFixture "test/fixtures/fueleconomy/vehicle-47339.xml"
+    let badSourceSeed = corollaSourceSeed {sourceBaseModel = "NotARealModel"}
+        buildResult = buildCatalogImportSeedFromSourceSeed badSourceSeed toyotaVpicModels corollaFuelEconomyVehicle
+    case buildResult of
+      Left errorMessage ->
+        assertBool "the error points at missing vPIC model support" ("vPIC" `contains` errorMessage)
+      Right _ ->
+        assertFailure "Expected the source seed validation to reject the wrong base model."
+
 summaryOrderingTest :: Test
 summaryOrderingTest =
   TestCase $ do
@@ -489,3 +608,121 @@ assertVehiclePresetLooksUsable preset = do
   assertBool "preset purchase price is positive" (presetPurchasePrice preset > 0)
   assertBool "preset MPG is positive" (presetMilesPerGallon preset > 0)
   assertBool "preset repair shock probability is in range" (presetRepairShockProbability preset >= 0 && presetRepairShockProbability preset <= 1)
+
+assertVehicleSourceSeedLooksUsable :: VehicleCatalogSourceSeed -> Assertion
+assertVehicleSourceSeedLooksUsable sourceSeed = do
+  assertBool "source seed has a catalog id" (not (null (sourceCatalogId sourceSeed)))
+  assertBool "source seed has a make" (not (null (sourceMake sourceSeed)))
+  assertBool "source seed has a display model" (not (null (sourceCatalogModel sourceSeed)))
+  assertBool "source seed has a base model for matching" (not (null (sourceBaseModel sourceSeed)))
+  assertBool "source seed uses a positive FuelEconomy.gov vehicle id" (sourceFuelEconomyVehicleId sourceSeed > 0)
+
+loadDefaultVehicleSourceSeeds :: IO [VehicleCatalogSourceSeed]
+loadDefaultVehicleSourceSeeds = do
+  sourceSeedPath <- getDataFileName defaultVehicleCatalogSourceSeedsRelativePath
+  loadVehicleCatalogSourceSeeds sourceSeedPath
+
+lookupVehicleSourceSeed :: String -> [VehicleCatalogSourceSeed] -> Maybe VehicleCatalogSourceSeed
+lookupVehicleSourceSeed sourceSeedId =
+  find (\sourceSeed -> sourceCatalogId sourceSeed == sourceSeedId)
+
+loadFixture :: FilePath -> IO String
+loadFixture fixturePath = do
+  resolvedPath <- getDataFileName fixturePath
+  readFile resolvedPath
+
+decodeVpicFixture :: FilePath -> IO [VpicModelResult]
+decodeVpicFixture fixturePath = do
+  rawFixture <- loadFixture fixturePath
+  case decodeVpicModelResults rawFixture of
+    Left decodeError -> assertFailure ("Unable to decode vPIC fixture " <> fixturePath <> ": " <> decodeError) >> pure []
+    Right decodedFixture -> pure decodedFixture
+
+decodeFuelEconomyFixture :: FilePath -> IO FuelEconomyVehicleRecord
+decodeFuelEconomyFixture fixturePath = do
+  rawFixture <- loadFixture fixturePath
+  case parseFuelEconomyVehicleRecord rawFixture of
+    Left decodeError -> assertFailure ("Unable to decode FuelEconomy fixture " <> fixturePath <> ": " <> decodeError) >> pure fallbackFuelEconomyVehicleRecord
+    Right decodedFixture -> pure decodedFixture
+
+contains :: String -> String -> Bool
+contains needle haystack =
+  needle `isInfixOf` haystack
+
+fallbackBoundedNormal :: BoundedNormal
+fallbackBoundedNormal =
+  BoundedNormal
+    { boundedNormalMean = 0,
+      boundedNormalStdDev = 0,
+      boundedNormalLowerBound = 0,
+      boundedNormalUpperBound = Just 0
+    }
+
+fallbackVehicleSourceSeed :: VehicleCatalogSourceSeed
+fallbackVehicleSourceSeed =
+  VehicleCatalogSourceSeed
+    { sourceCatalogId = "fallback",
+      sourceDescription = "Fallback source seed for failed test setup.",
+      sourceYear = 2024,
+      sourceMake = "Toyota",
+      sourceCatalogModel = "Fallback",
+      sourceTrim = "Base",
+      sourceBaseModel = "Fallback",
+      sourceFuelEconomyVehicleId = 1,
+      sourcePurchasePrice = 1,
+      sourceAnnualInsurance = 1,
+      sourceAnnualRegistration = 1,
+      sourceAnnualMaintenance = fallbackBoundedNormal,
+      sourceAnnualDepreciationRate = fallbackBoundedNormal,
+      sourceRepairShockProbability = 0,
+      sourceRepairShockCost = fallbackBoundedNormal,
+      sourceSourceUpdatedAt = "2026-04-16"
+    }
+
+fallbackFuelEconomyVehicleRecord :: FuelEconomyVehicleRecord
+fallbackFuelEconomyVehicleRecord =
+  FuelEconomyVehicleRecord
+    { fuelEconomyVehicleYear = 2024,
+      fuelEconomyVehicleMake = "Fallback",
+      fuelEconomyVehicleModel = "Fallback",
+      fuelEconomyVehicleBaseModel = Just "Fallback",
+      fuelEconomyVehicleFuelType = "Regular Gasoline",
+      fuelEconomyVehicleAtvType = Nothing,
+      fuelEconomyVehicleCombinedMpg = 1,
+      fuelEconomyVehicleCityMpg = Just 1,
+      fuelEconomyVehicleHighwayMpg = Just 1
+    }
+
+fallbackCatalogImportSeed :: CatalogImportSeed
+fallbackCatalogImportSeed =
+  CatalogImportSeed
+    { importCatalogId = "fallback",
+      importDescription = "Fallback catalog import seed for failed test setup.",
+      importIdentity =
+        VpicVehicleIdentity
+          { vpicYear = 2024,
+            vpicMake = "Fallback",
+            vpicModel = "Fallback",
+            vpicTrim = "Base"
+          },
+      importFuelEconomy =
+        FuelEconomyProfile
+          { fuelEconomyFuelType = "gasoline",
+            fuelEconomyCombinedMpg = 1,
+            fuelEconomyCityMpg = Just 1,
+            fuelEconomyHighwayMpg = Just 1
+          },
+      importPurchasePrice = 1,
+      importAnnualInsurance = 1,
+      importAnnualRegistration = 1,
+      importAnnualMaintenance = fallbackBoundedNormal,
+      importAnnualDepreciationRate = fallbackBoundedNormal,
+      importRepairShockProbability = 0,
+      importRepairShockCost = fallbackBoundedNormal,
+      importSourceName = "fallback",
+      importSourceUpdatedAt = "2026-04-16"
+    }
+
+fallbackVehicleCatalogEntry :: VehicleCatalogEntry
+fallbackVehicleCatalogEntry =
+  buildVehicleCatalogEntry fallbackCatalogImportSeed

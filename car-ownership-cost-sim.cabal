@@ -11,13 +11,23 @@ maintainer:         garion@example.com
 category:           Web
 extra-source-files:
     README.md
+    catalog/vehicle-source-seeds.json
     docs/vehicle-data-sourcing.md
     static/index.html
     static/styles.css
     static/app.js
+    test/fixtures/fueleconomy/vehicle-47097.xml
+    test/fixtures/fueleconomy/vehicle-47339.xml
+    test/fixtures/vpic/honda-2024-models.json
+    test/fixtures/vpic/toyota-2024-models.json
 
 data-files:
     catalog/vehicle-catalog.json
+    catalog/vehicle-source-seeds.json
+    test/fixtures/fueleconomy/vehicle-47097.xml
+    test/fixtures/fueleconomy/vehicle-47339.xml
+    test/fixtures/vpic/honda-2024-models.json
+    test/fixtures/vpic/toyota-2024-models.json
 
 common shared-properties
     default-language: GHC2021
@@ -32,10 +42,13 @@ library
         CarOwnershipCostSim.Statistics
         CarOwnershipCostSim.Types
         CarOwnershipCostSim.VehicleCatalog
+        CarOwnershipCostSim.VehicleCatalogImport
         CarOwnershipCostSim.VehiclePresets
     build-depends:
         base >=4.18 && <4.21,
         aeson >=2.1 && <2.3,
+        bytestring >=0.11 && <0.13,
+        process >=1.6 && <1.7,
         random >=1.2 && <1.4
 
 executable car-ownership-cost-sim
@@ -53,6 +66,15 @@ executable car-ownership-cost-sim
         http-types >=0.12 && <0.13,
         random >=1.2 && <1.4,
         scotty >=0.22 && <0.23
+
+executable build-vehicle-catalog
+    import:           shared-properties
+    hs-source-dirs:   app
+    main-is:          BuildCatalog.hs
+    build-depends:
+        base >=4.18 && <4.21,
+        aeson >=2.1 && <2.3,
+        car-ownership-cost-sim
 
 test-suite car-ownership-cost-sim-test
     import:           shared-properties
