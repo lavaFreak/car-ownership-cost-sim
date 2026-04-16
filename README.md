@@ -184,6 +184,9 @@ suite. The current app can now model taxes and fees, inflation, repair-shock
 tail risk, yearly sample traces, and preset vehicle assumptions while keeping
 the web layer lightweight.
 
+For current source research on where to obtain broad vehicle data, see
+`docs/vehicle-data-sourcing.md`.
+
 ## Near-Term Next Tasks
 
 - compare multiple vehicles side by side
