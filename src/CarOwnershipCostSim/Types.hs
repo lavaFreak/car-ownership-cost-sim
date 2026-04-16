@@ -32,6 +32,7 @@ data SimulationInput = SimulationInput
     simulationDownPayment :: Double,
     simulationSalesTaxRate :: Double,
     simulationUpfrontFees :: Double,
+    simulationAnnualInflationRate :: Double,
     simulationYearsOwned :: Int,
     simulationAnnualMiles :: Double,
     simulationMilesPerGallon :: Double,
@@ -81,6 +82,7 @@ instance ToJSON CostBreakdown
 
 data YearlyCostBreakdown = YearlyCostBreakdown
   { yearlyYear :: Int,
+    yearlyInflationMultiplier :: Double,
     yearlyUpfrontPayment :: Double,
     yearlyPurchaseTax :: Double,
     yearlyUpfrontFees :: Double,
@@ -145,6 +147,7 @@ exampleSimulationRequest =
             simulationDownPayment = 5000,
             simulationSalesTaxRate = 0.0675,
             simulationUpfrontFees = 650,
+            simulationAnnualInflationRate = 0.03,
             simulationYearsOwned = 5,
             simulationAnnualMiles = 12000,
             simulationMilesPerGallon = 32,

@@ -55,6 +55,7 @@ function collectFormValues() {
     milesPerGallon: numericValue("milesPerGallon"),
     annualInsurance: numericValue("annualInsurance"),
     annualRegistration: numericValue("annualRegistration"),
+    annualInflationPercent: numericValue("annualInflationPercent"),
     loanAprPercent: numericValue("loanAprPercent"),
     loanTermMonths: numericValue("loanTermMonths"),
     fuelMean: numericValue("fuelMean"),
@@ -94,6 +95,7 @@ function buildRequestPayload(values) {
       simulationMilesPerGallon: values.milesPerGallon,
       simulationAnnualInsurance: values.annualInsurance,
       simulationAnnualRegistration: values.annualRegistration,
+      simulationAnnualInflationRate: values.annualInflationPercent / 100,
       simulationLoanApr: values.loanAprPercent / 100,
       simulationLoanTermMonths: values.loanTermMonths,
       simulationFuelPrice: buildBoundedNormal(
@@ -172,6 +174,7 @@ function renderYearlyBreakdownPlaceholder() {
           <dl>
             <div><dt>Annual totals</dt><dd>After a run</dd></div>
             <div><dt>Year 1 purchase costs</dt><dd>After a run</dd></div>
+            <div><dt>Inflation factor</dt><dd>After a run</dd></div>
             <div><dt>Ending value</dt><dd>After a run</dd></div>
             <div><dt>Remaining loan</dt><dd>After a run</dd></div>
             <div><dt>Estimated equity</dt><dd>After a run</dd></div>
@@ -303,6 +306,16 @@ function validateFormValues(values) {
     values.annualRegistration < 0
   ) {
     pushValidationError(errors, "annualRegistration", "Registration cost cannot be negative.");
+  }
+
+  if (validateRequiredNumber(errors, values, "annualInflationPercent", "Annual inflation")) {
+    if (values.annualInflationPercent < 0) {
+      pushValidationError(errors, "annualInflationPercent", "Annual inflation cannot be negative.");
+    }
+
+    if (values.annualInflationPercent > 100) {
+      pushValidationError(errors, "annualInflationPercent", "Annual inflation must be 100% or less.");
+    }
   }
 
   if (validateRequiredNumber(errors, values, "loanAprPercent", "Loan APR")) {
@@ -521,6 +534,7 @@ function renderYearlyBreakdown(response) {
           <dl>
             <div><dt>Total for year</dt><dd>${currency.format(year.yearlyTotalCost)}</dd></div>
             <div><dt>Year 1 purchase costs</dt><dd>${currency.format(year.yearlyPurchaseTax + year.yearlyUpfrontFees)}</dd></div>
+            <div><dt>Inflation factor</dt><dd>${year.yearlyInflationMultiplier.toFixed(2)}x</dd></div>
             <div><dt>Loan payments</dt><dd>${currency.format(year.yearlyLoanPayments)}</dd></div>
             <div><dt>Depreciation loss</dt><dd>${currency.format(year.yearlyDepreciationLoss)}</dd></div>
             <div><dt>Ending value</dt><dd>${currency.format(year.yearlyEndingVehicleValue)}</dd></div>

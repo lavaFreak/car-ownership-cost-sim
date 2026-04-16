@@ -94,10 +94,9 @@ simulateDetailedCostBreakdown simulationInput initialGen =
       salesTaxRate = max 0 (simulationSalesTaxRate simulationInput)
       purchaseTax = purchasePrice * salesTaxRate
       upfrontFees = max 0 (simulationUpfrontFees simulationInput)
+      annualInflationRate = max 0 (simulationAnnualInflationRate simulationInput)
       annualInsuranceCost = max 0 (simulationAnnualInsurance simulationInput)
       annualRegistrationCost = max 0 (simulationAnnualRegistration simulationInput)
-      insuranceCost = annualInsuranceCost * fromIntegral yearsOwned
-      registrationCost = annualRegistrationCost * fromIntegral yearsOwned
       annualGallons =
         if simulationMilesPerGallon simulationInput <= 0
           then 0
@@ -114,11 +113,13 @@ simulateDetailedCostBreakdown simulationInput initialGen =
       financing = buildFinancingSnapshot simulationInput
       yearlyBreakdowns =
         zipWith
-          (buildYearlyCostBreakdown financing purchaseTax upfrontFees annualInsuranceCost annualRegistrationCost)
+          (buildYearlyCostBreakdown financing purchaseTax upfrontFees annualInflationRate annualInsuranceCost annualRegistrationCost)
           [1 ..]
           sampledYears
-      fuelCost = sum (map sampledYearFuelCost sampledYears)
-      maintenanceCost = sum (map sampledYearMaintenanceCost sampledYears)
+      fuelCost = sum (map yearlyFuel yearlyBreakdowns)
+      maintenanceCost = sum (map yearlyMaintenance yearlyBreakdowns)
+      insuranceCost = sum (map yearlyInsurance yearlyBreakdowns)
+      registrationCost = sum (map yearlyRegistration yearlyBreakdowns)
       resaleValue =
         case sampledYears of
           [] -> purchasePrice
@@ -230,14 +231,16 @@ buildYearlyCostBreakdown ::
   Double ->
   Double ->
   Double ->
+  Double ->
   Int ->
   SampledYear ->
   YearlyCostBreakdown
-buildYearlyCostBreakdown financing purchaseTax upfrontFees annualInsuranceCost annualRegistrationCost yearIndex sampledYear =
+buildYearlyCostBreakdown financing purchaseTax upfrontFees annualInflationRate annualInsuranceCost annualRegistrationCost yearIndex sampledYear =
   let upfrontPayment =
         if yearIndex == 1
           then financingUpfrontPayment financing
           else 0
+      inflationMultiplier = (1 + annualInflationRate) ** fromIntegral (max 0 (yearIndex - 1))
       yearOnePurchaseTax =
         if yearIndex == 1
           then purchaseTax
@@ -246,6 +249,10 @@ buildYearlyCostBreakdown financing purchaseTax upfrontFees annualInsuranceCost a
         if yearIndex == 1
           then upfrontFees
           else 0
+      inflatedFuelCost = sampledYearFuelCost sampledYear * inflationMultiplier
+      inflatedMaintenanceCost = sampledYearMaintenanceCost sampledYear * inflationMultiplier
+      inflatedInsuranceCost = annualInsuranceCost * inflationMultiplier
+      inflatedRegistrationCost = annualRegistrationCost * inflationMultiplier
       loanPayments = loanPaymentsForYear financing yearIndex
       yearEndLoanBalance = remainingLoanBalanceAtYearEnd financing yearIndex
       endingVehicleValue = sampledYearEndingVehicleValue sampledYear
@@ -254,21 +261,22 @@ buildYearlyCostBreakdown financing purchaseTax upfrontFees annualInsuranceCost a
           + yearOnePurchaseTax
           + yearOneUpfrontFees
           + loanPayments
-          + sampledYearFuelCost sampledYear
-          + sampledYearMaintenanceCost sampledYear
-          + annualInsuranceCost
-          + annualRegistrationCost
+          + inflatedFuelCost
+          + inflatedMaintenanceCost
+          + inflatedInsuranceCost
+          + inflatedRegistrationCost
           + sampledYearDepreciationLoss sampledYear
    in YearlyCostBreakdown
         { yearlyYear = yearIndex,
+          yearlyInflationMultiplier = inflationMultiplier,
           yearlyUpfrontPayment = upfrontPayment,
           yearlyPurchaseTax = yearOnePurchaseTax,
           yearlyUpfrontFees = yearOneUpfrontFees,
           yearlyLoanPayments = loanPayments,
-          yearlyFuel = sampledYearFuelCost sampledYear,
-          yearlyMaintenance = sampledYearMaintenanceCost sampledYear,
-          yearlyInsurance = annualInsuranceCost,
-          yearlyRegistration = annualRegistrationCost,
+          yearlyFuel = inflatedFuelCost,
+          yearlyMaintenance = inflatedMaintenanceCost,
+          yearlyInsurance = inflatedInsuranceCost,
+          yearlyRegistration = inflatedRegistrationCost,
           yearlyDepreciationLoss = sampledYearDepreciationLoss sampledYear,
           yearlyEndingVehicleValue = endingVehicleValue,
           yearlyRemainingLoanBalance = yearEndLoanBalance,
@@ -355,6 +363,8 @@ validateSimulationInput simulationInput =
       require (simulationSalesTaxRate simulationInput >= 0) "Sales tax rate cannot be negative.",
       require (simulationSalesTaxRate simulationInput <= 1) "Sales tax rate should be expressed as a decimal between 0 and 1.",
       require (simulationUpfrontFees simulationInput >= 0) "Upfront fees cannot be negative.",
+      require (simulationAnnualInflationRate simulationInput >= 0) "Annual inflation rate cannot be negative.",
+      require (simulationAnnualInflationRate simulationInput <= 1) "Annual inflation rate should be expressed as a decimal between 0 and 1.",
       require (simulationYearsOwned simulationInput >= 1) "Years owned must be at least 1.",
       require (simulationAnnualMiles simulationInput >= 0) "Annual miles cannot be negative.",
       require (simulationMilesPerGallon simulationInput > 0) "Fuel efficiency must be greater than 0 MPG.",

@@ -16,6 +16,7 @@ tests =
   TestList
     [ TestLabel "deterministic cash purchase keeps only operating costs" deterministicCashPurchaseTest,
       TestLabel "purchase taxes and fees are included" purchaseTaxAndFeesTest,
+      TestLabel "inflation raises later-year recurring costs" inflationTest,
       TestLabel "summary statistics stay ordered" summaryOrderingTest,
       TestLabel "invalid input is rejected" invalidInputValidationTest
     ]
@@ -33,6 +34,7 @@ deterministicCashPurchaseTest =
                     simulationDownPayment = 0,
                     simulationSalesTaxRate = 0,
                     simulationUpfrontFees = 0,
+                    simulationAnnualInflationRate = 0,
                     simulationYearsOwned = 1,
                     simulationAnnualMiles = 12000,
                     simulationMilesPerGallon = 30,
@@ -98,6 +100,7 @@ purchaseTaxAndFeesTest =
                     simulationDownPayment = 4000,
                     simulationSalesTaxRate = 0.05,
                     simulationUpfrontFees = 300,
+                    simulationAnnualInflationRate = 0,
                     simulationYearsOwned = 1,
                     simulationAnnualMiles = 0,
                     simulationMilesPerGallon = 30,
@@ -141,6 +144,68 @@ purchaseTaxAndFeesTest =
         assertClose "year one total includes tax and fees" 21300 (yearlyTotalCost yearOne)
       _ -> assertFailure "Expected exactly one yearly breakdown row."
 
+inflationTest :: Test
+inflationTest =
+  TestCase $ do
+    let request =
+          SimulationRequest
+            { requestIterations = 1,
+              requestSeed = Just 13,
+              requestInput =
+                SimulationInput
+                  { simulationPurchasePrice = 10000,
+                    simulationDownPayment = 0,
+                    simulationSalesTaxRate = 0,
+                    simulationUpfrontFees = 0,
+                    simulationAnnualInflationRate = 0.1,
+                    simulationYearsOwned = 2,
+                    simulationAnnualMiles = 12000,
+                    simulationMilesPerGallon = 30,
+                    simulationAnnualInsurance = 100,
+                    simulationAnnualRegistration = 50,
+                    simulationLoanApr = 0,
+                    simulationLoanTermMonths = 0,
+                    simulationFuelPrice =
+                      BoundedNormal
+                        { boundedNormalMean = 1,
+                          boundedNormalStdDev = 0,
+                          boundedNormalLowerBound = 1,
+                          boundedNormalUpperBound = Just 1
+                        },
+                    simulationAnnualMaintenance =
+                      BoundedNormal
+                        { boundedNormalMean = 200,
+                          boundedNormalStdDev = 0,
+                          boundedNormalLowerBound = 200,
+                          boundedNormalUpperBound = Just 200
+                        },
+                    simulationAnnualDepreciationRate =
+                      BoundedNormal
+                        { boundedNormalMean = 0,
+                          boundedNormalStdDev = 0,
+                          boundedNormalLowerBound = 0,
+                          boundedNormalUpperBound = Just 0
+                        }
+                  }
+            }
+        response = simulateRequestWithSeed 13 request
+        breakdown = responseExampleBreakdown response
+        yearlyBreakdown = responseExampleYearlyBreakdown response
+    assertClose "fuel total includes inflation" 840 (costFuel breakdown)
+    assertClose "maintenance total includes inflation" 420 (costMaintenance breakdown)
+    assertClose "insurance total includes inflation" 210 (costInsurance breakdown)
+    assertClose "registration total includes inflation" 105 (costRegistration breakdown)
+    assertClose "total reflects inflated recurring costs across both years" 1575 (costTotal breakdown)
+    case yearlyBreakdown of
+      [yearOne, yearTwo] -> do
+        assertClose "year one inflation multiplier is 1.0" 1.0 (yearlyInflationMultiplier yearOne)
+        assertClose "year two inflation multiplier grows" 1.1 (yearlyInflationMultiplier yearTwo)
+        assertClose "year one fuel is uninflated" 400 (yearlyFuel yearOne)
+        assertClose "year two fuel is inflated" 440 (yearlyFuel yearTwo)
+        assertClose "year one total includes upfront purchase" 10750 (yearlyTotalCost yearOne)
+        assertClose "year two total reflects inflation only" 825 (yearlyTotalCost yearTwo)
+      _ -> assertFailure "Expected exactly two yearly breakdown rows."
+
 summaryOrderingTest :: Test
 summaryOrderingTest =
   TestCase $ do
@@ -176,6 +241,7 @@ invalidInputValidationTest =
                     simulationDownPayment = 25000,
                     simulationSalesTaxRate = 1.2,
                     simulationUpfrontFees = -1,
+                    simulationAnnualInflationRate = 1.2,
                     simulationYearsOwned = 0,
                     simulationAnnualMiles = 12000,
                     simulationMilesPerGallon = 0,
@@ -211,6 +277,7 @@ invalidInputValidationTest =
     assertBool "down payment is validated" ("Down payment cannot exceed purchase price." `elem` validationErrors)
     assertBool "sales tax is validated" ("Sales tax rate should be expressed as a decimal between 0 and 1." `elem` validationErrors)
     assertBool "upfront fees are validated" ("Upfront fees cannot be negative." `elem` validationErrors)
+    assertBool "inflation is validated" ("Annual inflation rate should be expressed as a decimal between 0 and 1." `elem` validationErrors)
     assertBool "years owned is validated" ("Years owned must be at least 1." `elem` validationErrors)
     assertBool "fuel efficiency is validated" ("Fuel efficiency must be greater than 0 MPG." `elem` validationErrors)
     assertBool "APR is validated" ("Loan APR should be expressed as a decimal between 0 and 1." `elem` validationErrors)
