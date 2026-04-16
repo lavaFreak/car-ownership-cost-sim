@@ -120,8 +120,10 @@ The backend currently exposes:
   Serves the frontend.
 - `GET /api/example`
   Returns a sample request payload.
+- `GET /api/catalog`
+  Returns the normalized local vehicle catalog entries used by the app.
 - `GET /api/presets`
-  Returns a small curated set of vehicle presets for pre-filling car-specific assumptions.
+  Returns vehicle presets derived from the local vehicle catalog.
 - `POST /api/simulate`
   Runs the simulation and returns summary statistics plus sample totals.
 
@@ -181,8 +183,8 @@ Then open `http://localhost:3000`.
 The repository already includes an initial simulation engine, a Scotty-based web
 server, a lightweight frontend, curated vehicle presets, and a growing test
 suite. The current app can now model taxes and fees, inflation, repair-shock
-tail risk, yearly sample traces, and preset vehicle assumptions while keeping
-the web layer lightweight.
+tail risk, yearly sample traces, and catalog-backed vehicle presets while
+keeping the web layer lightweight.
 
 For current source research on where to obtain broad vehicle data, see
 `docs/vehicle-data-sourcing.md`.
@@ -193,3 +195,4 @@ For current source research on where to obtain broad vehicle data, see
 - support alternative probability distributions
 - improve the resale model so it is not driven only by annual depreciation
 - add state-specific taxes and registration rules
+- add importers for vPIC and FuelEconomy.gov into the local catalog

@@ -1,0 +1,150 @@
+[
+  {
+    "catalogId": "corolla-hybrid-2024",
+    "catalogName": "2024 Toyota Corolla Hybrid LE",
+    "catalogDescription": "Efficient compact sedan with low operating costs and modest depreciation.",
+    "catalogYear": 2024,
+    "catalogMake": "Toyota",
+    "catalogModel": "Corolla Hybrid",
+    "catalogTrim": "LE",
+    "catalogFuelType": "hybrid-gasoline",
+    "catalogCombinedMpg": 47,
+    "catalogCityMpg": 53,
+    "catalogHighwayMpg": 46,
+    "catalogPurchasePrice": 25100,
+    "catalogAnnualInsurance": 1650,
+    "catalogAnnualRegistration": 220,
+    "catalogAnnualMaintenance": {
+      "boundedNormalMean": 520,
+      "boundedNormalStdDev": 140,
+      "boundedNormalLowerBound": 220,
+      "boundedNormalUpperBound": 1400
+    },
+    "catalogAnnualDepreciationRate": {
+      "boundedNormalMean": 0.13,
+      "boundedNormalStdDev": 0.03,
+      "boundedNormalLowerBound": 0.05,
+      "boundedNormalUpperBound": 0.24
+    },
+    "catalogRepairShockProbability": 0.08,
+    "catalogRepairShockCost": {
+      "boundedNormalMean": 1200,
+      "boundedNormalStdDev": 500,
+      "boundedNormalLowerBound": 300,
+      "boundedNormalUpperBound": 3200
+    },
+    "catalogSourceName": "catalog-seed",
+    "catalogSourceUpdatedAt": "2026-04-16"
+  },
+  {
+    "catalogId": "civic-hatchback-2024",
+    "catalogName": "2024 Honda Civic Hatchback EX-L",
+    "catalogDescription": "Balanced compact daily driver with moderate maintenance and resale assumptions.",
+    "catalogYear": 2024,
+    "catalogMake": "Honda",
+    "catalogModel": "Civic Hatchback",
+    "catalogTrim": "EX-L",
+    "catalogFuelType": "gasoline",
+    "catalogCombinedMpg": 35,
+    "catalogCityMpg": 31,
+    "catalogHighwayMpg": 39,
+    "catalogPurchasePrice": 30100,
+    "catalogAnnualInsurance": 1780,
+    "catalogAnnualRegistration": 235,
+    "catalogAnnualMaintenance": {
+      "boundedNormalMean": 640,
+      "boundedNormalStdDev": 180,
+      "boundedNormalLowerBound": 260,
+      "boundedNormalUpperBound": 1800
+    },
+    "catalogAnnualDepreciationRate": {
+      "boundedNormalMean": 0.145,
+      "boundedNormalStdDev": 0.035,
+      "boundedNormalLowerBound": 0.06,
+      "boundedNormalUpperBound": 0.27
+    },
+    "catalogRepairShockProbability": 0.1,
+    "catalogRepairShockCost": {
+      "boundedNormalMean": 1500,
+      "boundedNormalStdDev": 650,
+      "boundedNormalLowerBound": 400,
+      "boundedNormalUpperBound": 4200
+    },
+    "catalogSourceName": "catalog-seed",
+    "catalogSourceUpdatedAt": "2026-04-16"
+  },
+  {
+    "catalogId": "rav4-hybrid-2024",
+    "catalogName": "2024 Toyota RAV4 Hybrid XLE",
+    "catalogDescription": "Popular hybrid crossover with higher price, higher insurance, and strong MPG.",
+    "catalogYear": 2024,
+    "catalogMake": "Toyota",
+    "catalogModel": "RAV4 Hybrid",
+    "catalogTrim": "XLE",
+    "catalogFuelType": "hybrid-gasoline",
+    "catalogCombinedMpg": 39,
+    "catalogCityMpg": 41,
+    "catalogHighwayMpg": 38,
+    "catalogPurchasePrice": 34300,
+    "catalogAnnualInsurance": 1940,
+    "catalogAnnualRegistration": 250,
+    "catalogAnnualMaintenance": {
+      "boundedNormalMean": 760,
+      "boundedNormalStdDev": 230,
+      "boundedNormalLowerBound": 320,
+      "boundedNormalUpperBound": 2200
+    },
+    "catalogAnnualDepreciationRate": {
+      "boundedNormalMean": 0.15,
+      "boundedNormalStdDev": 0.035,
+      "boundedNormalLowerBound": 0.07,
+      "boundedNormalUpperBound": 0.28
+    },
+    "catalogRepairShockProbability": 0.12,
+    "catalogRepairShockCost": {
+      "boundedNormalMean": 1800,
+      "boundedNormalStdDev": 800,
+      "boundedNormalLowerBound": 450,
+      "boundedNormalUpperBound": 5200
+    },
+    "catalogSourceName": "catalog-seed",
+    "catalogSourceUpdatedAt": "2026-04-16"
+  },
+  {
+    "catalogId": "outback-2024",
+    "catalogName": "2024 Subaru Outback Premium",
+    "catalogDescription": "Wagon-style AWD option with higher fuel use and slightly heavier repair risk.",
+    "catalogYear": 2024,
+    "catalogMake": "Subaru",
+    "catalogModel": "Outback",
+    "catalogTrim": "Premium",
+    "catalogFuelType": "gasoline",
+    "catalogCombinedMpg": 29,
+    "catalogCityMpg": 26,
+    "catalogHighwayMpg": 32,
+    "catalogPurchasePrice": 32900,
+    "catalogAnnualInsurance": 2010,
+    "catalogAnnualRegistration": 245,
+    "catalogAnnualMaintenance": {
+      "boundedNormalMean": 880,
+      "boundedNormalStdDev": 260,
+      "boundedNormalLowerBound": 360,
+      "boundedNormalUpperBound": 2500
+    },
+    "catalogAnnualDepreciationRate": {
+      "boundedNormalMean": 0.155,
+      "boundedNormalStdDev": 0.04,
+      "boundedNormalLowerBound": 0.07,
+      "boundedNormalUpperBound": 0.3
+    },
+    "catalogRepairShockProbability": 0.15,
+    "catalogRepairShockCost": {
+      "boundedNormalMean": 2100,
+      "boundedNormalStdDev": 900,
+      "boundedNormalLowerBound": 500,
+      "boundedNormalUpperBound": 5800
+    },
+    "catalogSourceName": "catalog-seed",
+    "catalogSourceUpdatedAt": "2026-04-16"
+  }
+]

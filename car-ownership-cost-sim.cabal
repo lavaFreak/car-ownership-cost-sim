@@ -11,9 +11,13 @@ maintainer:         garion@example.com
 category:           Web
 extra-source-files:
     README.md
+    docs/vehicle-data-sourcing.md
     static/index.html
     static/styles.css
     static/app.js
+
+data-files:
+    catalog/vehicle-catalog.json
 
 common shared-properties
     default-language: GHC2021
@@ -27,6 +31,7 @@ library
         CarOwnershipCostSim.Simulation
         CarOwnershipCostSim.Statistics
         CarOwnershipCostSim.Types
+        CarOwnershipCostSim.VehicleCatalog
         CarOwnershipCostSim.VehiclePresets
     build-depends:
         base >=4.18 && <4.21,
@@ -35,8 +40,12 @@ library
 
 executable car-ownership-cost-sim
     import:           shared-properties
+    autogen-modules:
+        Paths_car_ownership_cost_sim
     hs-source-dirs:   app
     main-is:          Main.hs
+    other-modules:
+        Paths_car_ownership_cost_sim
     build-depends:
         base >=4.18 && <4.21,
         aeson >=2.1 && <2.3,
@@ -47,9 +56,13 @@ executable car-ownership-cost-sim
 
 test-suite car-ownership-cost-sim-test
     import:           shared-properties
+    autogen-modules:
+        Paths_car_ownership_cost_sim
     type:             exitcode-stdio-1.0
     hs-source-dirs:   test
     main-is:          Spec.hs
+    other-modules:
+        Paths_car_ownership_cost_sim
     build-depends:
         base >=4.18 && <4.21,
         car-ownership-cost-sim,

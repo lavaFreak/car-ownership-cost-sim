@@ -2,7 +2,17 @@ module Main (main) where
 
 import CarOwnershipCostSim.Simulation (simulateRequestWithSeed, validateSimulationRequest)
 import CarOwnershipCostSim.Types
-import CarOwnershipCostSim.VehiclePresets (VehiclePreset (..), vehiclePresets)
+import CarOwnershipCostSim.VehicleCatalog
+  ( CatalogImportSeed (..),
+    FuelEconomyProfile (..),
+    VpicVehicleIdentity (..),
+    VehicleCatalogEntry (..),
+    buildVehicleCatalogEntry,
+    defaultVehicleCatalogRelativePath,
+    loadVehicleCatalog,
+  )
+import CarOwnershipCostSim.VehiclePresets (VehiclePreset (..), vehiclePresetsFromCatalog)
+import Paths_car_ownership_cost_sim (getDataFileName)
 import Test.HUnit
 
 main :: IO ()
@@ -19,7 +29,8 @@ tests =
       TestLabel "purchase taxes and fees are included" purchaseTaxAndFeesTest,
       TestLabel "inflation raises later-year recurring costs" inflationTest,
       TestLabel "repair shocks add tail-risk costs" repairShockTest,
-      TestLabel "vehicle presets stay usable" vehiclePresetsTest,
+      TestLabel "vehicle catalog loads and drives presets" vehicleCatalogTest,
+      TestLabel "catalog import seeds build normalized entries" catalogImportSeedTest,
       TestLabel "summary statistics stay ordered" summaryOrderingTest,
       TestLabel "invalid input is rejected" invalidInputValidationTest
     ]
@@ -296,11 +307,71 @@ repairShockTest =
         assertClose "year one total includes repair shock" 13500 (yearlyTotalCost yearOne)
       _ -> assertFailure "Expected exactly one yearly breakdown row."
 
-vehiclePresetsTest :: Test
-vehiclePresetsTest =
+vehicleCatalogTest :: Test
+vehicleCatalogTest =
   TestCase $ do
-    assertBool "at least three presets are available" (length vehiclePresets >= 3)
-    mapM_ assertVehiclePresetLooksUsable vehiclePresets
+    catalogPath <- getDataFileName defaultVehicleCatalogRelativePath
+    vehicleCatalog <- loadVehicleCatalog catalogPath
+    let presets = vehiclePresetsFromCatalog vehicleCatalog
+    assertBool "at least three catalog entries are available" (length vehicleCatalog >= 3)
+    assertEqual "catalog-backed presets stay in sync with catalog rows" (length vehicleCatalog) (length presets)
+    mapM_ assertVehicleCatalogEntryLooksUsable vehicleCatalog
+    mapM_ assertVehiclePresetLooksUsable presets
+
+catalogImportSeedTest :: Test
+catalogImportSeedTest =
+  TestCase $ do
+    let catalogEntry =
+          buildVehicleCatalogEntry
+            CatalogImportSeed
+              { importCatalogId = "sample-import",
+                importDescription = "Sample imported vehicle data for importer-hook testing.",
+                importIdentity =
+                  VpicVehicleIdentity
+                    { vpicYear = 2024,
+                      vpicMake = "Toyota",
+                      vpicModel = "Prius",
+                      vpicTrim = "LE"
+                    },
+                importFuelEconomy =
+                  FuelEconomyProfile
+                    { fuelEconomyFuelType = "hybrid-gasoline",
+                      fuelEconomyCombinedMpg = 57,
+                      fuelEconomyCityMpg = Just 57,
+                      fuelEconomyHighwayMpg = Just 56
+                    },
+                importPurchasePrice = 28900,
+                importAnnualInsurance = 1700,
+                importAnnualRegistration = 225,
+                importAnnualMaintenance =
+                  BoundedNormal
+                    { boundedNormalMean = 560,
+                      boundedNormalStdDev = 150,
+                      boundedNormalLowerBound = 220,
+                      boundedNormalUpperBound = Just 1500
+                    },
+                importAnnualDepreciationRate =
+                  BoundedNormal
+                    { boundedNormalMean = 0.125,
+                      boundedNormalStdDev = 0.03,
+                      boundedNormalLowerBound = 0.05,
+                      boundedNormalUpperBound = Just 0.24
+                    },
+                importRepairShockProbability = 0.07,
+                importRepairShockCost =
+                  BoundedNormal
+                    { boundedNormalMean = 1100,
+                      boundedNormalStdDev = 450,
+                      boundedNormalLowerBound = 250,
+                      boundedNormalUpperBound = Just 3000
+                    },
+                importSourceName = "vpic+fueleconomy-import",
+                importSourceUpdatedAt = "2026-04-16"
+              }
+    assertEqual "catalog name is normalized from imported identity" "2024 Toyota Prius LE" (catalogName catalogEntry)
+    assertEqual "fuel type comes from imported fuel economy data" "hybrid-gasoline" (catalogFuelType catalogEntry)
+    assertClose "combined MPG is preserved" 57 (catalogCombinedMpg catalogEntry)
+    assertClose "purchase price is preserved" 28900 (catalogPurchasePrice catalogEntry)
 
 summaryOrderingTest :: Test
 summaryOrderingTest =
@@ -402,6 +473,15 @@ assertMaybeClose label expected maybeActual =
   case maybeActual of
     Nothing -> assertFailure (label <> ": expected a value, got Nothing")
     Just actual -> assertClose label expected actual
+
+assertVehicleCatalogEntryLooksUsable :: VehicleCatalogEntry -> Assertion
+assertVehicleCatalogEntryLooksUsable catalogEntry = do
+  assertBool "catalog entry has a name" (not (null (catalogName catalogEntry)))
+  assertBool "catalog purchase price is positive" (catalogPurchasePrice catalogEntry > 0)
+  assertBool "catalog MPG is positive" (catalogCombinedMpg catalogEntry > 0)
+  assertBool
+    "catalog repair shock probability is in range"
+    (catalogRepairShockProbability catalogEntry >= 0 && catalogRepairShockProbability catalogEntry <= 1)
 
 assertVehiclePresetLooksUsable :: VehiclePreset -> Assertion
 assertVehiclePresetLooksUsable preset = do
