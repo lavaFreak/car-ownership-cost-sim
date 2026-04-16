@@ -216,6 +216,29 @@ button:disabled {
   transform: none;
 }
 
+.button-secondary {
+  background: rgba(255, 255, 255, 0.72);
+  color: var(--ink);
+  border: 1px solid var(--line);
+  box-shadow: none;
+}
+
+.scenario-tools {
+  display: grid;
+  gap: 0.7rem;
+}
+
+.tool-feedback {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.45;
+  word-break: break-word;
+}
+
+.tool-feedback.is-error {
+  color: #9a3817;
+}
+
 .preset-shell {
   margin-bottom: 1rem;
   padding: 1rem;

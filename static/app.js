@@ -2,6 +2,9 @@ const form = document.getElementById("sim-form");
 const vehiclePresetSelect = document.getElementById("vehicle-preset");
 const presetDescription = document.getElementById("preset-description");
 const submitButton = form.querySelector('button[type="submit"]');
+const copyLinkButton = document.getElementById("copy-link-button");
+const resetFormButton = document.getElementById("reset-form-button");
+const toolFeedback = document.getElementById("tool-feedback");
 const statusLine = document.getElementById("status-line");
 const formFeedback = document.getElementById("form-feedback");
 const resultsFeedback = document.getElementById("results-feedback");
@@ -31,6 +34,36 @@ const preciseCurrency = new Intl.NumberFormat("en-US", {
 
 let hasSuccessfulRun = false;
 let vehiclePresets = [];
+let pendingPresetSelection = { presetId: "", hasFieldOverrides: false };
+
+const defaultPresetDescription =
+  "Pick a curated vehicle profile to prefill car-specific assumptions without changing your mileage or loan setup.";
+
+const shareFieldNames = [
+  "purchasePrice",
+  "downPayment",
+  "salesTaxPercent",
+  "upfrontFees",
+  "yearsOwned",
+  "annualMiles",
+  "milesPerGallon",
+  "annualInsurance",
+  "annualRegistration",
+  "annualInflationPercent",
+  "loanAprPercent",
+  "loanTermMonths",
+  "fuelMean",
+  "fuelStdDev",
+  "maintenanceMean",
+  "maintenanceStdDev",
+  "repairShockProbabilityPercent",
+  "repairShockMean",
+  "repairShockStdDev",
+  "depreciationMeanPercent",
+  "depreciationStdDevPercent",
+  "iterations",
+  "seed",
+];
 
 function fieldValue(name) {
   return form.elements[name].value.trim();
@@ -57,6 +90,18 @@ function setNumericField(name, value) {
   }
 
   field.value = String(value);
+}
+
+function showToolFeedback(message, isError = false) {
+  toolFeedback.hidden = false;
+  toolFeedback.textContent = message;
+  toolFeedback.classList.toggle("is-error", isError);
+}
+
+function hideToolFeedback() {
+  toolFeedback.hidden = true;
+  toolFeedback.textContent = "";
+  toolFeedback.classList.remove("is-error");
 }
 
 function collectFormValues() {
@@ -118,6 +163,7 @@ function applyVehiclePreset(preset) {
 
   clearFieldErrors();
   hideFeedback(formFeedback);
+  hideToolFeedback();
   presetDescription.textContent = presetDescriptionText(preset);
   statusLine.textContent = `Applied the ${preset.presetName} preset. Review the assumptions, then run the simulation.`;
 }
@@ -146,11 +192,86 @@ async function loadVehiclePresets() {
 
     vehiclePresets = payload;
     populateVehiclePresets(vehiclePresets);
+    syncPresetSelectionFromQuery();
   } catch (error) {
     vehiclePresetSelect.innerHTML = '<option value="">Presets unavailable</option>';
     presetDescription.textContent =
       error.message || "Vehicle presets could not be loaded, so the starter assumptions are still available.";
   }
+}
+
+function buildScenarioSearchParams() {
+  const params = new URLSearchParams();
+
+  shareFieldNames.forEach((name) => {
+    const rawValue = fieldValue(name);
+    if (rawValue !== "") {
+      params.set(name, rawValue);
+    }
+  });
+
+  if (vehiclePresetSelect.value) {
+    params.set("preset", vehiclePresetSelect.value);
+  }
+
+  return params;
+}
+
+function replaceUrlWithCurrentScenario() {
+  const params = buildScenarioSearchParams();
+  const queryString = params.toString();
+  const nextUrl = queryString ? `${window.location.pathname}?${queryString}` : window.location.pathname;
+  window.history.replaceState({}, "", nextUrl);
+}
+
+function applyScenarioFromQuery() {
+  const params = new URLSearchParams(window.location.search);
+  let hasFieldOverrides = false;
+
+  shareFieldNames.forEach((name) => {
+    if (!params.has(name)) {
+      return;
+    }
+
+    const field = form.elements[name];
+    if (!field) {
+      return;
+    }
+
+    field.value = params.get(name);
+    hasFieldOverrides = true;
+  });
+
+  pendingPresetSelection = {
+    presetId: params.get("preset") || "",
+    hasFieldOverrides,
+  };
+
+  if (hasFieldOverrides) {
+    statusLine.textContent = "Loaded a shared scenario from the URL.";
+    showToolFeedback("This page opened with a shared scenario. Run it as-is or tweak the inputs first.");
+  }
+}
+
+function syncPresetSelectionFromQuery() {
+  if (!pendingPresetSelection.presetId) {
+    presetDescription.textContent = defaultPresetDescription;
+    return;
+  }
+
+  const preset = vehiclePresets.find((item) => item.presetId === pendingPresetSelection.presetId);
+  if (!preset) {
+    return;
+  }
+
+  vehiclePresetSelect.value = preset.presetId;
+
+  if (!pendingPresetSelection.hasFieldOverrides) {
+    applyVehiclePreset(preset);
+    return;
+  }
+
+  presetDescription.textContent = presetDescriptionText(preset);
 }
 
 function buildRequestPayload(values) {
@@ -340,6 +461,20 @@ function renderInitialResultsState() {
     "How to read the results",
     "Average cost is the across-run mean. Median is the middle outcome. The 10th to 90th percentile band gives a practical low-to-high range, not a guarantee."
   );
+}
+
+function resetScenarioForm() {
+  form.reset();
+  vehiclePresetSelect.value = "";
+  presetDescription.textContent = defaultPresetDescription;
+  clearFieldErrors();
+  hideFeedback(formFeedback);
+  hideToolFeedback();
+  pendingPresetSelection = { presetId: "", hasFieldOverrides: false };
+  window.history.replaceState({}, "", window.location.pathname);
+  statusLine.textContent = hasSuccessfulRun
+    ? "Starter inputs restored. Run the simulation again to compare with the last result."
+    : "Starter inputs restored. Run the simulation when you are ready.";
 }
 
 function pushValidationError(errors, field, message) {
@@ -848,6 +983,7 @@ async function runSimulation() {
 
   hideFeedback(formFeedback);
   hideFeedback(resultsFeedback);
+  hideToolFeedback();
   clearFieldErrors();
 
   if (validationErrors.length > 0) {
@@ -921,6 +1057,7 @@ async function runSimulation() {
     }
 
     hasSuccessfulRun = true;
+    replaceUrlWithCurrentScenario();
     hideFeedback(resultsFeedback);
     renderSummary(payload);
     renderInsights(payload);
@@ -961,12 +1098,41 @@ form.addEventListener("submit", (event) => {
   runSimulation();
 });
 
+copyLinkButton.addEventListener("click", async () => {
+  const values = collectFormValues();
+  const validationErrors = validateFormValues(values);
+
+  hideFeedback(formFeedback);
+  clearFieldErrors();
+
+  if (validationErrors.length > 0) {
+    renderValidationErrors(validationErrors);
+    showToolFeedback("Fix the highlighted inputs before creating a share link.", true);
+    return;
+  }
+
+  const shareUrl = new URL(window.location.origin + window.location.pathname);
+  shareUrl.search = buildScenarioSearchParams().toString();
+
+  try {
+    await navigator.clipboard.writeText(shareUrl.toString());
+    showToolFeedback("Share link copied. Anyone opening it will get this scenario prefilled.");
+    replaceUrlWithCurrentScenario();
+  } catch (error) {
+    showToolFeedback(`Copy failed, but this is the share URL: ${shareUrl.toString()}`, true);
+  }
+});
+
+resetFormButton.addEventListener("click", () => {
+  resetScenarioForm();
+});
+
 vehiclePresetSelect.addEventListener("change", (event) => {
   const presetId = event.target.value;
 
   if (!presetId) {
-    presetDescription.textContent =
-      "Pick a curated vehicle profile to prefill car-specific assumptions without changing your mileage or loan setup.";
+    presetDescription.textContent = defaultPresetDescription;
+    pendingPresetSelection = { presetId: "", hasFieldOverrides: false };
     return;
   }
 
@@ -978,6 +1144,11 @@ vehiclePresetSelect.addEventListener("change", (event) => {
   applyVehiclePreset(preset);
 });
 
-renderInitialResultsState();
-loadVehiclePresets();
-runSimulation();
+async function initializeApp() {
+  renderInitialResultsState();
+  applyScenarioFromQuery();
+  await loadVehiclePresets();
+  runSimulation();
+}
+
+initializeApp();

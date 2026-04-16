@@ -173,7 +173,12 @@
               </label>
             </fieldset>
 
-            <button type="submit">Run simulation</button>
+            <div class="scenario-tools">
+              <button type="submit">Run simulation</button>
+              <button id="copy-link-button" type="button" class="button-secondary">Copy share link</button>
+              <button id="reset-form-button" type="button" class="button-secondary">Reset starter inputs</button>
+            </div>
+            <p id="tool-feedback" class="tool-feedback" hidden aria-live="polite"></p>
             <div id="form-feedback" class="feedback-panel" hidden aria-live="polite"></div>
           </form>
         </section>
