@@ -7,6 +7,7 @@ const resultsCalloutTitle = document.getElementById("results-callout-title");
 const resultsCalloutCopy = document.getElementById("results-callout-copy");
 const summaryGrid = document.getElementById("summary-grid");
 const breakdownGrid = document.getElementById("breakdown-grid");
+const yearlyGrid = document.getElementById("yearly-grid");
 const canvas = document.getElementById("distribution-chart");
 const context = canvas.getContext("2d");
 
@@ -158,6 +159,20 @@ function renderBreakdownPlaceholder() {
   ]);
 }
 
+function renderYearlyBreakdownPlaceholder() {
+  yearlyGrid.innerHTML = `
+    <article class="yearly-card">
+      <h4>Yearly timeline</h4>
+      <dl>
+        <div><dt>Annual totals</dt><dd>After a run</dd></div>
+        <div><dt>Ending value</dt><dd>After a run</dd></div>
+        <div><dt>Remaining loan</dt><dd>After a run</dd></div>
+        <div><dt>Estimated equity</dt><dd>After a run</dd></div>
+      </dl>
+    </article>
+  `;
+}
+
 function drawPlaceholderChart(title, detail) {
   const width = canvas.width;
   const height = canvas.height;
@@ -184,6 +199,7 @@ function drawPlaceholderChart(title, detail) {
 function renderInitialResultsState() {
   renderSummaryPlaceholder("Run a scenario");
   renderBreakdownPlaceholder();
+  renderYearlyBreakdownPlaceholder();
   drawPlaceholderChart(
     "Simulation results will appear here",
     "Run the sample scenario or adjust the inputs to compare outcomes."
@@ -466,6 +482,33 @@ function renderBreakdown(response) {
   ]);
 }
 
+function renderYearlyBreakdown(response) {
+  const yearlyBreakdown = response.responseExampleYearlyBreakdown || [];
+
+  if (!yearlyBreakdown.length) {
+    renderYearlyBreakdownPlaceholder();
+    return;
+  }
+
+  yearlyGrid.innerHTML = yearlyBreakdown
+    .map(
+      (year) => `
+        <article class="yearly-card">
+          <h4>Year ${year.yearlyYear}</h4>
+          <dl>
+            <div><dt>Total for year</dt><dd>${currency.format(year.yearlyTotalCost)}</dd></div>
+            <div><dt>Loan payments</dt><dd>${currency.format(year.yearlyLoanPayments)}</dd></div>
+            <div><dt>Depreciation loss</dt><dd>${currency.format(year.yearlyDepreciationLoss)}</dd></div>
+            <div><dt>Ending value</dt><dd>${currency.format(year.yearlyEndingVehicleValue)}</dd></div>
+            <div><dt>Remaining loan</dt><dd>${currency.format(year.yearlyRemainingLoanBalance)}</dd></div>
+            <div><dt>Estimated equity</dt><dd>${currency.format(year.yearlyEstimatedEquity)}</dd></div>
+          </dl>
+        </article>
+      `
+    )
+    .join("");
+}
+
 function drawHistogram(values) {
   const width = canvas.width;
   const height = canvas.height;
@@ -562,6 +605,7 @@ async function runSimulation() {
   if (!hasSuccessfulRun) {
     renderSummaryPlaceholder("Running...");
     renderBreakdownPlaceholder();
+    renderYearlyBreakdownPlaceholder();
     drawPlaceholderChart("Running simulation...", "Sampling possible ownership paths for this scenario.");
   }
 
@@ -600,6 +644,7 @@ async function runSimulation() {
     hideFeedback(resultsFeedback);
     renderSummary(payload);
     renderBreakdown(payload);
+    renderYearlyBreakdown(payload);
     drawHistogram(payload.responseSampleTotals);
     setResultsCallout(
       "How to read this run",

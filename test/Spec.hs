@@ -62,20 +62,30 @@ deterministicCashPurchaseTest =
             }
         response = simulateRequestWithSeed 7 request
         summary = responseSummary response
+        yearlyBreakdown = responseExampleYearlyBreakdown response
         totalCost =
           case responseSampleTotals response of
             value : _ -> value
             [] -> 0
         expectedCost = 12000 / 30 * 4 + 500 + 1000 + 200
+        expectedYearOneTotal = 10000 + expectedCost
     assertClose "deterministic operating cost" expectedCost totalCost
     assertEqual "total miles driven is tracked" 12000 (summaryTotalMilesDriven summary)
     assertMaybeClose "deterministic cost per mile" (expectedCost / 12000) (summaryMeanCostPerMile summary)
+    assertEqual "yearly breakdown length matches years owned" 1 (length yearlyBreakdown)
+    case yearlyBreakdown of
+      [yearOne] -> do
+        assertEqual "year one index is tracked" 1 (yearlyYear yearOne)
+        assertClose "year one upfront payment is tracked" 10000 (yearlyUpfrontPayment yearOne)
+        assertClose "year one total includes upfront and annual costs" expectedYearOneTotal (yearlyTotalCost yearOne)
+      _ -> assertFailure "Expected exactly one yearly breakdown row."
 
 summaryOrderingTest :: Test
 summaryOrderingTest =
   TestCase $ do
     let response = simulateRequestWithSeed 20260415 exampleSimulationRequest
         summary = responseSummary response
+        yearlyBreakdown = responseExampleYearlyBreakdown response
         firstTotal =
           case responseSampleTotals response of
             value : _ -> value
@@ -88,6 +98,9 @@ summaryOrderingTest =
     assertClose "example breakdown matches the first sample" firstTotal (costTotal (responseExampleBreakdown response))
     assertBool "mean cost per mile is available" (summaryMeanCostPerMile summary /= Nothing)
     assertBool "median cost per mile is available" (summaryMedianCostPerMile summary /= Nothing)
+    assertEqual "five yearly rows are returned for the example request" 5 (length yearlyBreakdown)
+    assertEqual "yearly timeline starts at year one" 1 (yearlyYear (head yearlyBreakdown))
+    assertEqual "yearly timeline ends at the ownership horizon" 5 (yearlyYear (last yearlyBreakdown))
 
 invalidInputValidationTest :: Test
 invalidInputValidationTest =

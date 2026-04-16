@@ -259,14 +259,16 @@ button:disabled {
 }
 
 .summary-grid,
-.breakdown-grid {
+.breakdown-grid,
+.yearly-grid {
   display: grid;
   gap: 0.85rem;
   grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
 }
 
 .summary-card,
-.breakdown-card {
+.breakdown-card,
+.yearly-card {
   border: 1px solid var(--line);
   border-radius: 18px;
   padding: 1rem;
@@ -274,7 +276,8 @@ button:disabled {
 }
 
 .summary-card .label,
-.breakdown-card .label {
+.breakdown-card .label,
+.yearly-card .label {
   display: block;
   margin-bottom: 0.3rem;
   color: var(--muted);
@@ -282,10 +285,39 @@ button:disabled {
 }
 
 .summary-card .value,
-.breakdown-card .value {
+.breakdown-card .value,
+.yearly-card .value {
   font-size: 1.35rem;
   font-weight: 700;
   line-height: 1.15;
+}
+
+.yearly-card h4 {
+  margin: 0 0 0.7rem;
+  font-size: 1.02rem;
+}
+
+.yearly-card dl {
+  margin: 0;
+  display: grid;
+  gap: 0.45rem;
+}
+
+.yearly-card div {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.8rem;
+  align-items: baseline;
+}
+
+.yearly-card dt {
+  color: var(--muted);
+  font-size: 0.88rem;
+}
+
+.yearly-card dd {
+  margin: 0;
+  font-weight: 700;
 }
 
 .chart-shell {

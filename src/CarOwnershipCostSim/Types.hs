@@ -5,6 +5,7 @@ module CarOwnershipCostSim.Types
     SimulationInput (..),
     SimulationRequest (..),
     CostBreakdown (..),
+    YearlyCostBreakdown (..),
     SimulationSummary (..),
     SimulationResponse (..),
     exampleSimulationRequest,
@@ -74,6 +75,26 @@ instance FromJSON CostBreakdown
 
 instance ToJSON CostBreakdown
 
+data YearlyCostBreakdown = YearlyCostBreakdown
+  { yearlyYear :: Int,
+    yearlyUpfrontPayment :: Double,
+    yearlyLoanPayments :: Double,
+    yearlyFuel :: Double,
+    yearlyMaintenance :: Double,
+    yearlyInsurance :: Double,
+    yearlyRegistration :: Double,
+    yearlyDepreciationLoss :: Double,
+    yearlyEndingVehicleValue :: Double,
+    yearlyRemainingLoanBalance :: Double,
+    yearlyEstimatedEquity :: Double,
+    yearlyTotalCost :: Double
+  }
+  deriving (Eq, Show, Generic)
+
+instance FromJSON YearlyCostBreakdown
+
+instance ToJSON YearlyCostBreakdown
+
 data SimulationSummary = SimulationSummary
   { summaryIterations :: Int,
     summaryTotalMilesDriven :: Double,
@@ -98,7 +119,8 @@ data SimulationResponse = SimulationResponse
   { responseSeedUsed :: Int,
     responseSummary :: SimulationSummary,
     responseSampleTotals :: [Double],
-    responseExampleBreakdown :: CostBreakdown
+    responseExampleBreakdown :: CostBreakdown,
+    responseExampleYearlyBreakdown :: [YearlyCostBreakdown]
   }
   deriving (Eq, Show, Generic)
 

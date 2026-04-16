@@ -13,6 +13,7 @@ import CarOwnershipCostSim.Types
     SimulationRequest (..),
     SimulationResponse (..),
     SimulationSummary (..),
+    YearlyCostBreakdown (..),
   )
 import System.Random (StdGen, mkStdGen, randomR)
 
@@ -32,29 +33,17 @@ simulateRequestWithSeed seed request =
       simulationInput = requestInput request
       samples = simulateMany iterations (requestInput request) seed
       totals = map costTotal samples
+      (exampleBreakdown, exampleYearlyBreakdown, _) =
+        simulateDetailedCostBreakdown simulationInput (mkStdGen seed)
       totalMilesDriven =
         max 0 (simulationAnnualMiles simulationInput)
           * fromIntegral (max 1 (simulationYearsOwned simulationInput))
-      exampleBreakdown =
-        case samples of
-          sampleBreakdown : _ -> sampleBreakdown
-          [] ->
-            CostBreakdown
-              { costUpfrontPayment = 0,
-                costLoanPaymentsMade = 0,
-                costRemainingLoanBalance = 0,
-                costFuel = 0,
-                costMaintenance = 0,
-                costInsurance = 0,
-                costRegistration = 0,
-                costResaleValue = 0,
-                costTotal = 0
-              }
    in SimulationResponse
         { responseSeedUsed = seed,
           responseSummary = summarizeTotals iterations totalMilesDriven totals,
           responseSampleTotals = totals,
-          responseExampleBreakdown = exampleBreakdown
+          responseExampleBreakdown = exampleBreakdown,
+          responseExampleYearlyBreakdown = exampleYearlyBreakdown
         }
 
 validateSimulationRequest :: SimulationRequest -> [String]
@@ -95,15 +84,22 @@ costPerMile totalMilesDriven totalCost
 
 simulateCostBreakdown :: SimulationInput -> StdGen -> (CostBreakdown, StdGen)
 simulateCostBreakdown simulationInput initialGen =
+  let (breakdown, _, finalGen) = simulateDetailedCostBreakdown simulationInput initialGen
+   in (breakdown, finalGen)
+
+simulateDetailedCostBreakdown :: SimulationInput -> StdGen -> (CostBreakdown, [YearlyCostBreakdown], StdGen)
+simulateDetailedCostBreakdown simulationInput initialGen =
   let yearsOwned = max 1 (simulationYearsOwned simulationInput)
       purchasePrice = max 0 (simulationPurchasePrice simulationInput)
-      insuranceCost = max 0 (simulationAnnualInsurance simulationInput) * fromIntegral yearsOwned
-      registrationCost = max 0 (simulationAnnualRegistration simulationInput) * fromIntegral yearsOwned
+      annualInsuranceCost = max 0 (simulationAnnualInsurance simulationInput)
+      annualRegistrationCost = max 0 (simulationAnnualRegistration simulationInput)
+      insuranceCost = annualInsuranceCost * fromIntegral yearsOwned
+      registrationCost = annualRegistrationCost * fromIntegral yearsOwned
       annualGallons =
         if simulationMilesPerGallon simulationInput <= 0
           then 0
           else max 0 (simulationAnnualMiles simulationInput) / simulationMilesPerGallon simulationInput
-      (fuelCost, maintenanceCost, resaleValue, finalGen) =
+      (sampledYears, finalGen) =
         simulateYears
           yearsOwned
           purchasePrice
@@ -113,6 +109,17 @@ simulateCostBreakdown simulationInput initialGen =
           (simulationAnnualDepreciationRate simulationInput)
           initialGen
       financing = buildFinancingSnapshot simulationInput
+      yearlyBreakdowns =
+        zipWith
+          (buildYearlyCostBreakdown financing annualInsuranceCost annualRegistrationCost)
+          [1 ..]
+          sampledYears
+      fuelCost = sum (map sampledYearFuelCost sampledYears)
+      maintenanceCost = sum (map sampledYearMaintenanceCost sampledYears)
+      resaleValue =
+        case sampledYears of
+          [] -> purchasePrice
+          values -> sampledYearEndingVehicleValue (last values)
       totalCost =
         financingUpfrontPayment financing
           + financingPaymentsMade financing
@@ -133,8 +140,16 @@ simulateCostBreakdown simulationInput initialGen =
             costResaleValue = resaleValue,
             costTotal = totalCost
           },
+        yearlyBreakdowns,
         finalGen
       )
+
+data SampledYear = SampledYear
+  { sampledYearFuelCost :: Double,
+    sampledYearMaintenanceCost :: Double,
+    sampledYearDepreciationLoss :: Double,
+    sampledYearEndingVehicleValue :: Double
+  }
 
 simulateYears ::
   Int ->
@@ -144,22 +159,31 @@ simulateYears ::
   BoundedNormal ->
   BoundedNormal ->
   StdGen ->
-  (Double, Double, Double, StdGen)
+  ([SampledYear], StdGen)
 simulateYears yearsRemaining carValue annualGallons fuelModel maintenanceModel depreciationModel =
-  go yearsRemaining 0 0 carValue
+  go yearsRemaining carValue []
   where
-    go 0 fuelAcc maintenanceAcc currentValue gen = (fuelAcc, maintenanceAcc, currentValue, gen)
-    go remaining fuelAcc maintenanceAcc currentValue gen0 =
+    go 0 _ acc gen = (reverse acc, gen)
+    go remaining currentValue acc gen0 =
       let (fuelPrice, gen1) = sampleBoundedNormal fuelModel gen0
           (maintenanceCost, gen2) = sampleBoundedNormal maintenanceModel gen1
           (depreciationRate, gen3) = sampleBoundedNormal depreciationModel gen2
           nextValue = max 0 (currentValue * (1 - depreciationRate))
-          nextFuelAcc = fuelAcc + annualGallons * fuelPrice
-          nextMaintenanceAcc = maintenanceAcc + maintenanceCost
-       in go (remaining - 1) nextFuelAcc nextMaintenanceAcc nextValue gen3
+          sampledYear =
+            SampledYear
+              { sampledYearFuelCost = annualGallons * fuelPrice,
+                sampledYearMaintenanceCost = maintenanceCost,
+                sampledYearDepreciationLoss = max 0 (currentValue - nextValue),
+                sampledYearEndingVehicleValue = nextValue
+              }
+       in go (remaining - 1) nextValue (sampledYear : acc) gen3
 
 data FinancingSnapshot = FinancingSnapshot
   { financingUpfrontPayment :: Double,
+    financingPrincipal :: Double,
+    financingAnnualRate :: Double,
+    financingLoanTermMonths :: Int,
+    financingMonthlyPayment :: Double,
     financingPaymentsMade :: Double,
     financingRemainingBalance :: Double
   }
@@ -170,6 +194,7 @@ buildFinancingSnapshot simulationInput =
       downPayment = max 0 (min purchasePrice (simulationDownPayment simulationInput))
       loanTermMonths = max 0 (simulationLoanTermMonths simulationInput)
       monthsOwned = max 0 (simulationYearsOwned simulationInput * 12)
+      annualRate = max 0 (simulationLoanApr simulationInput)
       financedAmount =
         if loanTermMonths > 0 && purchasePrice > downPayment
           then purchasePrice - downPayment
@@ -179,14 +204,72 @@ buildFinancingSnapshot simulationInput =
           then downPayment
           else purchasePrice
       paymentsMadeCount = min monthsOwned loanTermMonths
-      monthlyPayment = loanMonthlyPayment financedAmount (max 0 (simulationLoanApr simulationInput)) loanTermMonths
+      monthlyPayment = loanMonthlyPayment financedAmount annualRate loanTermMonths
       paymentsMade = monthlyPayment * fromIntegral paymentsMadeCount
-      remainingBalance = remainingLoanBalance financedAmount (max 0 (simulationLoanApr simulationInput)) loanTermMonths paymentsMadeCount
+      remainingBalance = remainingLoanBalance financedAmount annualRate loanTermMonths paymentsMadeCount
    in FinancingSnapshot
         { financingUpfrontPayment = upfrontPayment,
+          financingPrincipal = financedAmount,
+          financingAnnualRate = annualRate,
+          financingLoanTermMonths = loanTermMonths,
+          financingMonthlyPayment = monthlyPayment,
           financingPaymentsMade = paymentsMade,
           financingRemainingBalance = remainingBalance
         }
+
+buildYearlyCostBreakdown ::
+  FinancingSnapshot ->
+  Double ->
+  Double ->
+  Int ->
+  SampledYear ->
+  YearlyCostBreakdown
+buildYearlyCostBreakdown financing annualInsuranceCost annualRegistrationCost yearIndex sampledYear =
+  let upfrontPayment =
+        if yearIndex == 1
+          then financingUpfrontPayment financing
+          else 0
+      loanPayments = loanPaymentsForYear financing yearIndex
+      yearEndLoanBalance = remainingLoanBalanceAtYearEnd financing yearIndex
+      endingVehicleValue = sampledYearEndingVehicleValue sampledYear
+      totalCost =
+        upfrontPayment
+          + loanPayments
+          + sampledYearFuelCost sampledYear
+          + sampledYearMaintenanceCost sampledYear
+          + annualInsuranceCost
+          + annualRegistrationCost
+          + sampledYearDepreciationLoss sampledYear
+   in YearlyCostBreakdown
+        { yearlyYear = yearIndex,
+          yearlyUpfrontPayment = upfrontPayment,
+          yearlyLoanPayments = loanPayments,
+          yearlyFuel = sampledYearFuelCost sampledYear,
+          yearlyMaintenance = sampledYearMaintenanceCost sampledYear,
+          yearlyInsurance = annualInsuranceCost,
+          yearlyRegistration = annualRegistrationCost,
+          yearlyDepreciationLoss = sampledYearDepreciationLoss sampledYear,
+          yearlyEndingVehicleValue = endingVehicleValue,
+          yearlyRemainingLoanBalance = yearEndLoanBalance,
+          yearlyEstimatedEquity = endingVehicleValue - yearEndLoanBalance,
+          yearlyTotalCost = totalCost
+        }
+
+loanPaymentsForYear :: FinancingSnapshot -> Int -> Double
+loanPaymentsForYear financing yearIndex =
+  let monthsPaidBeforeYear = max 0 ((yearIndex - 1) * 12)
+      monthsPaidThroughYear = min (yearIndex * 12) (financingLoanTermMonths financing)
+      monthsPaidThisYear = max 0 (monthsPaidThroughYear - monthsPaidBeforeYear)
+   in financingMonthlyPayment financing * fromIntegral monthsPaidThisYear
+
+remainingLoanBalanceAtYearEnd :: FinancingSnapshot -> Int -> Double
+remainingLoanBalanceAtYearEnd financing yearIndex =
+  let monthsPaidThroughYear = min (yearIndex * 12) (financingLoanTermMonths financing)
+   in remainingLoanBalance
+        (financingPrincipal financing)
+        (financingAnnualRate financing)
+        (financingLoanTermMonths financing)
+        monthsPaidThroughYear
 
 loanMonthlyPayment :: Double -> Double -> Int -> Double
 loanMonthlyPayment principal annualRate termMonths
