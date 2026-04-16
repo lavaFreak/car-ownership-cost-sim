@@ -8,10 +8,13 @@ const resultsFeedback = document.getElementById("results-feedback");
 const resultsCalloutTitle = document.getElementById("results-callout-title");
 const resultsCalloutCopy = document.getElementById("results-callout-copy");
 const summaryGrid = document.getElementById("summary-grid");
+const insightGrid = document.getElementById("insight-grid");
 const breakdownGrid = document.getElementById("breakdown-grid");
 const yearlyGrid = document.getElementById("yearly-grid");
 const canvas = document.getElementById("distribution-chart");
+const yearlyChart = document.getElementById("yearly-chart");
 const context = canvas.getContext("2d");
+const yearlyChartContext = yearlyChart.getContext("2d");
 
 const currency = new Intl.NumberFormat("en-US", {
   style: "currency",
@@ -200,10 +203,11 @@ function buildRequestPayload(values) {
 }
 
 function renderCards(container, cards) {
+  const cardClass = container === breakdownGrid ? "breakdown-card" : "summary-card";
   container.innerHTML = cards
     .map(
       ({ label, value }) => `
-        <article class="${container === summaryGrid ? "summary-card" : "breakdown-card"}">
+        <article class="${cardClass}">
           <span class="label">${label}</span>
           <span class="value">${value}</span>
         </article>
@@ -247,6 +251,15 @@ function renderBreakdownPlaceholder() {
   ]);
 }
 
+function renderInsightPlaceholder() {
+  renderCards(insightGrid, [
+    { label: "Typical yearly cost", value: "After a run" },
+    { label: "10-90 spread", value: "After a run" },
+    { label: "Sampled end equity", value: "After a run" },
+    { label: "Repair-shock share", value: "After a run" },
+  ]);
+}
+
 function renderYearlyBreakdownPlaceholder() {
   yearlyGrid.innerHTML = `
         <article class="yearly-card">
@@ -287,13 +300,41 @@ function drawPlaceholderChart(title, detail) {
   context.textAlign = "start";
 }
 
+function drawYearlyPlaceholderChart(title, detail) {
+  const width = yearlyChart.width;
+  const height = yearlyChart.height;
+
+  yearlyChartContext.clearRect(0, 0, width, height);
+  yearlyChartContext.fillStyle = "#fff8ef";
+  yearlyChartContext.fillRect(0, 0, width, height);
+
+  yearlyChartContext.strokeStyle = "rgba(31, 38, 48, 0.18)";
+  yearlyChartContext.lineWidth = 1;
+  yearlyChartContext.strokeRect(22, 22, width - 44, height - 44);
+
+  yearlyChartContext.fillStyle = "#1f2630";
+  yearlyChartContext.font = '600 20px "Avenir Next", "Segoe UI", sans-serif';
+  yearlyChartContext.textAlign = "center";
+  yearlyChartContext.fillText(title, width / 2, height / 2 - 12);
+
+  yearlyChartContext.fillStyle = "#5f6976";
+  yearlyChartContext.font = '14px "Avenir Next", "Segoe UI", sans-serif';
+  yearlyChartContext.fillText(detail, width / 2, height / 2 + 16);
+  yearlyChartContext.textAlign = "start";
+}
+
 function renderInitialResultsState() {
   renderSummaryPlaceholder("Run a scenario");
+  renderInsightPlaceholder();
   renderBreakdownPlaceholder();
   renderYearlyBreakdownPlaceholder();
   drawPlaceholderChart(
     "Simulation results will appear here",
     "Run the sample scenario or adjust the inputs to compare outcomes."
+  );
+  drawYearlyPlaceholderChart(
+    "Year-by-year pattern will appear here",
+    "The sampled timeline will show annual cost pressure after a run."
   );
   setResultsCallout(
     "How to read the results",
@@ -629,6 +670,39 @@ function renderBreakdown(response) {
   ]);
 }
 
+function renderInsights(response) {
+  const summary = response.responseSummary;
+  const yearlyBreakdown = response.responseExampleYearlyBreakdown || [];
+  const yearsOwned = Math.max(1, yearlyBreakdown.length || 1);
+  const spread = summary.summaryP90TotalCost - summary.summaryP10TotalCost;
+  const endingEquity = yearlyBreakdown.length
+    ? yearlyBreakdown[yearlyBreakdown.length - 1].yearlyEstimatedEquity
+    : 0;
+  const repairShockShare =
+    response.responseExampleBreakdown.costTotal <= 0
+      ? null
+      : response.responseExampleBreakdown.costRepairShocks / response.responseExampleBreakdown.costTotal;
+
+  renderCards(insightGrid, [
+    {
+      label: "Typical yearly cost",
+      value: currency.format(summary.summaryMedianTotalCost / yearsOwned),
+    },
+    {
+      label: "10-90 spread",
+      value: currency.format(spread),
+    },
+    {
+      label: "Sampled end equity",
+      value: currency.format(endingEquity),
+    },
+    {
+      label: "Repair-shock share",
+      value: repairShockShare === null ? "N/A" : `${Math.round(repairShockShare * 100)}%`,
+    },
+  ]);
+}
+
 function renderYearlyBreakdown(response) {
   const yearlyBreakdown = response.responseExampleYearlyBreakdown || [];
 
@@ -657,6 +731,60 @@ function renderYearlyBreakdown(response) {
       `
     )
     .join("");
+}
+
+function drawYearlyCostChart(yearlyBreakdown) {
+  const width = yearlyChart.width;
+  const height = yearlyChart.height;
+
+  yearlyChartContext.clearRect(0, 0, width, height);
+
+  if (!yearlyBreakdown.length) {
+    drawYearlyPlaceholderChart("No yearly pattern yet", "Run a simulation to draw the annual cost path.");
+    return;
+  }
+
+  const values = yearlyBreakdown.map((year) => year.yearlyTotalCost);
+  const maxValue = Math.max(...values, 1);
+  const chartLeft = 48;
+  const chartBottom = height - 36;
+  const chartWidth = width - chartLeft - 24;
+  const chartHeight = height - 62;
+  const barWidth = chartWidth / yearlyBreakdown.length;
+
+  yearlyChartContext.fillStyle = "#fff8ef";
+  yearlyChartContext.fillRect(0, 0, width, height);
+
+  yearlyChartContext.strokeStyle = "rgba(31, 38, 48, 0.18)";
+  yearlyChartContext.lineWidth = 1;
+  yearlyChartContext.beginPath();
+  yearlyChartContext.moveTo(chartLeft, 16);
+  yearlyChartContext.lineTo(chartLeft, chartBottom);
+  yearlyChartContext.lineTo(width - 16, chartBottom);
+  yearlyChartContext.stroke();
+
+  yearlyBreakdown.forEach((year, index) => {
+    const barHeight = (year.yearlyTotalCost / maxValue) * chartHeight;
+    const x = chartLeft + index * barWidth + 10;
+    const y = chartBottom - barHeight;
+
+    yearlyChartContext.fillStyle =
+      index === 0 ? "rgba(31, 38, 48, 0.82)" : "rgba(184, 95, 54, 0.72)";
+    yearlyChartContext.fillRect(x, y, Math.max(barWidth - 18, 10), barHeight);
+
+    yearlyChartContext.fillStyle = "#5f6976";
+    yearlyChartContext.font = '13px "Avenir Next", "Segoe UI", sans-serif';
+    yearlyChartContext.fillText(`Y${year.yearlyYear}`, x, height - 10);
+  });
+
+  yearlyChartContext.fillStyle = "#1f2630";
+  yearlyChartContext.font = '600 16px "Avenir Next", "Segoe UI", sans-serif';
+  yearlyChartContext.fillText("Sampled yearly cost path", chartLeft, 18);
+
+  yearlyChartContext.fillStyle = "#5f6976";
+  yearlyChartContext.font = '14px "Avenir Next", "Segoe UI", sans-serif';
+  yearlyChartContext.fillText(currency.format(maxValue), 4, 24);
+  yearlyChartContext.fillText("$0", 16, height - 10);
 }
 
 function drawHistogram(values) {
@@ -754,9 +882,11 @@ async function runSimulation() {
 
   if (!hasSuccessfulRun) {
     renderSummaryPlaceholder("Running...");
+    renderInsightPlaceholder();
     renderBreakdownPlaceholder();
     renderYearlyBreakdownPlaceholder();
     drawPlaceholderChart("Running simulation...", "Sampling possible ownership paths for this scenario.");
+    drawYearlyPlaceholderChart("Running simulation...", "Building the sampled annual timeline.");
   }
 
   try {
@@ -793,9 +923,11 @@ async function runSimulation() {
     hasSuccessfulRun = true;
     hideFeedback(resultsFeedback);
     renderSummary(payload);
+    renderInsights(payload);
     renderBreakdown(payload);
     renderYearlyBreakdown(payload);
     drawHistogram(payload.responseSampleTotals);
+    drawYearlyCostChart(payload.responseExampleYearlyBreakdown || []);
     setResultsCallout(
       "How to read this run",
       "Average cost is the across-run mean. Median is the middle outcome. The 10th to 90th percentile band is a practical low-to-high range for many scenarios, but outliers can still land outside it."

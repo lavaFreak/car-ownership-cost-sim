@@ -85,22 +85,32 @@ The current MVP models uncertainty with bounded normal distributions for:
 - fuel price
 - annual maintenance
 - annual depreciation rate
+- annual repair shock cost when a repair shock occurs
 
 For each simulation run, the app estimates total ownership cost as:
 
 ```text
 upfront payment
++ purchase tax
++ upfront fees
 + loan payments made during ownership
 + remaining loan balance at sale
 + fuel
 + maintenance
++ repair shocks
 + insurance
 + registration
 - resale value
 ```
 
-This is intentionally a first-pass model. It captures several major cost
-drivers while staying small enough to verify and improve.
+The yearly model now also applies:
+
+- purchase tax and upfront one-time fees
+- annual inflation to recurring costs such as fuel, maintenance, insurance, registration, and repair shocks
+- year-by-year sampled traces for the example scenario
+
+This is still intentionally compact, but it now captures more of the front
+loaded and tail-risk behavior that matters in real ownership decisions.
 
 ## Current API
 
@@ -110,6 +120,8 @@ The backend currently exposes:
   Serves the frontend.
 - `GET /api/example`
   Returns a sample request payload.
+- `GET /api/presets`
+  Returns a small curated set of vehicle presets for pre-filling car-specific assumptions.
 - `POST /api/simulate`
   Runs the simulation and returns summary statistics plus sample totals.
 
@@ -167,13 +179,14 @@ Then open `http://localhost:3000`.
 ## Current Status
 
 The repository already includes an initial simulation engine, a Scotty-based web
-server, a lightweight frontend, and a small test suite. The next step is to
-turn the MVP assumptions into a more careful model and tighten the project
-documentation as the code grows.
+server, a lightweight frontend, curated vehicle presets, and a growing test
+suite. The current app can now model taxes and fees, inflation, repair-shock
+tail risk, yearly sample traces, and preset vehicle assumptions while keeping
+the web layer lightweight.
 
 ## Near-Term Next Tasks
 
-- add input validation and clearer error messages
-- expose yearly sample traces for richer visualizations
+- compare multiple vehicles side by side
 - support alternative probability distributions
 - improve the resale model so it is not driven only by annual depreciation
+- add state-specific taxes and registration rules
