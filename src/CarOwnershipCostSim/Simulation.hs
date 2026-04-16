@@ -91,6 +91,9 @@ simulateDetailedCostBreakdown :: SimulationInput -> StdGen -> (CostBreakdown, [Y
 simulateDetailedCostBreakdown simulationInput initialGen =
   let yearsOwned = max 1 (simulationYearsOwned simulationInput)
       purchasePrice = max 0 (simulationPurchasePrice simulationInput)
+      salesTaxRate = max 0 (simulationSalesTaxRate simulationInput)
+      purchaseTax = purchasePrice * salesTaxRate
+      upfrontFees = max 0 (simulationUpfrontFees simulationInput)
       annualInsuranceCost = max 0 (simulationAnnualInsurance simulationInput)
       annualRegistrationCost = max 0 (simulationAnnualRegistration simulationInput)
       insuranceCost = annualInsuranceCost * fromIntegral yearsOwned
@@ -111,7 +114,7 @@ simulateDetailedCostBreakdown simulationInput initialGen =
       financing = buildFinancingSnapshot simulationInput
       yearlyBreakdowns =
         zipWith
-          (buildYearlyCostBreakdown financing annualInsuranceCost annualRegistrationCost)
+          (buildYearlyCostBreakdown financing purchaseTax upfrontFees annualInsuranceCost annualRegistrationCost)
           [1 ..]
           sampledYears
       fuelCost = sum (map sampledYearFuelCost sampledYears)
@@ -122,6 +125,8 @@ simulateDetailedCostBreakdown simulationInput initialGen =
           values -> sampledYearEndingVehicleValue (last values)
       totalCost =
         financingUpfrontPayment financing
+          + purchaseTax
+          + upfrontFees
           + financingPaymentsMade financing
           + financingRemainingBalance financing
           + fuelCost
@@ -131,6 +136,8 @@ simulateDetailedCostBreakdown simulationInput initialGen =
           - resaleValue
    in ( CostBreakdown
           { costUpfrontPayment = financingUpfrontPayment financing,
+            costPurchaseTax = purchaseTax,
+            costUpfrontFees = upfrontFees,
             costLoanPaymentsMade = financingPaymentsMade financing,
             costRemainingLoanBalance = financingRemainingBalance financing,
             costFuel = fuelCost,
@@ -221,19 +228,31 @@ buildYearlyCostBreakdown ::
   FinancingSnapshot ->
   Double ->
   Double ->
+  Double ->
+  Double ->
   Int ->
   SampledYear ->
   YearlyCostBreakdown
-buildYearlyCostBreakdown financing annualInsuranceCost annualRegistrationCost yearIndex sampledYear =
+buildYearlyCostBreakdown financing purchaseTax upfrontFees annualInsuranceCost annualRegistrationCost yearIndex sampledYear =
   let upfrontPayment =
         if yearIndex == 1
           then financingUpfrontPayment financing
+          else 0
+      yearOnePurchaseTax =
+        if yearIndex == 1
+          then purchaseTax
+          else 0
+      yearOneUpfrontFees =
+        if yearIndex == 1
+          then upfrontFees
           else 0
       loanPayments = loanPaymentsForYear financing yearIndex
       yearEndLoanBalance = remainingLoanBalanceAtYearEnd financing yearIndex
       endingVehicleValue = sampledYearEndingVehicleValue sampledYear
       totalCost =
         upfrontPayment
+          + yearOnePurchaseTax
+          + yearOneUpfrontFees
           + loanPayments
           + sampledYearFuelCost sampledYear
           + sampledYearMaintenanceCost sampledYear
@@ -243,6 +262,8 @@ buildYearlyCostBreakdown financing annualInsuranceCost annualRegistrationCost ye
    in YearlyCostBreakdown
         { yearlyYear = yearIndex,
           yearlyUpfrontPayment = upfrontPayment,
+          yearlyPurchaseTax = yearOnePurchaseTax,
+          yearlyUpfrontFees = yearOneUpfrontFees,
           yearlyLoanPayments = loanPayments,
           yearlyFuel = sampledYearFuelCost sampledYear,
           yearlyMaintenance = sampledYearMaintenanceCost sampledYear,
@@ -331,6 +352,9 @@ validateSimulationInput simulationInput =
       require
         (simulationDownPayment simulationInput <= simulationPurchasePrice simulationInput)
         "Down payment cannot exceed purchase price.",
+      require (simulationSalesTaxRate simulationInput >= 0) "Sales tax rate cannot be negative.",
+      require (simulationSalesTaxRate simulationInput <= 1) "Sales tax rate should be expressed as a decimal between 0 and 1.",
+      require (simulationUpfrontFees simulationInput >= 0) "Upfront fees cannot be negative.",
       require (simulationYearsOwned simulationInput >= 1) "Years owned must be at least 1.",
       require (simulationAnnualMiles simulationInput >= 0) "Annual miles cannot be negative.",
       require (simulationMilesPerGallon simulationInput > 0) "Fuel efficiency must be greater than 0 MPG.",

@@ -30,6 +30,8 @@ instance ToJSON BoundedNormal
 data SimulationInput = SimulationInput
   { simulationPurchasePrice :: Double,
     simulationDownPayment :: Double,
+    simulationSalesTaxRate :: Double,
+    simulationUpfrontFees :: Double,
     simulationYearsOwned :: Int,
     simulationAnnualMiles :: Double,
     simulationMilesPerGallon :: Double,
@@ -60,6 +62,8 @@ instance ToJSON SimulationRequest
 
 data CostBreakdown = CostBreakdown
   { costUpfrontPayment :: Double,
+    costPurchaseTax :: Double,
+    costUpfrontFees :: Double,
     costLoanPaymentsMade :: Double,
     costRemainingLoanBalance :: Double,
     costFuel :: Double,
@@ -78,6 +82,8 @@ instance ToJSON CostBreakdown
 data YearlyCostBreakdown = YearlyCostBreakdown
   { yearlyYear :: Int,
     yearlyUpfrontPayment :: Double,
+    yearlyPurchaseTax :: Double,
+    yearlyUpfrontFees :: Double,
     yearlyLoanPayments :: Double,
     yearlyFuel :: Double,
     yearlyMaintenance :: Double,
@@ -137,6 +143,8 @@ exampleSimulationRequest =
         SimulationInput
           { simulationPurchasePrice = 32000,
             simulationDownPayment = 5000,
+            simulationSalesTaxRate = 0.0675,
+            simulationUpfrontFees = 650,
             simulationYearsOwned = 5,
             simulationAnnualMiles = 12000,
             simulationMilesPerGallon = 32,

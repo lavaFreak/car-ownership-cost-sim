@@ -15,6 +15,7 @@ tests :: Test
 tests =
   TestList
     [ TestLabel "deterministic cash purchase keeps only operating costs" deterministicCashPurchaseTest,
+      TestLabel "purchase taxes and fees are included" purchaseTaxAndFeesTest,
       TestLabel "summary statistics stay ordered" summaryOrderingTest,
       TestLabel "invalid input is rejected" invalidInputValidationTest
     ]
@@ -30,6 +31,8 @@ deterministicCashPurchaseTest =
                 SimulationInput
                   { simulationPurchasePrice = 10000,
                     simulationDownPayment = 0,
+                    simulationSalesTaxRate = 0,
+                    simulationUpfrontFees = 0,
                     simulationYearsOwned = 1,
                     simulationAnnualMiles = 12000,
                     simulationMilesPerGallon = 30,
@@ -77,7 +80,65 @@ deterministicCashPurchaseTest =
       [yearOne] -> do
         assertEqual "year one index is tracked" 1 (yearlyYear yearOne)
         assertClose "year one upfront payment is tracked" 10000 (yearlyUpfrontPayment yearOne)
+        assertClose "year one purchase tax stays zero" 0 (yearlyPurchaseTax yearOne)
+        assertClose "year one upfront fees stay zero" 0 (yearlyUpfrontFees yearOne)
         assertClose "year one total includes upfront and annual costs" expectedYearOneTotal (yearlyTotalCost yearOne)
+      _ -> assertFailure "Expected exactly one yearly breakdown row."
+
+purchaseTaxAndFeesTest :: Test
+purchaseTaxAndFeesTest =
+  TestCase $ do
+    let request =
+          SimulationRequest
+            { requestIterations = 1,
+              requestSeed = Just 11,
+              requestInput =
+                SimulationInput
+                  { simulationPurchasePrice = 20000,
+                    simulationDownPayment = 4000,
+                    simulationSalesTaxRate = 0.05,
+                    simulationUpfrontFees = 300,
+                    simulationYearsOwned = 1,
+                    simulationAnnualMiles = 0,
+                    simulationMilesPerGallon = 30,
+                    simulationAnnualInsurance = 0,
+                    simulationAnnualRegistration = 0,
+                    simulationLoanApr = 0,
+                    simulationLoanTermMonths = 12,
+                    simulationFuelPrice =
+                      BoundedNormal
+                        { boundedNormalMean = 4,
+                          boundedNormalStdDev = 0,
+                          boundedNormalLowerBound = 4,
+                          boundedNormalUpperBound = Just 4
+                        },
+                    simulationAnnualMaintenance =
+                      BoundedNormal
+                        { boundedNormalMean = 0,
+                          boundedNormalStdDev = 0,
+                          boundedNormalLowerBound = 0,
+                          boundedNormalUpperBound = Just 0
+                        },
+                    simulationAnnualDepreciationRate =
+                      BoundedNormal
+                        { boundedNormalMean = 0,
+                          boundedNormalStdDev = 0,
+                          boundedNormalLowerBound = 0,
+                          boundedNormalUpperBound = Just 0
+                        }
+                  }
+            }
+        response = simulateRequestWithSeed 11 request
+        breakdown = responseExampleBreakdown response
+        yearlyBreakdown = responseExampleYearlyBreakdown response
+    assertClose "purchase tax is included in example breakdown" 1000 (costPurchaseTax breakdown)
+    assertClose "upfront fees are included in example breakdown" 300 (costUpfrontFees breakdown)
+    assertClose "total reflects purchase costs net of full resale value" 1300 (costTotal breakdown)
+    case yearlyBreakdown of
+      [yearOne] -> do
+        assertClose "year one purchase tax is tracked" 1000 (yearlyPurchaseTax yearOne)
+        assertClose "year one upfront fees are tracked" 300 (yearlyUpfrontFees yearOne)
+        assertClose "year one total includes tax and fees" 21300 (yearlyTotalCost yearOne)
       _ -> assertFailure "Expected exactly one yearly breakdown row."
 
 summaryOrderingTest :: Test
@@ -113,6 +174,8 @@ invalidInputValidationTest =
                 SimulationInput
                   { simulationPurchasePrice = 20000,
                     simulationDownPayment = 25000,
+                    simulationSalesTaxRate = 1.2,
+                    simulationUpfrontFees = -1,
                     simulationYearsOwned = 0,
                     simulationAnnualMiles = 12000,
                     simulationMilesPerGallon = 0,
@@ -146,6 +209,8 @@ invalidInputValidationTest =
         validationErrors = validateSimulationRequest invalidRequest
     assertBool "iterations are validated" ("Iterations must be at least 1." `elem` validationErrors)
     assertBool "down payment is validated" ("Down payment cannot exceed purchase price." `elem` validationErrors)
+    assertBool "sales tax is validated" ("Sales tax rate should be expressed as a decimal between 0 and 1." `elem` validationErrors)
+    assertBool "upfront fees are validated" ("Upfront fees cannot be negative." `elem` validationErrors)
     assertBool "years owned is validated" ("Years owned must be at least 1." `elem` validationErrors)
     assertBool "fuel efficiency is validated" ("Fuel efficiency must be greater than 0 MPG." `elem` validationErrors)
     assertBool "APR is validated" ("Loan APR should be expressed as a decimal between 0 and 1." `elem` validationErrors)

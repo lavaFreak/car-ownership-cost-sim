@@ -48,6 +48,8 @@ function collectFormValues() {
   return {
     purchasePrice: numericValue("purchasePrice"),
     downPayment: numericValue("downPayment"),
+    salesTaxPercent: numericValue("salesTaxPercent"),
+    upfrontFees: numericValue("upfrontFees"),
     yearsOwned: numericValue("yearsOwned"),
     annualMiles: numericValue("annualMiles"),
     milesPerGallon: numericValue("milesPerGallon"),
@@ -85,6 +87,8 @@ function buildRequestPayload(values) {
     requestInput: {
       simulationPurchasePrice: values.purchasePrice,
       simulationDownPayment: values.downPayment,
+      simulationSalesTaxRate: values.salesTaxPercent / 100,
+      simulationUpfrontFees: values.upfrontFees,
       simulationYearsOwned: values.yearsOwned,
       simulationAnnualMiles: values.annualMiles,
       simulationMilesPerGallon: values.milesPerGallon,
@@ -148,6 +152,8 @@ function renderSummaryPlaceholder(averageLabel) {
 function renderBreakdownPlaceholder() {
   renderCards(breakdownGrid, [
     { label: "Upfront payment", value: "After a run" },
+    { label: "Purchase tax", value: "After a run" },
+    { label: "Upfront fees", value: "After a run" },
     { label: "Loan payments", value: "After a run" },
     { label: "Loan balance at sale", value: "After a run" },
     { label: "Fuel", value: "After a run" },
@@ -161,13 +167,14 @@ function renderBreakdownPlaceholder() {
 
 function renderYearlyBreakdownPlaceholder() {
   yearlyGrid.innerHTML = `
-    <article class="yearly-card">
-      <h4>Yearly timeline</h4>
-      <dl>
-        <div><dt>Annual totals</dt><dd>After a run</dd></div>
-        <div><dt>Ending value</dt><dd>After a run</dd></div>
-        <div><dt>Remaining loan</dt><dd>After a run</dd></div>
-        <div><dt>Estimated equity</dt><dd>After a run</dd></div>
+        <article class="yearly-card">
+          <h4>Yearly timeline</h4>
+          <dl>
+            <div><dt>Annual totals</dt><dd>After a run</dd></div>
+            <div><dt>Year 1 purchase costs</dt><dd>After a run</dd></div>
+            <div><dt>Ending value</dt><dd>After a run</dd></div>
+            <div><dt>Remaining loan</dt><dd>After a run</dd></div>
+            <div><dt>Estimated equity</dt><dd>After a run</dd></div>
       </dl>
     </article>
   `;
@@ -259,6 +266,20 @@ function validateFormValues(values) {
     if (Number.isFinite(values.purchasePrice) && values.downPayment > values.purchasePrice) {
       pushValidationError(errors, "downPayment", "Down payment cannot exceed purchase price.");
     }
+  }
+
+  if (validateRequiredNumber(errors, values, "salesTaxPercent", "Sales tax")) {
+    if (values.salesTaxPercent < 0) {
+      pushValidationError(errors, "salesTaxPercent", "Sales tax cannot be negative.");
+    }
+
+    if (values.salesTaxPercent > 100) {
+      pushValidationError(errors, "salesTaxPercent", "Sales tax must be 100% or less.");
+    }
+  }
+
+  if (validateRequiredNumber(errors, values, "upfrontFees", "Upfront fees") && values.upfrontFees < 0) {
+    pushValidationError(errors, "upfrontFees", "Upfront fees cannot be negative.");
   }
 
   if (validateRequiredInteger(errors, values, "yearsOwned", "Years owned") && values.yearsOwned < 1) {
@@ -471,6 +492,8 @@ function renderBreakdown(response) {
   const sample = response.responseExampleBreakdown;
   renderCards(breakdownGrid, [
     { label: "Upfront payment", value: currency.format(sample.costUpfrontPayment) },
+    { label: "Purchase tax", value: currency.format(sample.costPurchaseTax) },
+    { label: "Upfront fees", value: currency.format(sample.costUpfrontFees) },
     { label: "Loan payments", value: currency.format(sample.costLoanPaymentsMade) },
     { label: "Loan balance at sale", value: currency.format(sample.costRemainingLoanBalance) },
     { label: "Fuel", value: currency.format(sample.costFuel) },
@@ -497,6 +520,7 @@ function renderYearlyBreakdown(response) {
           <h4>Year ${year.yearlyYear}</h4>
           <dl>
             <div><dt>Total for year</dt><dd>${currency.format(year.yearlyTotalCost)}</dd></div>
+            <div><dt>Year 1 purchase costs</dt><dd>${currency.format(year.yearlyPurchaseTax + year.yearlyUpfrontFees)}</dd></div>
             <div><dt>Loan payments</dt><dd>${currency.format(year.yearlyLoanPayments)}</dd></div>
             <div><dt>Depreciation loss</dt><dd>${currency.format(year.yearlyDepreciationLoss)}</dd></div>
             <div><dt>Ending value</dt><dd>${currency.format(year.yearlyEndingVehicleValue)}</dd></div>
