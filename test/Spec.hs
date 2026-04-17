@@ -52,6 +52,9 @@ tests =
       TestLabel "purchase taxes and fees are included" purchaseTaxAndFeesTest,
       TestLabel "inflation raises later-year recurring costs" inflationTest,
       TestLabel "repair shocks add tail-risk costs" repairShockTest,
+      TestLabel "zero APR financing tracks partial payoff correctly" zeroAprFinancingTest,
+      TestLabel "loan payments stop after the payoff year" loanPayoffHorizonTest,
+      TestLabel "full depreciation floors resale at zero" fullDepreciationFloorTest,
       TestLabel "vehicle catalog loads and drives presets" vehicleCatalogTest,
       TestLabel "catalog import seeds build normalized entries" catalogImportSeedTest,
       TestLabel "vehicle source seeds load cleanly" vehicleSourceSeedLoadTest,
@@ -67,7 +70,8 @@ tests =
       TestLabel "simulation is deterministic for a fixed seed" simulationDeterminismTest,
       TestLabel "simulation invariants hold across many seeds" simulationInvariantsAcrossSeedsTest,
       TestLabel "summary statistics stay ordered" summaryOrderingTest,
-      TestLabel "invalid input is rejected" invalidInputValidationTest
+      TestLabel "invalid input is rejected" invalidInputValidationTest,
+      TestLabel "bounded normal relationships are validated" boundedNormalValidationTest
     ]
 
 deterministicCashPurchaseTest :: Test
@@ -341,6 +345,91 @@ repairShockTest =
         assertClose "year one repair shock is tracked" 1500 (yearlyRepairShocks yearOne)
         assertClose "year one total includes repair shock" 13500 (yearlyTotalCost yearOne)
       _ -> assertFailure "Expected exactly one yearly breakdown row."
+
+zeroAprFinancingTest :: Test
+zeroAprFinancingTest =
+  TestCase $ do
+    let financedAmount = 20000 :: Double
+        monthlyPayment = financedAmount / 36
+        expectedYearlyLoanPayments = monthlyPayment * 12
+        expectedYearOneBalance = financedAmount - expectedYearlyLoanPayments
+        expectedYearTwoBalance = financedAmount - monthlyPayment * 24
+        request =
+          deterministicRequest
+            23
+            baselineSimulationInput
+              { simulationPurchasePrice = 24000,
+                simulationDownPayment = 4000,
+                simulationYearsOwned = 2,
+                simulationLoanTermMonths = 36
+              }
+        response = simulateRequestWithSeed 23 request
+        breakdown = responseExampleBreakdown response
+        yearlyBreakdown = responseExampleYearlyBreakdown response
+    assertClose "down payment stays upfront" 4000 (costUpfrontPayment breakdown)
+    assertClose "zero APR payments are straight-line" (monthlyPayment * 24) (costLoanPaymentsMade breakdown)
+    assertClose "remaining balance matches unpaid principal" expectedYearTwoBalance (costRemainingLoanBalance breakdown)
+    assertClose "zero-interest financing without depreciation nets to zero ownership cost" 0 (costTotal breakdown)
+    case yearlyBreakdown of
+      [yearOne, yearTwo] -> do
+        assertClose "year one loan payments match twelve installments" expectedYearlyLoanPayments (yearlyLoanPayments yearOne)
+        assertClose "year one remaining balance tracks unpaid principal" expectedYearOneBalance (yearlyRemainingLoanBalance yearOne)
+        assertClose "year one equity is vehicle value minus balance" (24000 - expectedYearOneBalance) (yearlyEstimatedEquity yearOne)
+        assertClose "year two loan payments match twelve more installments" expectedYearlyLoanPayments (yearlyLoanPayments yearTwo)
+        assertClose "year two remaining balance tracks unpaid principal" expectedYearTwoBalance (yearlyRemainingLoanBalance yearTwo)
+        assertClose "year two equity continues to build" (24000 - expectedYearTwoBalance) (yearlyEstimatedEquity yearTwo)
+      _ -> assertFailure "Expected exactly two yearly breakdown rows."
+
+loanPayoffHorizonTest :: Test
+loanPayoffHorizonTest =
+  TestCase $ do
+    let request =
+          deterministicRequest
+            29
+            baselineSimulationInput
+              { simulationPurchasePrice = 24000,
+                simulationDownPayment = 4000,
+                simulationYearsOwned = 3,
+                simulationLoanTermMonths = 12
+              }
+        response = simulateRequestWithSeed 29 request
+        breakdown = responseExampleBreakdown response
+        yearlyBreakdown = responseExampleYearlyBreakdown response
+    assertClose "all financed principal is paid within the first year" 20000 (costLoanPaymentsMade breakdown)
+    assertClose "remaining balance is zero after payoff" 0 (costRemainingLoanBalance breakdown)
+    assertClose "full payoff with flat resale nets to zero ownership cost" 0 (costTotal breakdown)
+    case yearlyBreakdown of
+      [yearOne, yearTwo, yearThree] -> do
+        assertClose "payoff year includes the full financed principal" 20000 (yearlyLoanPayments yearOne)
+        assertClose "remaining balance is cleared at the end of payoff year" 0 (yearlyRemainingLoanBalance yearOne)
+        assertClose "later years do not keep charging loan payments" 0 (yearlyLoanPayments yearTwo)
+        assertClose "later years keep zero balance after payoff" 0 (yearlyRemainingLoanBalance yearTwo)
+        assertClose "final year also keeps zero payments" 0 (yearlyLoanPayments yearThree)
+      _ -> assertFailure "Expected exactly three yearly breakdown rows."
+
+fullDepreciationFloorTest :: Test
+fullDepreciationFloorTest =
+  TestCase $ do
+    let request =
+          deterministicRequest
+            31
+            baselineSimulationInput
+              { simulationPurchasePrice = 12000,
+                simulationYearsOwned = 3,
+                simulationAnnualDepreciationRate = deterministicBoundedNormal 1
+              }
+        response = simulateRequestWithSeed 31 request
+        breakdown = responseExampleBreakdown response
+        yearlyBreakdown = responseExampleYearlyBreakdown response
+    assertClose "full depreciation drives resale value to zero" 0 (costResaleValue breakdown)
+    assertClose "full depreciation makes the vehicle a total loss" 12000 (costTotal breakdown)
+    case yearlyBreakdown of
+      [yearOne, yearTwo, yearThree] -> do
+        assertClose "first year absorbs the entire depreciation loss" 12000 (yearlyDepreciationLoss yearOne)
+        assertClose "vehicle value hits zero after the first year" 0 (yearlyEndingVehicleValue yearOne)
+        assertClose "once the value is zero there is no more depreciation loss" 0 (yearlyDepreciationLoss yearTwo)
+        assertClose "zero-value floor persists through later years" 0 (yearlyEndingVehicleValue yearThree)
+      _ -> assertFailure "Expected exactly three yearly breakdown rows."
 
 vehicleCatalogTest :: Test
 vehicleCatalogTest =
@@ -703,6 +792,48 @@ invalidInputValidationTest =
     assertBool "loan term is validated" ("Loan term cannot be negative." `elem` validationErrors)
     assertBool "rate bounds are validated" ("Annual depreciation rate upper bound must be less than or equal to 1." `elem` validationErrors)
 
+boundedNormalValidationTest :: Test
+boundedNormalValidationTest =
+  TestCase $ do
+    let invalidRequest =
+          deterministicRequest
+            37
+            baselineSimulationInput
+              { simulationRepairShockCost =
+                  BoundedNormal
+                    { boundedNormalMean = 800,
+                      boundedNormalStdDev = 50,
+                      boundedNormalLowerBound = -10,
+                      boundedNormalUpperBound = Just 1200
+                    },
+                simulationFuelPrice =
+                  BoundedNormal
+                    { boundedNormalMean = 2.5,
+                      boundedNormalStdDev = 0.2,
+                      boundedNormalLowerBound = 3,
+                      boundedNormalUpperBound = Just 5
+                    },
+                simulationAnnualMaintenance =
+                  BoundedNormal
+                    { boundedNormalMean = 950,
+                      boundedNormalStdDev = 75,
+                      boundedNormalLowerBound = 100,
+                      boundedNormalUpperBound = Just 900
+                    },
+                simulationAnnualDepreciationRate =
+                  BoundedNormal
+                    { boundedNormalMean = 0.25,
+                      boundedNormalStdDev = 0.05,
+                      boundedNormalLowerBound = 0.3,
+                      boundedNormalUpperBound = Just 0.2
+                    }
+              }
+        validationErrors = validateSimulationRequest invalidRequest
+    assertBool "negative lower bounds are rejected" ("Repair shock cost lower bound cannot be negative." `elem` validationErrors)
+    assertBool "means below the lower bound are rejected" ("Fuel price mean must be greater than or equal to its lower bound." `elem` validationErrors)
+    assertBool "means above the upper bound are rejected" ("Annual maintenance mean must be less than or equal to its upper bound." `elem` validationErrors)
+    assertBool "upper bounds below the lower bound are rejected" ("Annual depreciation rate upper bound must be greater than or equal to its lower bound." `elem` validationErrors)
+
 assertClose :: String -> Double -> Double -> Assertion
 assertClose label expected actual =
   let tolerance = 1.0e-6
@@ -778,6 +909,9 @@ assertResponseInvariants seed = do
       totals = responseSampleTotals response
       totalMiles = summaryTotalMilesDriven summary
       yearlyBreakdown = responseExampleYearlyBreakdown response
+      exampleBreakdown = responseExampleBreakdown response
+      endingValues = map yearlyEndingVehicleValue yearlyBreakdown
+      remainingBalances = map yearlyRemainingLoanBalance yearlyBreakdown
   assertEqual "iteration count stays aligned" (requestIterations exampleSimulationRequest) (summaryIterations summary)
   assertEqual "sample total count stays aligned" (requestIterations exampleSimulationRequest) (length totals)
   assertEqual "yearly breakdown length stays aligned" (simulationYearsOwned (requestInput exampleSimulationRequest)) (length yearlyBreakdown)
@@ -785,6 +919,24 @@ assertResponseInvariants seed = do
   assertBool "percentiles stay ordered" (summaryP10TotalCost summary <= summaryMedianTotalCost summary && summaryMedianTotalCost summary <= summaryP90TotalCost summary)
   assertMaybeClose "mean cost per mile stays consistent with mean total cost" (summaryMeanTotalCost summary / totalMiles) (summaryMeanCostPerMile summary)
   assertBool "all yearly totals stay non-negative" (all (\yearBreakdown -> yearlyTotalCost yearBreakdown >= 0) yearlyBreakdown)
+  assertClose "fuel totals stay aligned with the yearly timeline" (sum (map yearlyFuel yearlyBreakdown)) (costFuel exampleBreakdown)
+  assertClose "maintenance totals stay aligned with the yearly timeline" (sum (map yearlyMaintenance yearlyBreakdown)) (costMaintenance exampleBreakdown)
+  assertClose "repair shock totals stay aligned with the yearly timeline" (sum (map yearlyRepairShocks yearlyBreakdown)) (costRepairShocks exampleBreakdown)
+  assertClose "insurance totals stay aligned with the yearly timeline" (sum (map yearlyInsurance yearlyBreakdown)) (costInsurance exampleBreakdown)
+  assertClose "registration totals stay aligned with the yearly timeline" (sum (map yearlyRegistration yearlyBreakdown)) (costRegistration exampleBreakdown)
+  assertClose "loan payment totals stay aligned with the yearly timeline" (sum (map yearlyLoanPayments yearlyBreakdown)) (costLoanPaymentsMade exampleBreakdown)
+  assertClose "upfront payment stays aligned with the yearly timeline" (sum (map yearlyUpfrontPayment yearlyBreakdown)) (costUpfrontPayment exampleBreakdown)
+  assertClose "purchase tax stays aligned with the yearly timeline" (sum (map yearlyPurchaseTax yearlyBreakdown)) (costPurchaseTax exampleBreakdown)
+  assertClose "upfront fees stay aligned with the yearly timeline" (sum (map yearlyUpfrontFees yearlyBreakdown)) (costUpfrontFees exampleBreakdown)
+  assertBool "vehicle value stays non-increasing over time" (isNonIncreasing endingValues)
+  assertBool "loan balance stays non-increasing over time" (isNonIncreasing remainingBalances)
+  mapM_ assertYearlyEquityIdentity yearlyBreakdown
+  case reverse yearlyBreakdown of
+    lastYear : _ -> do
+      assertClose "resale value stays aligned with the final yearly vehicle value" (yearlyEndingVehicleValue lastYear) (costResaleValue exampleBreakdown)
+      assertClose "remaining balance stays aligned with the final yearly loan balance" (yearlyRemainingLoanBalance lastYear) (costRemainingLoanBalance exampleBreakdown)
+    [] ->
+      assertFailure "Expected at least one yearly breakdown row."
 
 lookupVehicleSourceSeed :: String -> [VehicleCatalogSourceSeed] -> Maybe VehicleCatalogSourceSeed
 lookupVehicleSourceSeed sourceSeedId =
@@ -812,6 +964,17 @@ decodeFuelEconomyFixture fixturePath = do
 contains :: String -> String -> Bool
 contains needle haystack =
   needle `isInfixOf` haystack
+
+isNonIncreasing :: [Double] -> Bool
+isNonIncreasing values =
+  and (zipWith (>=) values (drop 1 values))
+
+assertYearlyEquityIdentity :: YearlyCostBreakdown -> Assertion
+assertYearlyEquityIdentity yearlyBreakdown =
+  assertClose
+    "yearly equity stays equal to vehicle value minus remaining balance"
+    (yearlyEndingVehicleValue yearlyBreakdown - yearlyRemainingLoanBalance yearlyBreakdown)
+    (yearlyEstimatedEquity yearlyBreakdown)
 
 data ErrorPayload = ErrorPayload
   { errorPayloadMessage :: String,
@@ -891,6 +1054,45 @@ fallbackBoundedNormal =
       boundedNormalStdDev = 0,
       boundedNormalLowerBound = 0,
       boundedNormalUpperBound = Just 0
+    }
+
+deterministicBoundedNormal :: Double -> BoundedNormal
+deterministicBoundedNormal value =
+  BoundedNormal
+    { boundedNormalMean = value,
+      boundedNormalStdDev = 0,
+      boundedNormalLowerBound = value,
+      boundedNormalUpperBound = Just value
+    }
+
+baselineSimulationInput :: SimulationInput
+baselineSimulationInput =
+  SimulationInput
+    { simulationPurchasePrice = 10000,
+      simulationDownPayment = 0,
+      simulationSalesTaxRate = 0,
+      simulationUpfrontFees = 0,
+      simulationAnnualInflationRate = 0,
+      simulationYearsOwned = 1,
+      simulationAnnualMiles = 0,
+      simulationMilesPerGallon = 30,
+      simulationAnnualInsurance = 0,
+      simulationAnnualRegistration = 0,
+      simulationLoanApr = 0,
+      simulationLoanTermMonths = 0,
+      simulationRepairShockProbability = 0,
+      simulationRepairShockCost = deterministicBoundedNormal 0,
+      simulationFuelPrice = deterministicBoundedNormal 0,
+      simulationAnnualMaintenance = deterministicBoundedNormal 0,
+      simulationAnnualDepreciationRate = deterministicBoundedNormal 0
+    }
+
+deterministicRequest :: Int -> SimulationInput -> SimulationRequest
+deterministicRequest seed simulationInput =
+  SimulationRequest
+    { requestIterations = 1,
+      requestSeed = Just seed,
+      requestInput = simulationInput
     }
 
 fallbackVehicleSourceSeed :: VehicleCatalogSourceSeed
