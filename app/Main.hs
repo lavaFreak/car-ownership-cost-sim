@@ -10,18 +10,28 @@ Startup is intentionally simple:
 module Main (main) where
 
 import CarOwnershipCostSim.VehicleCatalog (defaultVehicleCatalogRelativePath, loadVehicleCatalog)
-import CarOwnershipCostSim.WebApp (appRoutes)
+import CarOwnershipCostSim.WebApp (StaticAssetPaths (..), buildApplication)
+import Network.Wai.Handler.Warp (run)
 import Paths_car_ownership_cost_sim (getDataFileName)
 import System.Environment (lookupEnv)
 import Text.Read (readMaybe)
-import Web.Scotty (scotty)
 
 main :: IO ()
 main = do
   catalogPath <- getDataFileName defaultVehicleCatalogRelativePath
+  indexHtmlPath <- getDataFileName "static/index.html"
+  stylesCssPath <- getDataFileName "static/styles.css"
+  appJsPath <- getDataFileName "static/app.js"
   vehicleCatalog <- loadVehicleCatalog catalogPath
   port <- readServerPort
-  scotty port (appRoutes vehicleCatalog)
+  let staticAssets =
+        StaticAssetPaths
+          { assetIndexHtml = indexHtmlPath,
+            assetStylesCss = stylesCssPath,
+            assetAppJs = appJsPath
+          }
+  application <- buildApplication vehicleCatalog staticAssets
+  run port application
 
 -- | Read the listening port from @PORT@, defaulting to @3000@.
 readServerPort :: IO Int

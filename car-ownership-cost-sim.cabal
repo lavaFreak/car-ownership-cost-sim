@@ -29,6 +29,9 @@ extra-source-files:
 data-files:
     catalog/vehicle-catalog.json
     catalog/vehicle-source-seeds.json
+    static/index.html
+    static/styles.css
+    static/app.js
     test/fixtures/fueleconomy/vehicle-47097.xml
     test/fixtures/fueleconomy/vehicle-47339.xml
     test/fixtures/vpic/honda-2024-models.json
@@ -60,10 +63,13 @@ library
         process >=1.6 && <1.7,
         random >=1.2 && <1.4,
         scotty >=0.22 && <0.23,
+        wai-extra >=3.1 && <3.2,
         wai >=3.2 && <3.3
 
 executable car-ownership-cost-sim
     import:           shared-properties
+    ghc-options:
+        -threaded
     autogen-modules:
         Paths_car_ownership_cost_sim
     hs-source-dirs:   app
@@ -76,7 +82,8 @@ executable car-ownership-cost-sim
         car-ownership-cost-sim,
         http-types >=0.12 && <0.13,
         random >=1.2 && <1.4,
-        scotty >=0.22 && <0.23
+        scotty >=0.22 && <0.23,
+        warp >=3.3 && <3.5
 
 executable build-vehicle-catalog
     import:           shared-properties

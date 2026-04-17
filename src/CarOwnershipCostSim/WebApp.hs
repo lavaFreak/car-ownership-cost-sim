@@ -10,7 +10,8 @@ suite. That keeps API behavior testable without depending on a separately
 booted server process.
 -}
 module CarOwnershipCostSim.WebApp
-  ( appRoutes,
+  ( StaticAssetPaths (..),
+    appRoutes,
     buildApplication,
   )
 where
@@ -22,29 +23,37 @@ import CarOwnershipCostSim.VehiclePresets (vehiclePresetsFromCatalog)
 import Data.Aeson ((.=), eitherDecode, object)
 import Network.HTTP.Types.Status (status400)
 import Network.Wai (Application)
+import Network.Wai.Middleware.Autohead (autohead)
 import System.Random (randomIO)
 import Web.Scotty
 
+-- | Absolute paths to the bundled static frontend assets.
+data StaticAssetPaths = StaticAssetPaths
+  { assetIndexHtml :: FilePath,
+    assetStylesCss :: FilePath,
+    assetAppJs :: FilePath
+  }
+
 -- | Build the WAI application used by the executable and test suite.
-buildApplication :: [VehicleCatalogEntry] -> IO Application
-buildApplication vehicleCatalog =
-  scottyApp (appRoutes vehicleCatalog)
+buildApplication :: [VehicleCatalogEntry] -> StaticAssetPaths -> IO Application
+buildApplication vehicleCatalog staticAssets =
+  autohead <$> scottyApp (appRoutes vehicleCatalog staticAssets)
 
 -- | Declare all frontend and API routes for the application.
-appRoutes :: [VehicleCatalogEntry] -> ScottyM ()
-appRoutes vehicleCatalog = do
+appRoutes :: [VehicleCatalogEntry] -> StaticAssetPaths -> ScottyM ()
+appRoutes vehicleCatalog staticAssets = do
   let vehiclePresets = vehiclePresetsFromCatalog vehicleCatalog
 
   get "/" $
-    file "static/index.html"
+    file (assetIndexHtml staticAssets)
 
   get "/styles.css" $ do
     setHeader "Content-Type" "text/css; charset=utf-8"
-    file "static/styles.css"
+    file (assetStylesCss staticAssets)
 
   get "/app.js" $ do
     setHeader "Content-Type" "application/javascript; charset=utf-8"
-    file "static/app.js"
+    file (assetAppJs staticAssets)
 
   get "/api/example" $
     json exampleSimulationRequest

@@ -37,13 +37,13 @@ import CarOwnershipCostSim.VehicleCatalogImport
     parseFuelEconomyVehicleRecord,
   )
 import CarOwnershipCostSim.VehiclePresets (VehiclePreset (..), vehiclePresetsFromCatalog)
-import CarOwnershipCostSim.WebApp (buildApplication)
+import CarOwnershipCostSim.WebApp (StaticAssetPaths (..), buildApplication)
 import Data.Aeson (FromJSON (..), eitherDecode, encode, withObject, (.:))
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as BL
 import qualified Data.ByteString.Lazy.Char8 as BL8
 import Data.List (find, isInfixOf)
-import Network.HTTP.Types (Header, hContentType, methodGet, methodPost, status200, status400)
+import Network.HTTP.Types (Header, hContentType, methodGet, methodHead, methodPost, status200, status400)
 import qualified Network.Wai as Wai
 import Network.Wai (Application)
 import Network.Wai.Test (SRequest (..), SResponse (..), defaultRequest, runSession, setPath, srequest)
@@ -81,6 +81,7 @@ tests =
       TestLabel "source seed validation rejects wrong vPIC model matches" sourceSeedValidationFailureTest,
       TestLabel "API example route returns a valid simulation request" apiExampleRouteTest,
       TestLabel "web asset routes boot successfully" webAssetRoutesSmokeTest,
+      TestLabel "HEAD requests resolve for the homepage" homepageHeadRouteTest,
       TestLabel "API catalog and preset routes stay aligned" apiCatalogAndPresetsRouteTest,
       TestLabel "API simulate route returns a valid simulation response" apiSimulateRouteTest,
       TestLabel "API simulate rejects malformed and invalid input" apiSimulateErrorRoutesTest,
@@ -884,6 +885,13 @@ webAssetRoutesSmokeTest =
     assertBool "styles route serves CSS" ("body" `contains` stylesBody)
     assertBool "script route serves the frontend bootstrap" ("loadVehiclePresets" `contains` scriptBody)
 
+homepageHeadRouteTest :: Test
+homepageHeadRouteTest =
+  TestCase $ do
+    testApplication <- buildTestApplication
+    response <- runRequest testApplication methodHead "/" BL.empty []
+    assertEqual "HEAD home route returns 200" status200 (simpleStatus response)
+
 apiSimulateRouteTest :: Test
 apiSimulateRouteTest =
   TestCase $ do
@@ -1157,7 +1165,16 @@ loadDefaultVehicleCatalog = do
 buildTestApplication :: IO Application
 buildTestApplication = do
   vehicleCatalog <- loadDefaultVehicleCatalog
-  buildApplication vehicleCatalog
+  indexHtmlPath <- getDataFileName "static/index.html"
+  stylesCssPath <- getDataFileName "static/styles.css"
+  appJsPath <- getDataFileName "static/app.js"
+  let staticAssets =
+        StaticAssetPaths
+          { assetIndexHtml = indexHtmlPath,
+            assetStylesCss = stylesCssPath,
+            assetAppJs = appJsPath
+          }
+  buildApplication vehicleCatalog staticAssets
 
 runRequest ::
   Application ->
