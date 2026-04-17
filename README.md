@@ -20,8 +20,10 @@ The app asks for values such as:
 - purchase price
 - down payment and loan details
 - miles driven per year
+- annual mileage change over time
 - fuel efficiency
-- yearly insurance and registration
+- yearly insurance, registration, parking, tolls, and inspection
+- tire replacement assumptions
 - assumptions about fuel price, maintenance, and depreciation
 
 It then runs many simulations and summarizes the results with statistics such
@@ -109,13 +111,19 @@ upfront payment
 + repair shocks
 + insurance
 + registration
++ parking
++ tolls and road fees
++ inspection and emissions
++ tire replacements
 - resale value
 ```
 
 The yearly model now also applies:
 
 - purchase tax and upfront one-time fees
-- annual inflation to recurring costs such as fuel, maintenance, insurance, registration, and repair shocks
+- annual inflation to recurring costs such as fuel, maintenance, insurance, registration, parking, tolls, inspection, tires, and repair shocks
+- annual mileage change so fuel use and tire wear can grow or shrink over time
+- loan amortization with interest tracked separately from principal in the yearly breakdown
 - year-by-year sampled traces for the example scenario
 
 This is still intentionally compact, but it now captures more of the front
@@ -210,12 +218,13 @@ cabal run build-vehicle-catalog -- /tmp/vehicle-catalog.json
 The repository already includes an initial simulation engine, a Scotty-based web
 server, a lightweight frontend, curated vehicle presets, and a growing test
 suite. The current app can now model taxes and fees, inflation, repair-shock
-tail risk, yearly sample traces, and catalog-backed vehicle presets while
-keeping the web layer lightweight. It also now includes a first importer layer
-that uses curated source seeds plus official `vPIC` and `FuelEconomy.gov`
-payloads to refresh the local vehicle catalog. The automated checks now cover
-simulation invariants, API routes, and a lightweight in-process smoke test for
-the web assets.
+tail risk, yearly sample traces, annual mileage change, tire replacement
+timing, local recurring costs, and catalog-backed vehicle presets while keeping
+the web layer lightweight. It also now includes a first importer layer that
+uses curated source seeds plus official `vPIC` and `FuelEconomy.gov` payloads
+to refresh the local vehicle catalog. The automated checks now cover simulation
+invariants, API routes, financing edge cases, deterministic mileage and wear
+logic, and a lightweight in-process smoke test for the web assets.
 
 The repository also includes a basic GitHub Actions workflow that runs the main
 build and test checks on pushes and pull requests.

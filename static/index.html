@@ -72,6 +72,11 @@
               </label>
 
               <label>
+                Annual mileage change (%)
+                <input name="annualMileageChangePercent" type="number" min="-100" max="100" step="0.5" value="2" required />
+              </label>
+
+              <label>
                 Fuel efficiency (MPG)
                 <input name="milesPerGallon" type="number" min="1" step="0.1" value="32" required />
               </label>
@@ -91,8 +96,37 @@
               </label>
 
               <label>
+                Parking
+                <input name="annualParking" type="number" min="0" step="25" value="720" required />
+              </label>
+
+              <label>
+                Tolls and road fees
+                <input name="annualTolls" type="number" min="0" step="25" value="240" required />
+              </label>
+
+              <label>
+                Inspection and emissions
+                <input name="annualInspection" type="number" min="0" step="5" value="85" required />
+              </label>
+
+              <label>
                 Annual inflation (%)
                 <input name="annualInflationPercent" type="number" min="0" max="100" step="0.1" value="3" required />
+              </label>
+            </fieldset>
+
+            <fieldset>
+              <legend>Wear items</legend>
+
+              <label>
+                Tire replacement cost
+                <input name="tireReplacementCost" type="number" min="0" step="25" value="950" required />
+              </label>
+
+              <label>
+                Tire life (miles)
+                <input name="tireLifeMiles" type="number" min="1" step="1000" value="45000" required />
               </label>
             </fieldset>
 

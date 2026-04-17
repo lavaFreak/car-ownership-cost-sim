@@ -55,6 +55,8 @@ tests =
       TestLabel "zero APR financing tracks partial payoff correctly" zeroAprFinancingTest,
       TestLabel "loan payments stop after the payoff year" loanPayoffHorizonTest,
       TestLabel "full depreciation floors resale at zero" fullDepreciationFloorTest,
+      TestLabel "mileage growth and tire wear affect deterministic totals" mileageGrowthAndTireWearTest,
+      TestLabel "local recurring costs inflate over time" localRecurringCostsInflationTest,
       TestLabel "vehicle catalog loads and drives presets" vehicleCatalogTest,
       TestLabel "catalog import seeds build normalized entries" catalogImportSeedTest,
       TestLabel "vehicle source seeds load cleanly" vehicleSourceSeedLoadTest,
@@ -90,11 +92,17 @@ deterministicCashPurchaseTest =
                     simulationAnnualInflationRate = 0,
                     simulationYearsOwned = 1,
                     simulationAnnualMiles = 12000,
+                    simulationAnnualMileageChangeRate = 0,
                     simulationMilesPerGallon = 30,
                     simulationAnnualInsurance = 1000,
                     simulationAnnualRegistration = 200,
+                    simulationAnnualParking = 0,
+                    simulationAnnualTolls = 0,
+                    simulationAnnualInspection = 0,
                     simulationLoanApr = 0,
                     simulationLoanTermMonths = 0,
+                    simulationTireReplacementCost = 0,
+                    simulationTireLifeMiles = 40000,
                     simulationRepairShockProbability = 0,
                     simulationRepairShockCost =
                       BoundedNormal
@@ -164,11 +172,17 @@ purchaseTaxAndFeesTest =
                     simulationAnnualInflationRate = 0,
                     simulationYearsOwned = 1,
                     simulationAnnualMiles = 0,
+                    simulationAnnualMileageChangeRate = 0,
                     simulationMilesPerGallon = 30,
                     simulationAnnualInsurance = 0,
                     simulationAnnualRegistration = 0,
+                    simulationAnnualParking = 0,
+                    simulationAnnualTolls = 0,
+                    simulationAnnualInspection = 0,
                     simulationLoanApr = 0,
                     simulationLoanTermMonths = 12,
+                    simulationTireReplacementCost = 0,
+                    simulationTireLifeMiles = 40000,
                     simulationRepairShockProbability = 0,
                     simulationRepairShockCost =
                       BoundedNormal
@@ -229,11 +243,17 @@ inflationTest =
                     simulationAnnualInflationRate = 0.1,
                     simulationYearsOwned = 2,
                     simulationAnnualMiles = 12000,
+                    simulationAnnualMileageChangeRate = 0,
                     simulationMilesPerGallon = 30,
                     simulationAnnualInsurance = 100,
                     simulationAnnualRegistration = 50,
+                    simulationAnnualParking = 0,
+                    simulationAnnualTolls = 0,
+                    simulationAnnualInspection = 0,
                     simulationLoanApr = 0,
                     simulationLoanTermMonths = 0,
+                    simulationTireReplacementCost = 0,
+                    simulationTireLifeMiles = 40000,
                     simulationRepairShockProbability = 0,
                     simulationRepairShockCost =
                       BoundedNormal
@@ -299,11 +319,17 @@ repairShockTest =
                     simulationAnnualInflationRate = 0,
                     simulationYearsOwned = 1,
                     simulationAnnualMiles = 0,
+                    simulationAnnualMileageChangeRate = 0,
                     simulationMilesPerGallon = 30,
                     simulationAnnualInsurance = 0,
                     simulationAnnualRegistration = 0,
+                    simulationAnnualParking = 0,
+                    simulationAnnualTolls = 0,
+                    simulationAnnualInspection = 0,
                     simulationLoanApr = 0,
                     simulationLoanTermMonths = 0,
+                    simulationTireReplacementCost = 0,
+                    simulationTireLifeMiles = 40000,
                     simulationRepairShockProbability = 1,
                     simulationRepairShockCost =
                       BoundedNormal
@@ -368,14 +394,17 @@ zeroAprFinancingTest =
         yearlyBreakdown = responseExampleYearlyBreakdown response
     assertClose "down payment stays upfront" 4000 (costUpfrontPayment breakdown)
     assertClose "zero APR payments are straight-line" (monthlyPayment * 24) (costLoanPaymentsMade breakdown)
+    assertClose "zero APR creates no interest cost" 0 (costLoanInterest breakdown)
     assertClose "remaining balance matches unpaid principal" expectedYearTwoBalance (costRemainingLoanBalance breakdown)
     assertClose "zero-interest financing without depreciation nets to zero ownership cost" 0 (costTotal breakdown)
     case yearlyBreakdown of
       [yearOne, yearTwo] -> do
         assertClose "year one loan payments match twelve installments" expectedYearlyLoanPayments (yearlyLoanPayments yearOne)
+        assertClose "year one interest stays zero" 0 (yearlyLoanInterest yearOne)
         assertClose "year one remaining balance tracks unpaid principal" expectedYearOneBalance (yearlyRemainingLoanBalance yearOne)
         assertClose "year one equity is vehicle value minus balance" (24000 - expectedYearOneBalance) (yearlyEstimatedEquity yearOne)
         assertClose "year two loan payments match twelve more installments" expectedYearlyLoanPayments (yearlyLoanPayments yearTwo)
+        assertClose "year two interest stays zero" 0 (yearlyLoanInterest yearTwo)
         assertClose "year two remaining balance tracks unpaid principal" expectedYearTwoBalance (yearlyRemainingLoanBalance yearTwo)
         assertClose "year two equity continues to build" (24000 - expectedYearTwoBalance) (yearlyEstimatedEquity yearTwo)
       _ -> assertFailure "Expected exactly two yearly breakdown rows."
@@ -430,6 +459,68 @@ fullDepreciationFloorTest =
         assertClose "once the value is zero there is no more depreciation loss" 0 (yearlyDepreciationLoss yearTwo)
         assertClose "zero-value floor persists through later years" 0 (yearlyEndingVehicleValue yearThree)
       _ -> assertFailure "Expected exactly three yearly breakdown rows."
+
+mileageGrowthAndTireWearTest :: Test
+mileageGrowthAndTireWearTest =
+  TestCase $ do
+    let request =
+          deterministicRequest
+            41
+            baselineSimulationInput
+              { simulationPurchasePrice = 15000,
+                simulationYearsOwned = 3,
+                simulationAnnualMiles = 12000,
+                simulationAnnualMileageChangeRate = 0.1,
+                simulationMilesPerGallon = 30,
+                simulationFuelPrice = deterministicBoundedNormal 1,
+                simulationTireReplacementCost = 800,
+                simulationTireLifeMiles = 20000
+              }
+        response = simulateRequestWithSeed 41 request
+        breakdown = responseExampleBreakdown response
+        summary = responseSummary response
+        yearlyBreakdown = responseExampleYearlyBreakdown response
+    assertClose "mileage growth increases total modeled miles" 39720 (summaryTotalMilesDriven summary)
+    assertClose "fuel cost follows the grown mileage path" 1324 (costFuel breakdown)
+    assertClose "one tire replacement is triggered by cumulative miles" 800 (costTires breakdown)
+    assertClose "deterministic usage costs sum into total ownership cost" 2124 (costTotal breakdown)
+    case yearlyBreakdown of
+      [yearOne, yearTwo, yearThree] -> do
+        assertClose "year one miles are unadjusted" 12000 (yearlyMilesDriven yearOne)
+        assertClose "year two miles reflect the growth rate" 13200 (yearlyMilesDriven yearTwo)
+        assertClose "year three miles keep compounding" 14520 (yearlyMilesDriven yearThree)
+        assertClose "the first tire cycle happens in year two" 800 (yearlyTires yearTwo)
+        assertClose "no second tire cycle happens yet" 0 (yearlyTires yearThree)
+      _ -> assertFailure "Expected exactly three yearly breakdown rows."
+
+localRecurringCostsInflationTest :: Test
+localRecurringCostsInflationTest =
+  TestCase $ do
+    let request =
+          deterministicRequest
+            43
+            baselineSimulationInput
+              { simulationPurchasePrice = 10000,
+                simulationYearsOwned = 2,
+                simulationAnnualInflationRate = 0.1,
+                simulationAnnualParking = 100,
+                simulationAnnualTolls = 50,
+                simulationAnnualInspection = 25
+              }
+        response = simulateRequestWithSeed 43 request
+        breakdown = responseExampleBreakdown response
+        yearlyBreakdown = responseExampleYearlyBreakdown response
+    assertClose "parking inflates over time" 210 (costParking breakdown)
+    assertClose "tolls inflate over time" 105 (costTolls breakdown)
+    assertClose "inspection inflates over time" 52.5 (costInspection breakdown)
+    assertClose "local recurring costs flow into total ownership cost" 367.5 (costTotal breakdown)
+    case yearlyBreakdown of
+      [yearOne, yearTwo] -> do
+        assertClose "first-year parking is uninflated" 100 (yearlyParking yearOne)
+        assertClose "second-year parking is inflated" 110 (yearlyParking yearTwo)
+        assertClose "first-year local fees are tracked" 75 (yearlyTolls yearOne + yearlyInspection yearOne)
+        assertClose "second-year local fees are inflated" 82.5 (yearlyTolls yearTwo + yearlyInspection yearTwo)
+      _ -> assertFailure "Expected exactly two yearly breakdown rows."
 
 vehicleCatalogTest :: Test
 vehicleCatalogTest =
@@ -742,11 +833,17 @@ invalidInputValidationTest =
                     simulationAnnualInflationRate = 1.2,
                     simulationYearsOwned = 0,
                     simulationAnnualMiles = 12000,
+                    simulationAnnualMileageChangeRate = 1.2,
                     simulationMilesPerGallon = 0,
                     simulationAnnualInsurance = 1500,
                     simulationAnnualRegistration = 180,
+                    simulationAnnualParking = -10,
+                    simulationAnnualTolls = -25,
+                    simulationAnnualInspection = -5,
                     simulationLoanApr = 1.2,
                     simulationLoanTermMonths = -12,
+                    simulationTireReplacementCost = -50,
+                    simulationTireLifeMiles = 0,
                     simulationRepairShockProbability = 1.2,
                     simulationRepairShockCost =
                       BoundedNormal
@@ -784,12 +881,18 @@ invalidInputValidationTest =
     assertBool "sales tax is validated" ("Sales tax rate should be expressed as a decimal between 0 and 1." `elem` validationErrors)
     assertBool "upfront fees are validated" ("Upfront fees cannot be negative." `elem` validationErrors)
     assertBool "inflation is validated" ("Annual inflation rate should be expressed as a decimal between 0 and 1." `elem` validationErrors)
+    assertBool "mileage change is validated" ("Annual mileage change rate should be less than or equal to 1." `elem` validationErrors)
     assertBool "repair shock probability is validated" ("Repair shock probability should be expressed as a decimal between 0 and 1." `elem` validationErrors)
     assertBool "repair shock bounds are validated" ("Repair shock cost standard deviation cannot be negative." `elem` validationErrors)
     assertBool "years owned is validated" ("Years owned must be at least 1." `elem` validationErrors)
     assertBool "fuel efficiency is validated" ("Fuel efficiency must be greater than 0 MPG." `elem` validationErrors)
+    assertBool "parking is validated" ("Parking cost cannot be negative." `elem` validationErrors)
+    assertBool "tolls are validated" ("Tolls and road fees cannot be negative." `elem` validationErrors)
+    assertBool "inspection is validated" ("Inspection and emissions costs cannot be negative." `elem` validationErrors)
     assertBool "APR is validated" ("Loan APR should be expressed as a decimal between 0 and 1." `elem` validationErrors)
     assertBool "loan term is validated" ("Loan term cannot be negative." `elem` validationErrors)
+    assertBool "tire cost is validated" ("Tire replacement cost cannot be negative." `elem` validationErrors)
+    assertBool "tire life is validated" ("Tire life must be greater than 0 miles." `elem` validationErrors)
     assertBool "rate bounds are validated" ("Annual depreciation rate upper bound must be less than or equal to 1." `elem` validationErrors)
 
 boundedNormalValidationTest :: Test
@@ -915,6 +1018,7 @@ assertResponseInvariants seed = do
   assertEqual "iteration count stays aligned" (requestIterations exampleSimulationRequest) (summaryIterations summary)
   assertEqual "sample total count stays aligned" (requestIterations exampleSimulationRequest) (length totals)
   assertEqual "yearly breakdown length stays aligned" (simulationYearsOwned (requestInput exampleSimulationRequest)) (length yearlyBreakdown)
+  assertClose "modeled miles stay aligned with the yearly timeline" (sum (map yearlyMilesDriven yearlyBreakdown)) totalMiles
   assertBool "totals stay ordered from min to max" (summaryMinTotalCost summary <= summaryMeanTotalCost summary && summaryMeanTotalCost summary <= summaryMaxTotalCost summary)
   assertBool "percentiles stay ordered" (summaryP10TotalCost summary <= summaryMedianTotalCost summary && summaryMedianTotalCost summary <= summaryP90TotalCost summary)
   assertMaybeClose "mean cost per mile stays consistent with mean total cost" (summaryMeanTotalCost summary / totalMiles) (summaryMeanCostPerMile summary)
@@ -924,13 +1028,19 @@ assertResponseInvariants seed = do
   assertClose "repair shock totals stay aligned with the yearly timeline" (sum (map yearlyRepairShocks yearlyBreakdown)) (costRepairShocks exampleBreakdown)
   assertClose "insurance totals stay aligned with the yearly timeline" (sum (map yearlyInsurance yearlyBreakdown)) (costInsurance exampleBreakdown)
   assertClose "registration totals stay aligned with the yearly timeline" (sum (map yearlyRegistration yearlyBreakdown)) (costRegistration exampleBreakdown)
+  assertClose "parking totals stay aligned with the yearly timeline" (sum (map yearlyParking yearlyBreakdown)) (costParking exampleBreakdown)
+  assertClose "toll totals stay aligned with the yearly timeline" (sum (map yearlyTolls yearlyBreakdown)) (costTolls exampleBreakdown)
+  assertClose "inspection totals stay aligned with the yearly timeline" (sum (map yearlyInspection yearlyBreakdown)) (costInspection exampleBreakdown)
+  assertClose "tire totals stay aligned with the yearly timeline" (sum (map yearlyTires yearlyBreakdown)) (costTires exampleBreakdown)
   assertClose "loan payment totals stay aligned with the yearly timeline" (sum (map yearlyLoanPayments yearlyBreakdown)) (costLoanPaymentsMade exampleBreakdown)
+  assertClose "loan interest totals stay aligned with the yearly timeline" (sum (map yearlyLoanInterest yearlyBreakdown)) (costLoanInterest exampleBreakdown)
   assertClose "upfront payment stays aligned with the yearly timeline" (sum (map yearlyUpfrontPayment yearlyBreakdown)) (costUpfrontPayment exampleBreakdown)
   assertClose "purchase tax stays aligned with the yearly timeline" (sum (map yearlyPurchaseTax yearlyBreakdown)) (costPurchaseTax exampleBreakdown)
   assertClose "upfront fees stay aligned with the yearly timeline" (sum (map yearlyUpfrontFees yearlyBreakdown)) (costUpfrontFees exampleBreakdown)
   assertBool "vehicle value stays non-increasing over time" (isNonIncreasing endingValues)
   assertBool "loan balance stays non-increasing over time" (isNonIncreasing remainingBalances)
   mapM_ assertYearlyEquityIdentity yearlyBreakdown
+  mapM_ assertLoanBreakdownIdentity yearlyBreakdown
   case reverse yearlyBreakdown of
     lastYear : _ -> do
       assertClose "resale value stays aligned with the final yearly vehicle value" (yearlyEndingVehicleValue lastYear) (costResaleValue exampleBreakdown)
@@ -976,6 +1086,13 @@ assertYearlyEquityIdentity yearlyBreakdown =
     (yearlyEndingVehicleValue yearlyBreakdown - yearlyRemainingLoanBalance yearlyBreakdown)
     (yearlyEstimatedEquity yearlyBreakdown)
 
+assertLoanBreakdownIdentity :: YearlyCostBreakdown -> Assertion
+assertLoanBreakdownIdentity yearlyBreakdown =
+  assertClose
+    "yearly loan payments stay equal to principal plus interest"
+    (yearlyLoanPrincipal yearlyBreakdown + yearlyLoanInterest yearlyBreakdown)
+    (yearlyLoanPayments yearlyBreakdown)
+
 data ErrorPayload = ErrorPayload
   { errorPayloadMessage :: String,
     errorPayloadDetails :: [String]
@@ -1010,11 +1127,17 @@ invalidSimulationRequest =
             simulationAnnualInflationRate = 1.2,
             simulationYearsOwned = 0,
             simulationAnnualMiles = 12000,
+            simulationAnnualMileageChangeRate = 1.2,
             simulationMilesPerGallon = 0,
             simulationAnnualInsurance = 1500,
             simulationAnnualRegistration = 180,
+            simulationAnnualParking = -10,
+            simulationAnnualTolls = -25,
+            simulationAnnualInspection = -5,
             simulationLoanApr = 1.2,
             simulationLoanTermMonths = -12,
+            simulationTireReplacementCost = -50,
+            simulationTireLifeMiles = 0,
             simulationRepairShockProbability = 1.2,
             simulationRepairShockCost =
               BoundedNormal
@@ -1075,11 +1198,17 @@ baselineSimulationInput =
       simulationAnnualInflationRate = 0,
       simulationYearsOwned = 1,
       simulationAnnualMiles = 0,
+      simulationAnnualMileageChangeRate = 0,
       simulationMilesPerGallon = 30,
       simulationAnnualInsurance = 0,
       simulationAnnualRegistration = 0,
+      simulationAnnualParking = 0,
+      simulationAnnualTolls = 0,
+      simulationAnnualInspection = 0,
       simulationLoanApr = 0,
       simulationLoanTermMonths = 0,
+      simulationTireReplacementCost = 0,
+      simulationTireLifeMiles = 40000,
       simulationRepairShockProbability = 0,
       simulationRepairShockCost = deterministicBoundedNormal 0,
       simulationFuelPrice = deterministicBoundedNormal 0,

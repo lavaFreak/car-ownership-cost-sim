@@ -46,12 +46,18 @@ const shareFieldNames = [
   "upfrontFees",
   "yearsOwned",
   "annualMiles",
+  "annualMileageChangePercent",
   "milesPerGallon",
   "annualInsurance",
   "annualRegistration",
+  "annualParking",
+  "annualTolls",
+  "annualInspection",
   "annualInflationPercent",
   "loanAprPercent",
   "loanTermMonths",
+  "tireReplacementCost",
+  "tireLifeMiles",
   "fuelMean",
   "fuelStdDev",
   "maintenanceMean",
@@ -112,12 +118,18 @@ function collectFormValues() {
     upfrontFees: numericValue("upfrontFees"),
     yearsOwned: numericValue("yearsOwned"),
     annualMiles: numericValue("annualMiles"),
+    annualMileageChangePercent: numericValue("annualMileageChangePercent"),
     milesPerGallon: numericValue("milesPerGallon"),
     annualInsurance: numericValue("annualInsurance"),
     annualRegistration: numericValue("annualRegistration"),
+    annualParking: numericValue("annualParking"),
+    annualTolls: numericValue("annualTolls"),
+    annualInspection: numericValue("annualInspection"),
     annualInflationPercent: numericValue("annualInflationPercent"),
     loanAprPercent: numericValue("loanAprPercent"),
     loanTermMonths: numericValue("loanTermMonths"),
+    tireReplacementCost: numericValue("tireReplacementCost"),
+    tireLifeMiles: numericValue("tireLifeMiles"),
     fuelMean: numericValue("fuelMean"),
     fuelStdDev: numericValue("fuelStdDev"),
     maintenanceMean: numericValue("maintenanceMean"),
@@ -288,12 +300,18 @@ function buildRequestPayload(values) {
       simulationUpfrontFees: values.upfrontFees,
       simulationYearsOwned: values.yearsOwned,
       simulationAnnualMiles: values.annualMiles,
+      simulationAnnualMileageChangeRate: values.annualMileageChangePercent / 100,
       simulationMilesPerGallon: values.milesPerGallon,
       simulationAnnualInsurance: values.annualInsurance,
       simulationAnnualRegistration: values.annualRegistration,
+      simulationAnnualParking: values.annualParking,
+      simulationAnnualTolls: values.annualTolls,
+      simulationAnnualInspection: values.annualInspection,
       simulationAnnualInflationRate: values.annualInflationPercent / 100,
       simulationLoanApr: values.loanAprPercent / 100,
       simulationLoanTermMonths: values.loanTermMonths,
+      simulationTireReplacementCost: values.tireReplacementCost,
+      simulationTireLifeMiles: values.tireLifeMiles,
       simulationRepairShockProbability: values.repairShockProbabilityPercent / 100,
       simulationRepairShockCost: buildBoundedNormal(
         values.repairShockMean,
@@ -361,12 +379,17 @@ function renderBreakdownPlaceholder() {
     { label: "Purchase tax", value: "After a run" },
     { label: "Upfront fees", value: "After a run" },
     { label: "Loan payments", value: "After a run" },
+    { label: "Loan interest", value: "After a run" },
     { label: "Loan balance at sale", value: "After a run" },
     { label: "Fuel", value: "After a run" },
     { label: "Maintenance", value: "After a run" },
     { label: "Repair shocks", value: "After a run" },
     { label: "Insurance", value: "After a run" },
     { label: "Registration", value: "After a run" },
+    { label: "Parking", value: "After a run" },
+    { label: "Tolls and road fees", value: "After a run" },
+    { label: "Inspection and emissions", value: "After a run" },
+    { label: "Tires", value: "After a run" },
     { label: "Resale value", value: "After a run" },
     { label: "Total ownership cost", value: "After a run" },
   ]);
@@ -376,6 +399,7 @@ function renderInsightPlaceholder() {
   renderCards(insightGrid, [
     { label: "Typical yearly cost", value: "After a run" },
     { label: "10-90 spread", value: "After a run" },
+    { label: "Modeled miles", value: "After a run" },
     { label: "Sampled end equity", value: "After a run" },
     { label: "Repair-shock share", value: "After a run" },
   ]);
@@ -386,9 +410,15 @@ function renderYearlyBreakdownPlaceholder() {
         <article class="yearly-card">
           <h4>Yearly timeline</h4>
           <dl>
+            <div><dt>Miles driven</dt><dd>After a run</dd></div>
+            <div><dt>Fuel burned</dt><dd>After a run</dd></div>
             <div><dt>Annual totals</dt><dd>After a run</dd></div>
             <div><dt>Year 1 purchase costs</dt><dd>After a run</dd></div>
+            <div><dt>Insurance + registration</dt><dd>After a run</dd></div>
+            <div><dt>Parking + tolls + inspection</dt><dd>After a run</dd></div>
             <div><dt>Inflation factor</dt><dd>After a run</dd></div>
+            <div><dt>Loan interest</dt><dd>After a run</dd></div>
+            <div><dt>Tires</dt><dd>After a run</dd></div>
             <div><dt>Repair shocks</dt><dd>After a run</dd></div>
             <div><dt>Ending value</dt><dd>After a run</dd></div>
             <div><dt>Remaining loan</dt><dd>After a run</dd></div>
@@ -550,6 +580,17 @@ function validateFormValues(values) {
     pushValidationError(errors, "annualMiles", "Annual miles cannot be negative.");
   }
 
+  if (
+    validateRequiredNumber(errors, values, "annualMileageChangePercent", "Annual mileage change") &&
+    (values.annualMileageChangePercent < -100 || values.annualMileageChangePercent > 100)
+  ) {
+    pushValidationError(
+      errors,
+      "annualMileageChangePercent",
+      "Annual mileage change must be between -100% and 100%."
+    );
+  }
+
   if (validateRequiredNumber(errors, values, "milesPerGallon", "Fuel efficiency") && values.milesPerGallon <= 0) {
     pushValidationError(errors, "milesPerGallon", "Fuel efficiency must be greater than 0 MPG.");
   }
@@ -563,6 +604,21 @@ function validateFormValues(values) {
     values.annualRegistration < 0
   ) {
     pushValidationError(errors, "annualRegistration", "Registration cost cannot be negative.");
+  }
+
+  if (validateRequiredNumber(errors, values, "annualParking", "Parking") && values.annualParking < 0) {
+    pushValidationError(errors, "annualParking", "Parking cost cannot be negative.");
+  }
+
+  if (validateRequiredNumber(errors, values, "annualTolls", "Tolls and road fees") && values.annualTolls < 0) {
+    pushValidationError(errors, "annualTolls", "Tolls and road fees cannot be negative.");
+  }
+
+  if (
+    validateRequiredNumber(errors, values, "annualInspection", "Inspection and emissions") &&
+    values.annualInspection < 0
+  ) {
+    pushValidationError(errors, "annualInspection", "Inspection and emissions costs cannot be negative.");
   }
 
   if (validateRequiredNumber(errors, values, "annualInflationPercent", "Annual inflation")) {
@@ -590,6 +646,17 @@ function validateFormValues(values) {
     values.loanTermMonths < 0
   ) {
     pushValidationError(errors, "loanTermMonths", "Loan term cannot be negative.");
+  }
+
+  if (
+    validateRequiredNumber(errors, values, "tireReplacementCost", "Tire replacement cost") &&
+    values.tireReplacementCost < 0
+  ) {
+    pushValidationError(errors, "tireReplacementCost", "Tire replacement cost cannot be negative.");
+  }
+
+  if (validateRequiredNumber(errors, values, "tireLifeMiles", "Tire life") && values.tireLifeMiles <= 0) {
+    pushValidationError(errors, "tireLifeMiles", "Tire life must be greater than 0 miles.");
   }
 
   if (validateRequiredNumber(errors, values, "fuelMean", "Fuel price mean") && values.fuelMean < 0) {
@@ -773,6 +840,14 @@ function formatCostPerMile(value) {
   return `${preciseCurrency.format(value)}/mi`;
 }
 
+function formatMiles(value) {
+  return `${Math.round(value).toLocaleString()} mi`;
+}
+
+function formatGallons(value) {
+  return `${Math.round(value).toLocaleString()} gal`;
+}
+
 function renderSummary(response) {
   const summary = response.responseSummary;
   renderCards(summaryGrid, [
@@ -794,12 +869,17 @@ function renderBreakdown(response) {
     { label: "Purchase tax", value: currency.format(sample.costPurchaseTax) },
     { label: "Upfront fees", value: currency.format(sample.costUpfrontFees) },
     { label: "Loan payments", value: currency.format(sample.costLoanPaymentsMade) },
+    { label: "Loan interest", value: currency.format(sample.costLoanInterest) },
     { label: "Loan balance at sale", value: currency.format(sample.costRemainingLoanBalance) },
     { label: "Fuel", value: currency.format(sample.costFuel) },
     { label: "Maintenance", value: currency.format(sample.costMaintenance) },
     { label: "Repair shocks", value: currency.format(sample.costRepairShocks) },
     { label: "Insurance", value: currency.format(sample.costInsurance) },
     { label: "Registration", value: currency.format(sample.costRegistration) },
+    { label: "Parking", value: currency.format(sample.costParking) },
+    { label: "Tolls and road fees", value: currency.format(sample.costTolls) },
+    { label: "Inspection and emissions", value: currency.format(sample.costInspection) },
+    { label: "Tires", value: currency.format(sample.costTires) },
     { label: "Resale value", value: currency.format(sample.costResaleValue) },
     { label: "Total ownership cost", value: currency.format(sample.costTotal) },
   ]);
@@ -828,6 +908,10 @@ function renderInsights(response) {
       value: currency.format(spread),
     },
     {
+      label: "Modeled miles",
+      value: formatMiles(summary.summaryTotalMilesDriven),
+    },
+    {
       label: "Sampled end equity",
       value: currency.format(endingEquity),
     },
@@ -852,11 +936,21 @@ function renderYearlyBreakdown(response) {
         <article class="yearly-card">
           <h4>Year ${year.yearlyYear}</h4>
           <dl>
+            <div><dt>Miles driven</dt><dd>${formatMiles(year.yearlyMilesDriven)}</dd></div>
+            <div><dt>Fuel burned</dt><dd>${formatGallons(year.yearlyFuelGallons)}</dd></div>
             <div><dt>Total for year</dt><dd>${currency.format(year.yearlyTotalCost)}</dd></div>
             <div><dt>Year 1 purchase costs</dt><dd>${currency.format(year.yearlyPurchaseTax + year.yearlyUpfrontFees)}</dd></div>
+            <div><dt>Insurance + registration</dt><dd>${currency.format(
+              year.yearlyInsurance + year.yearlyRegistration
+            )}</dd></div>
+            <div><dt>Parking + tolls + inspection</dt><dd>${currency.format(
+              year.yearlyParking + year.yearlyTolls + year.yearlyInspection
+            )}</dd></div>
             <div><dt>Inflation factor</dt><dd>${year.yearlyInflationMultiplier.toFixed(2)}x</dd></div>
             <div><dt>Repair shocks</dt><dd>${currency.format(year.yearlyRepairShocks)}</dd></div>
             <div><dt>Loan payments</dt><dd>${currency.format(year.yearlyLoanPayments)}</dd></div>
+            <div><dt>Loan interest</dt><dd>${currency.format(year.yearlyLoanInterest)}</dd></div>
+            <div><dt>Tires</dt><dd>${currency.format(year.yearlyTires)}</dd></div>
             <div><dt>Depreciation loss</dt><dd>${currency.format(year.yearlyDepreciationLoss)}</dd></div>
             <div><dt>Ending value</dt><dd>${currency.format(year.yearlyEndingVehicleValue)}</dd></div>
             <div><dt>Remaining loan</dt><dd>${currency.format(year.yearlyRemainingLoanBalance)}</dd></div>

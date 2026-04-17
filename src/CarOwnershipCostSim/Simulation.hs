@@ -35,9 +35,7 @@ simulateRequestWithSeed seed request =
       totals = map costTotal samples
       (exampleBreakdown, exampleYearlyBreakdown, _) =
         simulateDetailedCostBreakdown simulationInput (mkStdGen seed)
-      totalMilesDriven =
-        max 0 (simulationAnnualMiles simulationInput)
-          * fromIntegral (max 1 (simulationYearsOwned simulationInput))
+      totalMilesDriven = totalMilesDrivenForInput simulationInput
    in SimulationResponse
         { responseSeedUsed = seed,
           responseSummary = summarizeTotals iterations totalMilesDriven totals,
@@ -95,28 +93,36 @@ simulateDetailedCostBreakdown simulationInput initialGen =
       purchaseTax = purchasePrice * salesTaxRate
       upfrontFees = max 0 (simulationUpfrontFees simulationInput)
       annualInflationRate = max 0 (simulationAnnualInflationRate simulationInput)
+      annualMileageChangeRate = max (-1) (simulationAnnualMileageChangeRate simulationInput)
+      baseAnnualMiles = max 0 (simulationAnnualMiles simulationInput)
+      milesPerGallon = simulationMilesPerGallon simulationInput
       annualInsuranceCost = max 0 (simulationAnnualInsurance simulationInput)
       annualRegistrationCost = max 0 (simulationAnnualRegistration simulationInput)
+      annualParkingCost = max 0 (simulationAnnualParking simulationInput)
+      annualTollsCost = max 0 (simulationAnnualTolls simulationInput)
+      annualInspectionCost = max 0 (simulationAnnualInspection simulationInput)
+      tireReplacementCost = max 0 (simulationTireReplacementCost simulationInput)
+      tireLifeMiles = max 0 (simulationTireLifeMiles simulationInput)
       repairShockProbability = max 0 (simulationRepairShockProbability simulationInput)
-      annualGallons =
-        if simulationMilesPerGallon simulationInput <= 0
-          then 0
-          else max 0 (simulationAnnualMiles simulationInput) / simulationMilesPerGallon simulationInput
       (sampledYears, finalGen) =
         simulateYears
           yearsOwned
           purchasePrice
-          annualGallons
+          baseAnnualMiles
+          annualMileageChangeRate
+          milesPerGallon
           (simulationFuelPrice simulationInput)
           (simulationAnnualMaintenance simulationInput)
           repairShockProbability
           (simulationRepairShockCost simulationInput)
           (simulationAnnualDepreciationRate simulationInput)
+          tireReplacementCost
+          tireLifeMiles
           initialGen
       financing = buildFinancingSnapshot simulationInput
       yearlyBreakdowns =
         zipWith
-          (buildYearlyCostBreakdown financing purchaseTax upfrontFees annualInflationRate annualInsuranceCost annualRegistrationCost)
+          (buildYearlyCostBreakdown financing purchaseTax upfrontFees annualInflationRate annualInsuranceCost annualRegistrationCost annualParkingCost annualTollsCost annualInspectionCost)
           [1 ..]
           sampledYears
       fuelCost = sum (map yearlyFuel yearlyBreakdowns)
@@ -124,6 +130,10 @@ simulateDetailedCostBreakdown simulationInput initialGen =
       repairShockCost = sum (map yearlyRepairShocks yearlyBreakdowns)
       insuranceCost = sum (map yearlyInsurance yearlyBreakdowns)
       registrationCost = sum (map yearlyRegistration yearlyBreakdowns)
+      parkingCost = sum (map yearlyParking yearlyBreakdowns)
+      tollsCost = sum (map yearlyTolls yearlyBreakdowns)
+      inspectionCost = sum (map yearlyInspection yearlyBreakdowns)
+      tireCost = sum (map yearlyTires yearlyBreakdowns)
       resaleValue =
         case sampledYears of
           [] -> purchasePrice
@@ -139,18 +149,27 @@ simulateDetailedCostBreakdown simulationInput initialGen =
           + repairShockCost
           + insuranceCost
           + registrationCost
+          + parkingCost
+          + tollsCost
+          + inspectionCost
+          + tireCost
           - resaleValue
    in ( CostBreakdown
           { costUpfrontPayment = financingUpfrontPayment financing,
             costPurchaseTax = purchaseTax,
             costUpfrontFees = upfrontFees,
             costLoanPaymentsMade = financingPaymentsMade financing,
+            costLoanInterest = financingInterestPaid financing,
             costRemainingLoanBalance = financingRemainingBalance financing,
             costFuel = fuelCost,
             costMaintenance = maintenanceCost,
             costRepairShocks = repairShockCost,
             costInsurance = insuranceCost,
             costRegistration = registrationCost,
+            costParking = parkingCost,
+            costTolls = tollsCost,
+            costInspection = inspectionCost,
+            costTires = tireCost,
             costResaleValue = resaleValue,
             costTotal = totalCost
           },
@@ -159,9 +178,12 @@ simulateDetailedCostBreakdown simulationInput initialGen =
       )
 
 data SampledYear = SampledYear
-  { sampledYearFuelCost :: Double,
+  { sampledYearMilesDriven :: Double,
+    sampledYearFuelGallons :: Double,
+    sampledYearFuelCost :: Double,
     sampledYearMaintenanceCost :: Double,
     sampledYearRepairShockCost :: Double,
+    sampledYearTireCost :: Double,
     sampledYearDepreciationLoss :: Double,
     sampledYearEndingVehicleValue :: Double
   }
@@ -170,19 +192,28 @@ simulateYears ::
   Int ->
   Double ->
   Double ->
+  Double ->
+  Double ->
   BoundedNormal ->
   BoundedNormal ->
   Double ->
   BoundedNormal ->
   BoundedNormal ->
+  Double ->
+  Double ->
   StdGen ->
   ([SampledYear], StdGen)
-simulateYears yearsRemaining carValue annualGallons fuelModel maintenanceModel repairShockProbability repairShockModel depreciationModel =
-  go yearsRemaining carValue []
+simulateYears yearsRemaining carValue baseAnnualMiles annualMileageChangeRate milesPerGallon fuelModel maintenanceModel repairShockProbability repairShockModel depreciationModel tireReplacementCost tireLifeMiles =
+  go yearsRemaining 1 carValue 0 []
   where
-    go 0 _ acc gen = (reverse acc, gen)
-    go remaining currentValue acc gen0 =
-      let (fuelPrice, gen1) = sampleBoundedNormal fuelModel gen0
+    go 0 _ _ _ acc gen = (reverse acc, gen)
+    go remaining yearIndex currentValue priorMilesDriven acc gen0 =
+      let yearlyMiles = annualMilesForYear baseAnnualMiles annualMileageChangeRate yearIndex
+          annualGallons = gallonsDrivenForYear yearlyMiles milesPerGallon
+          tireCost =
+            tireReplacementCost
+              * fromIntegral (tireReplacementCount tireLifeMiles priorMilesDriven (priorMilesDriven + yearlyMiles))
+          (fuelPrice, gen1) = sampleBoundedNormal fuelModel gen0
           (maintenanceCost, gen2) = sampleBoundedNormal maintenanceModel gen1
           (repairShockRoll, gen3) = randomR (0.0, 1.0 :: Double) gen2
           (repairShockCost, gen4) =
@@ -193,13 +224,16 @@ simulateYears yearsRemaining carValue annualGallons fuelModel maintenanceModel r
           nextValue = max 0 (currentValue * (1 - depreciationRate))
           sampledYear =
             SampledYear
-              { sampledYearFuelCost = annualGallons * fuelPrice,
+              { sampledYearMilesDriven = yearlyMiles,
+                sampledYearFuelGallons = annualGallons,
+                sampledYearFuelCost = annualGallons * fuelPrice,
                 sampledYearMaintenanceCost = maintenanceCost,
                 sampledYearRepairShockCost = repairShockCost,
+                sampledYearTireCost = tireCost,
                 sampledYearDepreciationLoss = max 0 (currentValue - nextValue),
                 sampledYearEndingVehicleValue = nextValue
               }
-       in go (remaining - 1) nextValue (sampledYear : acc) gen5
+       in go (remaining - 1) (yearIndex + 1) nextValue (priorMilesDriven + yearlyMiles) (sampledYear : acc) gen5
 
 data FinancingSnapshot = FinancingSnapshot
   { financingUpfrontPayment :: Double,
@@ -208,6 +242,8 @@ data FinancingSnapshot = FinancingSnapshot
     financingLoanTermMonths :: Int,
     financingMonthlyPayment :: Double,
     financingPaymentsMade :: Double,
+    financingPrincipalPaid :: Double,
+    financingInterestPaid :: Double,
     financingRemainingBalance :: Double
   }
 
@@ -230,6 +266,8 @@ buildFinancingSnapshot simulationInput =
       monthlyPayment = loanMonthlyPayment financedAmount annualRate loanTermMonths
       paymentsMade = monthlyPayment * fromIntegral paymentsMadeCount
       remainingBalance = remainingLoanBalance financedAmount annualRate loanTermMonths paymentsMadeCount
+      principalPaid = max 0 (financedAmount - remainingBalance)
+      interestPaid = max 0 (paymentsMade - principalPaid)
    in FinancingSnapshot
         { financingUpfrontPayment = upfrontPayment,
           financingPrincipal = financedAmount,
@@ -237,6 +275,8 @@ buildFinancingSnapshot simulationInput =
           financingLoanTermMonths = loanTermMonths,
           financingMonthlyPayment = monthlyPayment,
           financingPaymentsMade = paymentsMade,
+          financingPrincipalPaid = principalPaid,
+          financingInterestPaid = interestPaid,
           financingRemainingBalance = remainingBalance
         }
 
@@ -247,10 +287,13 @@ buildYearlyCostBreakdown ::
   Double ->
   Double ->
   Double ->
+  Double ->
+  Double ->
+  Double ->
   Int ->
   SampledYear ->
   YearlyCostBreakdown
-buildYearlyCostBreakdown financing purchaseTax upfrontFees annualInflationRate annualInsuranceCost annualRegistrationCost yearIndex sampledYear =
+buildYearlyCostBreakdown financing purchaseTax upfrontFees annualInflationRate annualInsuranceCost annualRegistrationCost annualParkingCost annualTollsCost annualInspectionCost yearIndex sampledYear =
   let upfrontPayment =
         if yearIndex == 1
           then financingUpfrontPayment financing
@@ -269,8 +312,13 @@ buildYearlyCostBreakdown financing purchaseTax upfrontFees annualInflationRate a
       inflatedRepairShockCost = sampledYearRepairShockCost sampledYear * inflationMultiplier
       inflatedInsuranceCost = annualInsuranceCost * inflationMultiplier
       inflatedRegistrationCost = annualRegistrationCost * inflationMultiplier
-      loanPayments = loanPaymentsForYear financing yearIndex
-      yearEndLoanBalance = remainingLoanBalanceAtYearEnd financing yearIndex
+      inflatedParkingCost = annualParkingCost * inflationMultiplier
+      inflatedTollsCost = annualTollsCost * inflationMultiplier
+      inflatedInspectionCost = annualInspectionCost * inflationMultiplier
+      inflatedTireCost = sampledYearTireCost sampledYear * inflationMultiplier
+      loanBreakdown = loanBreakdownForYear financing yearIndex
+      loanPayments = yearlyLoanPaymentTotal loanBreakdown
+      yearEndLoanBalance = yearlyLoanBalanceEnd loanBreakdown
       endingVehicleValue = sampledYearEndingVehicleValue sampledYear
       totalCost =
         upfrontPayment
@@ -282,19 +330,31 @@ buildYearlyCostBreakdown financing purchaseTax upfrontFees annualInflationRate a
           + inflatedRepairShockCost
           + inflatedInsuranceCost
           + inflatedRegistrationCost
+          + inflatedParkingCost
+          + inflatedTollsCost
+          + inflatedInspectionCost
+          + inflatedTireCost
           + sampledYearDepreciationLoss sampledYear
    in YearlyCostBreakdown
         { yearlyYear = yearIndex,
+          yearlyMilesDriven = sampledYearMilesDriven sampledYear,
+          yearlyFuelGallons = sampledYearFuelGallons sampledYear,
           yearlyInflationMultiplier = inflationMultiplier,
           yearlyUpfrontPayment = upfrontPayment,
           yearlyPurchaseTax = yearOnePurchaseTax,
           yearlyUpfrontFees = yearOneUpfrontFees,
           yearlyLoanPayments = loanPayments,
+          yearlyLoanPrincipal = yearlyLoanPrincipalPaid loanBreakdown,
+          yearlyLoanInterest = yearlyLoanInterestPaid loanBreakdown,
           yearlyFuel = inflatedFuelCost,
           yearlyMaintenance = inflatedMaintenanceCost,
           yearlyRepairShocks = inflatedRepairShockCost,
           yearlyInsurance = inflatedInsuranceCost,
           yearlyRegistration = inflatedRegistrationCost,
+          yearlyParking = inflatedParkingCost,
+          yearlyTolls = inflatedTollsCost,
+          yearlyInspection = inflatedInspectionCost,
+          yearlyTires = inflatedTireCost,
           yearlyDepreciationLoss = sampledYearDepreciationLoss sampledYear,
           yearlyEndingVehicleValue = endingVehicleValue,
           yearlyRemainingLoanBalance = yearEndLoanBalance,
@@ -302,21 +362,29 @@ buildYearlyCostBreakdown financing purchaseTax upfrontFees annualInflationRate a
           yearlyTotalCost = totalCost
         }
 
-loanPaymentsForYear :: FinancingSnapshot -> Int -> Double
-loanPaymentsForYear financing yearIndex =
+data YearlyLoanBreakdown = YearlyLoanBreakdown
+  { yearlyLoanPaymentTotal :: Double,
+    yearlyLoanPrincipalPaid :: Double,
+    yearlyLoanInterestPaid :: Double,
+    yearlyLoanBalanceEnd :: Double
+  }
+
+loanBreakdownForYear :: FinancingSnapshot -> Int -> YearlyLoanBreakdown
+loanBreakdownForYear financing yearIndex =
   let monthsPaidBeforeYear = max 0 ((yearIndex - 1) * 12)
       monthsPaidThroughYear = min (yearIndex * 12) (financingLoanTermMonths financing)
       monthsPaidThisYear = max 0 (monthsPaidThroughYear - monthsPaidBeforeYear)
-   in financingMonthlyPayment financing * fromIntegral monthsPaidThisYear
-
-remainingLoanBalanceAtYearEnd :: FinancingSnapshot -> Int -> Double
-remainingLoanBalanceAtYearEnd financing yearIndex =
-  let monthsPaidThroughYear = min (yearIndex * 12) (financingLoanTermMonths financing)
-   in remainingLoanBalance
-        (financingPrincipal financing)
-        (financingAnnualRate financing)
-        (financingLoanTermMonths financing)
-        monthsPaidThroughYear
+      balanceBeforeYear = remainingLoanBalance (financingPrincipal financing) (financingAnnualRate financing) (financingLoanTermMonths financing) monthsPaidBeforeYear
+      balanceAfterYear = remainingLoanBalance (financingPrincipal financing) (financingAnnualRate financing) (financingLoanTermMonths financing) monthsPaidThroughYear
+      payments = financingMonthlyPayment financing * fromIntegral monthsPaidThisYear
+      principalPaid = max 0 (balanceBeforeYear - balanceAfterYear)
+      interestPaid = max 0 (payments - principalPaid)
+   in YearlyLoanBreakdown
+        { yearlyLoanPaymentTotal = payments,
+          yearlyLoanPrincipalPaid = principalPaid,
+          yearlyLoanInterestPaid = interestPaid,
+          yearlyLoanBalanceEnd = balanceAfterYear
+        }
 
 loanMonthlyPayment :: Double -> Double -> Int -> Double
 loanMonthlyPayment principal annualRate termMonths
@@ -370,6 +438,29 @@ applyBounds boundedNormal value =
         Nothing -> lowerClamped
         Just upperBound -> min upperBound lowerClamped
 
+annualMilesForYear :: Double -> Double -> Int -> Double
+annualMilesForYear baseAnnualMiles annualMileageChangeRate yearIndex =
+  max 0 (baseAnnualMiles * (1 + annualMileageChangeRate) ** fromIntegral (max 0 (yearIndex - 1)))
+
+gallonsDrivenForYear :: Double -> Double -> Double
+gallonsDrivenForYear yearlyMiles milesPerGallon
+  | milesPerGallon <= 0 = 0
+  | otherwise = yearlyMiles / milesPerGallon
+
+tireReplacementCount :: Double -> Double -> Double -> Int
+tireReplacementCount tireLifeMiles milesBeforeYear milesAfterYear
+  | tireLifeMiles <= 0 = 0
+  | otherwise =
+      max 0 (floor (milesAfterYear / tireLifeMiles) - floor (milesBeforeYear / tireLifeMiles))
+
+totalMilesDrivenForInput :: SimulationInput -> Double
+totalMilesDrivenForInput simulationInput =
+  sum
+    ( map
+        (annualMilesForYear (max 0 (simulationAnnualMiles simulationInput)) (max (-1) (simulationAnnualMileageChangeRate simulationInput)))
+        [1 .. max 1 (simulationYearsOwned simulationInput)]
+    )
+
 validateSimulationInput :: SimulationInput -> [String]
 validateSimulationInput simulationInput =
   concat
@@ -385,12 +476,19 @@ validateSimulationInput simulationInput =
       require (simulationAnnualInflationRate simulationInput <= 1) "Annual inflation rate should be expressed as a decimal between 0 and 1.",
       require (simulationYearsOwned simulationInput >= 1) "Years owned must be at least 1.",
       require (simulationAnnualMiles simulationInput >= 0) "Annual miles cannot be negative.",
+      require (simulationAnnualMileageChangeRate simulationInput >= (-1)) "Annual mileage change rate should be greater than or equal to -1.",
+      require (simulationAnnualMileageChangeRate simulationInput <= 1) "Annual mileage change rate should be less than or equal to 1.",
       require (simulationMilesPerGallon simulationInput > 0) "Fuel efficiency must be greater than 0 MPG.",
       require (simulationAnnualInsurance simulationInput >= 0) "Insurance cost cannot be negative.",
       require (simulationAnnualRegistration simulationInput >= 0) "Registration cost cannot be negative.",
+      require (simulationAnnualParking simulationInput >= 0) "Parking cost cannot be negative.",
+      require (simulationAnnualTolls simulationInput >= 0) "Tolls and road fees cannot be negative.",
+      require (simulationAnnualInspection simulationInput >= 0) "Inspection and emissions costs cannot be negative.",
       require (simulationLoanApr simulationInput >= 0) "Loan APR cannot be negative.",
       require (simulationLoanApr simulationInput <= 1) "Loan APR should be expressed as a decimal between 0 and 1.",
       require (simulationLoanTermMonths simulationInput >= 0) "Loan term cannot be negative.",
+      require (simulationTireReplacementCost simulationInput >= 0) "Tire replacement cost cannot be negative.",
+      require (simulationTireLifeMiles simulationInput > 0) "Tire life must be greater than 0 miles.",
       require (simulationRepairShockProbability simulationInput >= 0) "Repair shock probability cannot be negative.",
       require (simulationRepairShockProbability simulationInput <= 1) "Repair shock probability should be expressed as a decimal between 0 and 1.",
       validateBoundedNormal "Repair shock cost" False (simulationRepairShockCost simulationInput),
