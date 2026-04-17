@@ -21,7 +21,7 @@ The app asks for values such as:
 - down payment and loan details
 - miles driven per year
 - annual mileage change over time
-- fuel efficiency
+- city-driving share plus city and highway MPG
 - yearly insurance, registration, parking, tolls, and inspection
 - tire replacement assumptions
 - assumptions about fuel price, maintenance, and depreciation
@@ -153,6 +153,7 @@ The yearly model now also applies:
 - purchase tax and upfront one-time fees
 - annual inflation to recurring costs such as fuel, maintenance, insurance, registration, parking, tolls, inspection, tires, and repair shocks
 - annual mileage change so fuel use and tire wear can grow or shrink over time
+- city/highway fuel burn using a configurable city-driving share instead of one flat MPG assumption
 - loan amortization with interest tracked separately from principal in the yearly breakdown
 - a first-year resale hit on top of the sampled annual depreciation rate
 - a residual value floor so resale cannot fall below a configured minimum
@@ -257,13 +258,17 @@ depreciation, mileage penalties, and floor-limited residual value while keeping
 the web layer lightweight. The frontend now also supports side-by-side
 comparison by letting users pin a baseline run, compare later scenarios against
 it with delta cards, and overlay the baseline on the distribution and yearly
-charts. It also now includes a first importer layer that uses curated source
-seeds plus official `vPIC` and `FuelEconomy.gov` payloads to refresh the local
-vehicle catalog, and that catalog now carries resale defaults all the way
-through to the browser presets. The automated checks now cover simulation
-invariants, API routes, financing edge cases, deterministic mileage and wear
-logic, resale-floor behavior, mileage-based resale penalties, and a
-lightweight in-process smoke test for the web assets.
+charts. The fuel model now also distinguishes city and highway MPG, using the
+catalog's official FuelEconomy.gov values when presets are applied, so vehicle
+comparisons are no longer forced through one blended MPG input. It also now
+includes a first importer layer that uses curated source seeds plus official
+`vPIC` and `FuelEconomy.gov` payloads to refresh the local vehicle catalog, and
+that catalog now carries resale defaults and city/highway fuel-economy data all
+the way through to the browser presets. The automated checks now cover
+simulation invariants, API routes, financing edge cases, deterministic mileage
+and wear logic, resale-floor behavior, mileage-based resale penalties, the new
+city/highway fuel split, and a lightweight in-process smoke test for the web
+assets.
 
 The repository also includes a basic GitHub Actions workflow that runs the main
 build and test checks on pushes and pull requests.
@@ -277,6 +282,7 @@ easier to navigate as the project grows.
 - expand comparison mode beyond one saved baseline into richer multi-vehicle workflows
 - support alternative probability distributions
 - calibrate resale defaults from richer market-value inputs instead of only curated heuristics
+- extend the fuel model beyond a fixed city-driving share into commute, weekend, or seasonal usage patterns
 - add state-specific taxes and registration rules
 - expand the importer beyond curated vehicle IDs into richer discovery flows
 - broaden automated testing with API-contract, route, and browser-level coverage

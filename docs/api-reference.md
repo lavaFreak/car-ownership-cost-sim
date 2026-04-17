@@ -41,7 +41,10 @@ The request body is JSON with this top-level shape:
     "simulationYearsOwned": 5,
     "simulationAnnualMiles": 12000,
     "simulationAnnualMileageChangeRate": 0.02,
+    "simulationCityDrivingShare": 0.58,
     "simulationMilesPerGallon": 32,
+    "simulationCityMilesPerGallon": 28,
+    "simulationHighwayMilesPerGallon": 38,
     "simulationAnnualInsurance": 1800,
     "simulationAnnualRegistration": 220,
     "simulationAnnualParking": 720,
@@ -84,10 +87,14 @@ The request body is JSON with this top-level shape:
 
 - rates are decimals inside the backend payload
   - `0.061` means `6.1%`
+- `simulationCityDrivingShare` is also a decimal
+  - `0.58` means `58%` of annual miles are treated as city driving
 - `requestSeed` is optional
   - when absent, the server picks a random seed
 - `requestIterations` controls Monte Carlo sample count
 - bounded-normal inputs are used for uncertain variables
+- `simulationMilesPerGallon` is the derived blended MPG for the chosen
+  city/highway split
 
 ### Response shape
 

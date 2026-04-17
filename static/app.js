@@ -64,7 +64,9 @@ const shareFieldNames = [
   "yearsOwned",
   "annualMiles",
   "annualMileageChangePercent",
-  "milesPerGallon",
+  "cityDrivingSharePercent",
+  "cityMilesPerGallon",
+  "highwayMilesPerGallon",
   "annualInsurance",
   "annualRegistration",
   "annualParking",
@@ -201,7 +203,9 @@ function collectFormValues() {
     yearsOwned: numericValue("yearsOwned"),
     annualMiles: numericValue("annualMiles"),
     annualMileageChangePercent: numericValue("annualMileageChangePercent"),
-    milesPerGallon: numericValue("milesPerGallon"),
+    cityDrivingSharePercent: numericValue("cityDrivingSharePercent"),
+    cityMilesPerGallon: numericValue("cityMilesPerGallon"),
+    highwayMilesPerGallon: numericValue("highwayMilesPerGallon"),
     annualInsurance: numericValue("annualInsurance"),
     annualRegistration: numericValue("annualRegistration"),
     annualParking: numericValue("annualParking"),
@@ -239,13 +243,25 @@ function buildBoundedNormal(mean, stdDev, floor, ceiling) {
   };
 }
 
+function calculateCombinedMpg(cityShare, cityMpg, highwayMpg) {
+  const safeCityShare = Math.max(0, Math.min(1, cityShare));
+
+  if (!(cityMpg > 0) || !(highwayMpg > 0)) {
+    return 0;
+  }
+
+  const gallonsPerMile = safeCityShare / cityMpg + (1 - safeCityShare) / highwayMpg;
+  return gallonsPerMile > 0 ? 1 / gallonsPerMile : 0;
+}
+
 function presetDescriptionText(preset) {
-  return `${preset.presetDescription} Prefills price, MPG, insurance, registration, maintenance, depreciation, resale, and repair-risk assumptions.`;
+  return `${preset.presetDescription} Prefills price, city/highway MPG, insurance, registration, maintenance, depreciation, resale, and repair-risk assumptions.`;
 }
 
 function applyVehiclePreset(preset) {
   setNumericField("purchasePrice", Math.round(preset.presetPurchasePrice));
-  setNumericField("milesPerGallon", preset.presetMilesPerGallon);
+  setNumericField("cityMilesPerGallon", preset.presetCityMilesPerGallon.toFixed(1));
+  setNumericField("highwayMilesPerGallon", preset.presetHighwayMilesPerGallon.toFixed(1));
   setNumericField("annualInsurance", Math.round(preset.presetAnnualInsurance));
   setNumericField("annualRegistration", Math.round(preset.presetAnnualRegistration));
   setNumericField("maintenanceMean", Math.round(preset.presetAnnualMaintenance.boundedNormalMean));
@@ -388,6 +404,12 @@ function syncPresetSelectionFromQuery() {
 function buildRequestPayload(values) {
   const depreciationMean = values.depreciationMeanPercent / 100;
   const depreciationStdDev = values.depreciationStdDevPercent / 100;
+  const cityDrivingShare = values.cityDrivingSharePercent / 100;
+  const combinedMilesPerGallon = calculateCombinedMpg(
+    cityDrivingShare,
+    values.cityMilesPerGallon,
+    values.highwayMilesPerGallon
+  );
 
   return {
     requestIterations: values.iterations,
@@ -400,7 +422,10 @@ function buildRequestPayload(values) {
       simulationYearsOwned: values.yearsOwned,
       simulationAnnualMiles: values.annualMiles,
       simulationAnnualMileageChangeRate: values.annualMileageChangePercent / 100,
-      simulationMilesPerGallon: values.milesPerGallon,
+      simulationCityDrivingShare: cityDrivingShare,
+      simulationMilesPerGallon: combinedMilesPerGallon,
+      simulationCityMilesPerGallon: values.cityMilesPerGallon,
+      simulationHighwayMilesPerGallon: values.highwayMilesPerGallon,
       simulationAnnualInsurance: values.annualInsurance,
       simulationAnnualRegistration: values.annualRegistration,
       simulationAnnualParking: values.annualParking,
@@ -714,6 +739,7 @@ function renderInsightPlaceholder() {
     { label: "Typical yearly cost", value: "After a run" },
     { label: "10-90 spread", value: "After a run" },
     { label: "Modeled miles", value: "After a run" },
+    { label: "Blended sample MPG", value: "After a run" },
     { label: "Sampled end equity", value: "After a run" },
     { label: "Ending resale value", value: "After a run" },
     { label: "Repair-shock share", value: "After a run" },
@@ -726,7 +752,9 @@ function renderYearlyBreakdownPlaceholder() {
           <h4>Yearly timeline</h4>
           <dl>
             <div><dt>Miles driven</dt><dd>After a run</dd></div>
+            <div><dt>City + highway miles</dt><dd>After a run</dd></div>
             <div><dt>Fuel burned</dt><dd>After a run</dd></div>
+            <div><dt>City + highway gallons</dt><dd>After a run</dd></div>
             <div><dt>Annual totals</dt><dd>After a run</dd></div>
             <div><dt>Year 1 purchase costs</dt><dd>After a run</dd></div>
             <div><dt>Insurance + registration</dt><dd>After a run</dd></div>
@@ -911,8 +939,25 @@ function validateFormValues(values) {
     );
   }
 
-  if (validateRequiredNumber(errors, values, "milesPerGallon", "Fuel efficiency") && values.milesPerGallon <= 0) {
-    pushValidationError(errors, "milesPerGallon", "Fuel efficiency must be greater than 0 MPG.");
+  if (
+    validateRequiredNumber(errors, values, "cityDrivingSharePercent", "City driving share") &&
+    (values.cityDrivingSharePercent < 0 || values.cityDrivingSharePercent > 100)
+  ) {
+    pushValidationError(errors, "cityDrivingSharePercent", "City driving share must be between 0% and 100%.");
+  }
+
+  if (
+    validateRequiredNumber(errors, values, "cityMilesPerGallon", "City MPG") &&
+    values.cityMilesPerGallon <= 0
+  ) {
+    pushValidationError(errors, "cityMilesPerGallon", "City MPG must be greater than 0.");
+  }
+
+  if (
+    validateRequiredNumber(errors, values, "highwayMilesPerGallon", "Highway MPG") &&
+    values.highwayMilesPerGallon <= 0
+  ) {
+    pushValidationError(errors, "highwayMilesPerGallon", "Highway MPG must be greater than 0.");
   }
 
   if (validateRequiredNumber(errors, values, "annualInsurance", "Insurance") && values.annualInsurance < 0) {
@@ -1259,6 +1304,9 @@ function renderInsights(response) {
   const endingEquity = yearlyBreakdown.length
     ? yearlyBreakdown[yearlyBreakdown.length - 1].yearlyEstimatedEquity
     : 0;
+  const totalFuelGallons = yearlyBreakdown.reduce((sum, year) => sum + year.yearlyFuelGallons, 0);
+  const blendedMpg =
+    totalFuelGallons > 0 ? summary.summaryTotalMilesDriven / totalFuelGallons : null;
   const repairShockShare =
     response.responseExampleBreakdown.costTotal <= 0
       ? null
@@ -1276,6 +1324,10 @@ function renderInsights(response) {
     {
       label: "Modeled miles",
       value: formatMiles(summary.summaryTotalMilesDriven),
+    },
+    {
+      label: "Blended sample MPG",
+      value: blendedMpg === null ? "N/A" : blendedMpg.toFixed(1),
     },
     {
       label: "Sampled end equity",
@@ -1307,7 +1359,13 @@ function renderYearlyBreakdown(response) {
           <h4>Year ${year.yearlyYear}</h4>
           <dl>
             <div><dt>Miles driven</dt><dd>${formatMiles(year.yearlyMilesDriven)}</dd></div>
+            <div><dt>City + highway miles</dt><dd>${formatMiles(year.yearlyCityMilesDriven)} / ${formatMiles(
+              year.yearlyHighwayMilesDriven
+            )}</dd></div>
             <div><dt>Fuel burned</dt><dd>${formatGallons(year.yearlyFuelGallons)}</dd></div>
+            <div><dt>City + highway gallons</dt><dd>${formatGallons(year.yearlyCityFuelGallons)} / ${formatGallons(
+              year.yearlyHighwayFuelGallons
+            )}</dd></div>
             <div><dt>Total for year</dt><dd>${currency.format(year.yearlyTotalCost)}</dd></div>
             <div><dt>Year 1 purchase costs</dt><dd>${currency.format(year.yearlyPurchaseTax + year.yearlyUpfrontFees)}</dd></div>
             <div><dt>Insurance + registration</dt><dd>${currency.format(

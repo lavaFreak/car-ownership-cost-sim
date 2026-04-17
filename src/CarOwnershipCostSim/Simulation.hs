@@ -132,7 +132,10 @@ simulateDetailedCostBreakdown simulationInput initialGen =
       annualInflationRate = max 0 (simulationAnnualInflationRate simulationInput)
       annualMileageChangeRate = max (-1) (simulationAnnualMileageChangeRate simulationInput)
       baseAnnualMiles = max 0 (simulationAnnualMiles simulationInput)
-      milesPerGallon = simulationMilesPerGallon simulationInput
+      cityDrivingShare = clampUnitInterval (simulationCityDrivingShare simulationInput)
+      combinedMilesPerGallon = max 0 (simulationMilesPerGallon simulationInput)
+      cityMilesPerGallon = positiveOrFallback (simulationCityMilesPerGallon simulationInput) combinedMilesPerGallon
+      highwayMilesPerGallon = positiveOrFallback (simulationHighwayMilesPerGallon simulationInput) combinedMilesPerGallon
       annualInsuranceCost = max 0 (simulationAnnualInsurance simulationInput)
       annualRegistrationCost = max 0 (simulationAnnualRegistration simulationInput)
       annualParkingCost = max 0 (simulationAnnualParking simulationInput)
@@ -151,7 +154,9 @@ simulateDetailedCostBreakdown simulationInput initialGen =
           purchasePrice
           baseAnnualMiles
           annualMileageChangeRate
-          milesPerGallon
+          cityDrivingShare
+          cityMilesPerGallon
+          highwayMilesPerGallon
           (simulationFuelPrice simulationInput)
           (simulationAnnualMaintenance simulationInput)
           repairShockProbability
@@ -231,7 +236,11 @@ simulateDetailedCostBreakdown simulationInput initialGen =
 
 data SampledYear = SampledYear
   { sampledYearMilesDriven :: Double,
+    sampledYearCityMilesDriven :: Double,
+    sampledYearHighwayMilesDriven :: Double,
     sampledYearFuelGallons :: Double,
+    sampledYearCityFuelGallons :: Double,
+    sampledYearHighwayFuelGallons :: Double,
     sampledYearFuelCost :: Double,
     sampledYearMaintenanceCost :: Double,
     sampledYearRepairShockCost :: Double,
@@ -250,6 +259,8 @@ simulateYears ::
   Double ->
   Double ->
   Double ->
+  Double ->
+  Double ->
   BoundedNormal ->
   BoundedNormal ->
   Double ->
@@ -263,13 +274,17 @@ simulateYears ::
   Double ->
   StdGen ->
   ([SampledYear], StdGen)
-simulateYears yearsRemaining carValue baseAnnualMiles annualMileageChangeRate milesPerGallon fuelModel maintenanceModel repairShockProbability repairShockModel depreciationModel tireReplacementCost tireLifeMiles firstYearDepreciationBonus residualValueFloorPercent expectedAnnualMilesForResale extraMileageDepreciationPerMile =
-  go yearsRemaining 1 carValue 0 []
+simulateYears yearsRemaining carValue baseAnnualMiles annualMileageChangeRate cityDrivingShare cityMilesPerGallon highwayMilesPerGallon fuelModel maintenanceModel repairShockProbability repairShockModel depreciationModel tireReplacementCost tireLifeMiles firstYearDepreciationBonus residualValueFloorPercent expectedAnnualMilesForResale extraMileageDepreciationPerMile initialGen =
+  go yearsRemaining 1 carValue 0 [] initialGen
   where
     go 0 _ _ _ acc gen = (reverse acc, gen)
     go remaining yearIndex currentValue priorMilesDriven acc gen0 =
       let yearlyMiles = annualMilesForYear baseAnnualMiles annualMileageChangeRate yearIndex
-          annualGallons = gallonsDrivenForYear yearlyMiles milesPerGallon
+          cityMiles = yearlyMiles * cityDrivingShare
+          highwayMiles = max 0 (yearlyMiles - cityMiles)
+          cityGallons = gallonsDrivenForYear cityMiles cityMilesPerGallon
+          highwayGallons = gallonsDrivenForYear highwayMiles highwayMilesPerGallon
+          annualGallons = cityGallons + highwayGallons
           tireCost =
             tireReplacementCost
               * fromIntegral (tireReplacementCount tireLifeMiles priorMilesDriven (priorMilesDriven + yearlyMiles))
@@ -298,7 +313,11 @@ simulateYears yearsRemaining carValue baseAnnualMiles annualMileageChangeRate mi
           sampledYear =
             SampledYear
               { sampledYearMilesDriven = yearlyMiles,
+                sampledYearCityMilesDriven = cityMiles,
+                sampledYearHighwayMilesDriven = highwayMiles,
                 sampledYearFuelGallons = annualGallons,
+                sampledYearCityFuelGallons = cityGallons,
+                sampledYearHighwayFuelGallons = highwayGallons,
                 sampledYearFuelCost = annualGallons * fuelPrice,
                 sampledYearMaintenanceCost = maintenanceCost,
                 sampledYearRepairShockCost = repairShockCost,
@@ -416,7 +435,11 @@ buildYearlyCostBreakdown financing purchaseTax upfrontFees annualInflationRate a
    in YearlyCostBreakdown
         { yearlyYear = yearIndex,
           yearlyMilesDriven = sampledYearMilesDriven sampledYear,
+          yearlyCityMilesDriven = sampledYearCityMilesDriven sampledYear,
+          yearlyHighwayMilesDriven = sampledYearHighwayMilesDriven sampledYear,
           yearlyFuelGallons = sampledYearFuelGallons sampledYear,
+          yearlyCityFuelGallons = sampledYearCityFuelGallons sampledYear,
+          yearlyHighwayFuelGallons = sampledYearHighwayFuelGallons sampledYear,
           yearlyInflationMultiplier = inflationMultiplier,
           yearlyUpfrontPayment = upfrontPayment,
           yearlyPurchaseTax = yearOnePurchaseTax,
@@ -526,6 +549,15 @@ annualMilesForYear :: Double -> Double -> Int -> Double
 annualMilesForYear baseAnnualMiles annualMileageChangeRate yearIndex =
   max 0 (baseAnnualMiles * (1 + annualMileageChangeRate) ** fromIntegral (max 0 (yearIndex - 1)))
 
+clampUnitInterval :: Double -> Double
+clampUnitInterval =
+  max 0 . min 1
+
+positiveOrFallback :: Double -> Double -> Double
+positiveOrFallback candidate fallbackValue
+  | candidate > 0 = candidate
+  | otherwise = fallbackValue
+
 -- | Convert annual mileage into gallons consumed for the year.
 gallonsDrivenForYear :: Double -> Double -> Double
 gallonsDrivenForYear yearlyMiles milesPerGallon
@@ -594,7 +626,11 @@ validateSimulationInput simulationInput =
       require (simulationAnnualMiles simulationInput >= 0) "Annual miles cannot be negative.",
       require (simulationAnnualMileageChangeRate simulationInput >= (-1)) "Annual mileage change rate should be greater than or equal to -1.",
       require (simulationAnnualMileageChangeRate simulationInput <= 1) "Annual mileage change rate should be less than or equal to 1.",
+      require (simulationCityDrivingShare simulationInput >= 0) "City driving share cannot be negative.",
+      require (simulationCityDrivingShare simulationInput <= 1) "City driving share should be expressed as a decimal between 0 and 1.",
       require (simulationMilesPerGallon simulationInput > 0) "Fuel efficiency must be greater than 0 MPG.",
+      require (simulationCityMilesPerGallon simulationInput > 0) "City fuel efficiency must be greater than 0 MPG.",
+      require (simulationHighwayMilesPerGallon simulationInput > 0) "Highway fuel efficiency must be greater than 0 MPG.",
       require (simulationAnnualInsurance simulationInput >= 0) "Insurance cost cannot be negative.",
       require (simulationAnnualRegistration simulationInput >= 0) "Registration cost cannot be negative.",
       require (simulationAnnualParking simulationInput >= 0) "Parking cost cannot be negative.",

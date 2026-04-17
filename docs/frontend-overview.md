@@ -44,7 +44,8 @@ The preset dropdown is populated from `GET /api/presets`.
 
 Presets intentionally:
 
-- prefill vehicle-specific defaults such as MPG and maintenance assumptions
+- prefill vehicle-specific defaults such as city/highway MPG and maintenance
+  assumptions
 - leave scenario-specific choices like mileage and financing under user control
 - come from the local catalog so they stay reproducible
 
@@ -97,7 +98,7 @@ The frontend currently renders five views of the simulation response:
 - one sampled scenario
   - category-level breakdown for a single path
 - yearly snapshot
-  - annual timeline for that sampled path
+  - annual timeline for that sampled path, including city/highway fuel split
 
 Two simple canvas charts complement those cards:
 

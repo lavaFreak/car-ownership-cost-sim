@@ -70,6 +70,7 @@ tests =
       TestLabel "first-year depreciation bonus and residual floor shape resale value" firstYearBonusAndResidualFloorTest,
       TestLabel "extra mileage lowers resale value year by year" mileageResalePenaltyTest,
       TestLabel "mileage growth and tire wear affect deterministic totals" mileageGrowthAndTireWearTest,
+      TestLabel "city and highway MPG split shapes fuel costs" cityHighwayFuelSplitTest,
       TestLabel "local recurring costs inflate over time" localRecurringCostsInflationTest,
       TestLabel "vehicle catalog loads and drives presets" vehicleCatalogTest,
       TestLabel "catalog import seeds build normalized entries" catalogImportSeedTest,
@@ -107,7 +108,10 @@ deterministicCashPurchaseTest =
                     simulationYearsOwned = 1,
                     simulationAnnualMiles = 12000,
                     simulationAnnualMileageChangeRate = 0,
+                    simulationCityDrivingShare = 0.5,
                     simulationMilesPerGallon = 30,
+                    simulationCityMilesPerGallon = 30,
+                    simulationHighwayMilesPerGallon = 30,
                     simulationAnnualInsurance = 1000,
                     simulationAnnualRegistration = 200,
                     simulationAnnualParking = 0,
@@ -191,7 +195,10 @@ purchaseTaxAndFeesTest =
                     simulationYearsOwned = 1,
                     simulationAnnualMiles = 0,
                     simulationAnnualMileageChangeRate = 0,
+                    simulationCityDrivingShare = 0.5,
                     simulationMilesPerGallon = 30,
+                    simulationCityMilesPerGallon = 30,
+                    simulationHighwayMilesPerGallon = 30,
                     simulationAnnualInsurance = 0,
                     simulationAnnualRegistration = 0,
                     simulationAnnualParking = 0,
@@ -266,7 +273,10 @@ inflationTest =
                     simulationYearsOwned = 2,
                     simulationAnnualMiles = 12000,
                     simulationAnnualMileageChangeRate = 0,
+                    simulationCityDrivingShare = 0.5,
                     simulationMilesPerGallon = 30,
+                    simulationCityMilesPerGallon = 30,
+                    simulationHighwayMilesPerGallon = 30,
                     simulationAnnualInsurance = 100,
                     simulationAnnualRegistration = 50,
                     simulationAnnualParking = 0,
@@ -346,7 +356,10 @@ repairShockTest =
                     simulationYearsOwned = 1,
                     simulationAnnualMiles = 0,
                     simulationAnnualMileageChangeRate = 0,
+                    simulationCityDrivingShare = 0.5,
                     simulationMilesPerGallon = 30,
+                    simulationCityMilesPerGallon = 30,
+                    simulationHighwayMilesPerGallon = 30,
                     simulationAnnualInsurance = 0,
                     simulationAnnualRegistration = 0,
                     simulationAnnualParking = 0,
@@ -579,6 +592,36 @@ mileageGrowthAndTireWearTest =
         assertClose "the first tire cycle happens in year two" 800 (yearlyTires yearTwo)
         assertClose "no second tire cycle happens yet" 0 (yearlyTires yearThree)
       _ -> assertFailure "Expected exactly three yearly breakdown rows."
+
+cityHighwayFuelSplitTest :: Test
+cityHighwayFuelSplitTest =
+  TestCase $ do
+    let request =
+          deterministicRequest
+            45
+            baselineSimulationInput
+              { simulationPurchasePrice = 10000,
+                simulationYearsOwned = 1,
+                simulationAnnualMiles = 12000,
+                simulationCityDrivingShare = 0.5,
+                simulationMilesPerGallon = 80 / 3,
+                simulationCityMilesPerGallon = 20,
+                simulationHighwayMilesPerGallon = 40,
+                simulationFuelPrice = deterministicBoundedNormal 4
+              }
+        response = simulateRequestWithSeed 45 request
+        breakdown = responseExampleBreakdown response
+        yearlyBreakdown = responseExampleYearlyBreakdown response
+    assertClose "fuel cost follows the city and highway split" 1800 (costFuel breakdown)
+    assertClose "ownership cost remains just fuel under zeroed other inputs" 1800 (costTotal breakdown)
+    case yearlyBreakdown of
+      [yearOne] -> do
+        assertClose "year one city miles are tracked" 6000 (yearlyCityMilesDriven yearOne)
+        assertClose "year one highway miles are tracked" 6000 (yearlyHighwayMilesDriven yearOne)
+        assertClose "year one city gallons are tracked" 300 (yearlyCityFuelGallons yearOne)
+        assertClose "year one highway gallons are tracked" 150 (yearlyHighwayFuelGallons yearOne)
+        assertClose "year one total gallons stay aligned" 450 (yearlyFuelGallons yearOne)
+      _ -> assertFailure "Expected exactly one yearly breakdown row."
 
 localRecurringCostsInflationTest :: Test
 localRecurringCostsInflationTest =
@@ -933,7 +976,10 @@ invalidInputValidationTest =
                     simulationYearsOwned = 0,
                     simulationAnnualMiles = 12000,
                     simulationAnnualMileageChangeRate = 1.2,
+                    simulationCityDrivingShare = 1.2,
                     simulationMilesPerGallon = 0,
+                    simulationCityMilesPerGallon = 0,
+                    simulationHighwayMilesPerGallon = 0,
                     simulationAnnualInsurance = 1500,
                     simulationAnnualRegistration = 180,
                     simulationAnnualParking = -10,
@@ -988,7 +1034,10 @@ invalidInputValidationTest =
     assertBool "repair shock probability is validated" ("Repair shock probability should be expressed as a decimal between 0 and 1." `elem` validationErrors)
     assertBool "repair shock bounds are validated" ("Repair shock cost standard deviation cannot be negative." `elem` validationErrors)
     assertBool "years owned is validated" ("Years owned must be at least 1." `elem` validationErrors)
+    assertBool "city share is validated" ("City driving share should be expressed as a decimal between 0 and 1." `elem` validationErrors)
     assertBool "fuel efficiency is validated" ("Fuel efficiency must be greater than 0 MPG." `elem` validationErrors)
+    assertBool "city MPG is validated" ("City fuel efficiency must be greater than 0 MPG." `elem` validationErrors)
+    assertBool "highway MPG is validated" ("Highway fuel efficiency must be greater than 0 MPG." `elem` validationErrors)
     assertBool "parking is validated" ("Parking cost cannot be negative." `elem` validationErrors)
     assertBool "tolls are validated" ("Tolls and road fees cannot be negative." `elem` validationErrors)
     assertBool "inspection is validated" ("Inspection and emissions costs cannot be negative." `elem` validationErrors)
@@ -1075,6 +1124,8 @@ assertVehiclePresetLooksUsable preset = do
   assertBool "preset has a name" (not (null (presetName preset)))
   assertBool "preset purchase price is positive" (presetPurchasePrice preset > 0)
   assertBool "preset MPG is positive" (presetMilesPerGallon preset > 0)
+  assertBool "preset city MPG is positive" (presetCityMilesPerGallon preset > 0)
+  assertBool "preset highway MPG is positive" (presetHighwayMilesPerGallon preset > 0)
   assertBool "preset first-year depreciation bonus is in range" (presetFirstYearDepreciationBonus preset >= 0 && presetFirstYearDepreciationBonus preset <= 1)
   assertBool "preset residual floor is in range" (presetResidualValueFloorPercent preset >= 0 && presetResidualValueFloorPercent preset <= 1)
   assertBool "preset expected annual resale miles are non-negative" (presetExpectedAnnualMilesForResale preset >= 0)
@@ -1142,6 +1193,16 @@ assertResponseInvariants seed = do
   assertBool "percentiles stay ordered" (summaryP10TotalCost summary <= summaryMedianTotalCost summary && summaryMedianTotalCost summary <= summaryP90TotalCost summary)
   assertMaybeClose "mean cost per mile stays consistent with mean total cost" (summaryMeanTotalCost summary / totalMiles) (summaryMeanCostPerMile summary)
   assertBool "all yearly totals stay non-negative" (all (\yearBreakdown -> yearlyTotalCost yearBreakdown >= 0) yearlyBreakdown)
+  assertBool
+    "yearly city and highway miles stay aligned with total miles"
+    (all
+       (\yearBreakdown -> abs ((yearlyCityMilesDriven yearBreakdown + yearlyHighwayMilesDriven yearBreakdown) - yearlyMilesDriven yearBreakdown) <= 1.0e-6)
+       yearlyBreakdown)
+  assertBool
+    "yearly city and highway gallons stay aligned with total gallons"
+    (all
+       (\yearBreakdown -> abs ((yearlyCityFuelGallons yearBreakdown + yearlyHighwayFuelGallons yearBreakdown) - yearlyFuelGallons yearBreakdown) <= 1.0e-6)
+       yearlyBreakdown)
   assertClose "fuel totals stay aligned with the yearly timeline" (sum (map yearlyFuel yearlyBreakdown)) (costFuel exampleBreakdown)
   assertClose "maintenance totals stay aligned with the yearly timeline" (sum (map yearlyMaintenance yearlyBreakdown)) (costMaintenance exampleBreakdown)
   assertClose "repair shock totals stay aligned with the yearly timeline" (sum (map yearlyRepairShocks yearlyBreakdown)) (costRepairShocks exampleBreakdown)
@@ -1249,7 +1310,10 @@ invalidSimulationRequest =
             simulationYearsOwned = 0,
             simulationAnnualMiles = 12000,
             simulationAnnualMileageChangeRate = 1.2,
+            simulationCityDrivingShare = 1.2,
             simulationMilesPerGallon = 0,
+            simulationCityMilesPerGallon = 0,
+            simulationHighwayMilesPerGallon = 0,
             simulationAnnualInsurance = 1500,
             simulationAnnualRegistration = 180,
             simulationAnnualParking = -10,
@@ -1324,7 +1388,10 @@ baselineSimulationInput =
       simulationYearsOwned = 1,
       simulationAnnualMiles = 0,
       simulationAnnualMileageChangeRate = 0,
+      simulationCityDrivingShare = 0.5,
       simulationMilesPerGallon = 30,
+      simulationCityMilesPerGallon = 30,
+      simulationHighwayMilesPerGallon = 30,
       simulationAnnualInsurance = 0,
       simulationAnnualRegistration = 0,
       simulationAnnualParking = 0,
