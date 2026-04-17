@@ -1,5 +1,13 @@
 {-# LANGUAGE DeriveGeneric #-}
 
+{-|
+Module      : CarOwnershipCostSim.VehiclePresets
+Description : UI-facing vehicle presets derived from the local catalog.
+
+Presets are intentionally narrower than full catalog rows. They only include
+the fields the browser currently uses to prefill the simulation form, keeping
+the frontend payload small and purpose-specific.
+-}
 module CarOwnershipCostSim.VehiclePresets
   ( VehiclePreset (..),
     vehiclePresetFromCatalog,
@@ -12,6 +20,7 @@ import CarOwnershipCostSim.VehicleCatalog (VehicleCatalogEntry (..))
 import Data.Aeson (FromJSON, ToJSON)
 import GHC.Generics (Generic)
 
+-- | Prefill data sent to the browser for quick vehicle selection.
 data VehiclePreset = VehiclePreset
   { presetId :: String,
     presetName :: String,
@@ -31,10 +40,12 @@ instance FromJSON VehiclePreset
 
 instance ToJSON VehiclePreset
 
+-- | Convert the entire vehicle catalog into browser-friendly presets.
 vehiclePresetsFromCatalog :: [VehicleCatalogEntry] -> [VehiclePreset]
 vehiclePresetsFromCatalog =
   map vehiclePresetFromCatalog
 
+-- | Convert one catalog row into the subset of fields needed by the preset UI.
 vehiclePresetFromCatalog :: VehicleCatalogEntry -> VehiclePreset
 vehiclePresetFromCatalog catalogEntry =
   VehiclePreset

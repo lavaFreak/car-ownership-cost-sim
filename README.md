@@ -89,6 +89,21 @@ the core simulation code.
 - `test/Spec.hs`
   Holds deterministic tests for the simulation model and data-import pipeline.
 
+## Documentation Guide
+
+Start with the README for the project overview, then use the focused docs below
+for deeper context:
+
+- [docs/architecture-overview.md](/Users/garion/Work/projects/car-ownership-cost-sim/docs/architecture-overview.md)
+  Explains how the backend, importer, web layer, frontend, and tests fit
+  together.
+- [docs/simulation-model.md](/Users/garion/Work/projects/car-ownership-cost-sim/docs/simulation-model.md)
+  Explains the current Monte Carlo model, deterministic formulas, stochastic
+  inputs, and modeling limits.
+- [docs/vehicle-data-sourcing.md](/Users/garion/Work/projects/car-ownership-cost-sim/docs/vehicle-data-sourcing.md)
+  Explains the current strategy for acquiring vehicle data and why the project
+  favors APIs plus a local catalog over scraping-first approaches.
+
 ## Current Cost Model
 
 The current MVP models uncertainty with bounded normal distributions for:
@@ -229,8 +244,9 @@ logic, and a lightweight in-process smoke test for the web assets.
 The repository also includes a basic GitHub Actions workflow that runs the main
 build and test checks on pushes and pull requests.
 
-For current source research on where to obtain broad vehicle data, see
-`docs/vehicle-data-sourcing.md`.
+The documentation is now split across source-level comments plus dedicated docs
+for architecture, model behavior, and vehicle-data sourcing so the codebase is
+easier to navigate as the project grows.
 
 ## Near-Term Next Tasks
 

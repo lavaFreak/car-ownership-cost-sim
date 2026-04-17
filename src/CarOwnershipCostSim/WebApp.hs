@@ -1,5 +1,14 @@
 {-# LANGUAGE OverloadedStrings #-}
 
+{-|
+Module      : CarOwnershipCostSim.WebApp
+Description : Web routes for the browser UI and JSON API.
+
+The project keeps route construction in its own module so the same Scotty
+application can be reused by the production executable and the in-process test
+suite. That keeps API behavior testable without depending on a separately
+booted server process.
+-}
 module CarOwnershipCostSim.WebApp
   ( appRoutes,
     buildApplication,
@@ -16,10 +25,12 @@ import Network.Wai (Application)
 import System.Random (randomIO)
 import Web.Scotty
 
+-- | Build the WAI application used by the executable and test suite.
 buildApplication :: [VehicleCatalogEntry] -> IO Application
 buildApplication vehicleCatalog =
   scottyApp (appRoutes vehicleCatalog)
 
+-- | Declare all frontend and API routes for the application.
 appRoutes :: [VehicleCatalogEntry] -> ScottyM ()
 appRoutes vehicleCatalog = do
   let vehiclePresets = vehiclePresetsFromCatalog vehicleCatalog
@@ -58,6 +69,7 @@ appRoutes vehicleCatalog = do
           else
             badRequest "Invalid simulation input" validationErrors
 
+-- | Return a normalized JSON error payload for invalid requests.
 badRequest :: String -> [String] -> ActionM ()
 badRequest errorMessage details = do
   status status400

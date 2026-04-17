@@ -1,5 +1,17 @@
 {-# LANGUAGE DeriveGeneric #-}
 
+{-|
+Module      : CarOwnershipCostSim.Types
+Description : Shared request, response, and domain types for the simulator.
+
+These types sit at the boundary between the Haskell backend and the browser UI.
+They are serialized directly as JSON, so changes here tend to affect the
+simulation engine, the HTTP API, the frontend payload builder, and the test
+suite at the same time.
+
+Rates are generally expressed as decimal fractions inside the backend. For
+example, an APR of 6.1% is represented as @0.061@.
+-}
 module CarOwnershipCostSim.Types
   ( BoundedNormal (..),
     SimulationInput (..),
@@ -15,6 +27,11 @@ where
 import Data.Aeson (FromJSON, ToJSON)
 import GHC.Generics (Generic)
 
+-- | A normal distribution whose sampled values are clamped to a lower bound and
+-- an optional upper bound.
+--
+-- The simulator uses this shape for uncertain inputs such as fuel price,
+-- maintenance, repair shocks, and annual depreciation.
 data BoundedNormal = BoundedNormal
   { boundedNormalMean :: Double,
     boundedNormalStdDev :: Double,
@@ -27,6 +44,10 @@ instance FromJSON BoundedNormal
 
 instance ToJSON BoundedNormal
 
+-- | Full set of ownership assumptions for one simulation scenario.
+--
+-- This combines deterministic inputs, such as taxes or tolls, with the
+-- parameterization for stochastic inputs modeled by Monte Carlo sampling.
 data SimulationInput = SimulationInput
   { simulationPurchasePrice :: Double,
     simulationDownPayment :: Double,
@@ -58,6 +79,10 @@ instance FromJSON SimulationInput
 
 instance ToJSON SimulationInput
 
+-- | Top-level API payload used to request a simulation run.
+--
+-- The optional seed allows deterministic replay of a scenario, which is useful
+-- for tests, debugging, and shareable examples.
 data SimulationRequest = SimulationRequest
   { requestIterations :: Int,
     requestSeed :: Maybe Int,
@@ -69,6 +94,9 @@ instance FromJSON SimulationRequest
 
 instance ToJSON SimulationRequest
 
+-- | Aggregate cost categories for one sampled ownership path.
+--
+-- This is the "single scenario" breakdown shown in the UI after a run.
 data CostBreakdown = CostBreakdown
   { costUpfrontPayment :: Double,
     costPurchaseTax :: Double,
@@ -94,6 +122,10 @@ instance FromJSON CostBreakdown
 
 instance ToJSON CostBreakdown
 
+-- | Year-by-year view of a sampled ownership path.
+--
+-- The yearly breakdown is intended to explain how the final cost emerged,
+-- including financing, recurring costs, mileage-driven wear, and vehicle value.
 data YearlyCostBreakdown = YearlyCostBreakdown
   { yearlyYear :: Int,
     yearlyMilesDriven :: Double,
@@ -126,6 +158,7 @@ instance FromJSON YearlyCostBreakdown
 
 instance ToJSON YearlyCostBreakdown
 
+-- | Summary statistics derived from all sampled runs.
 data SimulationSummary = SimulationSummary
   { summaryIterations :: Int,
     summaryTotalMilesDriven :: Double,
@@ -146,6 +179,10 @@ instance FromJSON SimulationSummary
 
 instance ToJSON SimulationSummary
 
+-- | Full API response returned by @POST \/api\/simulate@.
+--
+-- The response contains both aggregate statistics across all runs and a single
+-- example path that can be used to explain the modeled timeline in the UI.
 data SimulationResponse = SimulationResponse
   { responseSeedUsed :: Int,
     responseSummary :: SimulationSummary,
@@ -159,6 +196,7 @@ instance FromJSON SimulationResponse
 
 instance ToJSON SimulationResponse
 
+-- | Example payload used by the API example route and by tests.
 exampleSimulationRequest :: SimulationRequest
 exampleSimulationRequest =
   SimulationRequest

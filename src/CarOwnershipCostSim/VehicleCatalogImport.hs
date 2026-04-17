@@ -1,6 +1,23 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE OverloadedStrings #-}
 
+{-|
+Module      : CarOwnershipCostSim.VehicleCatalogImport
+Description : Build local catalog entries from curated seeds and upstream data.
+
+This module bridges the gap between the project's stable local catalog and the
+external sources used to refresh it. The current approach is intentionally
+hybrid:
+
+- project-owned JSON source seeds keep pricing and modeling assumptions under
+  our control
+- NHTSA vPIC provides normalization checks for year/make/model identity
+- FuelEconomy.gov supplies MPG and fuel-type data
+
+The code here is used by the catalog-building CLI and heavily exercised by the
+test suite because upstream data normalization is one of the easiest places for
+quiet regressions to appear.
+-}
 module CarOwnershipCostSim.VehicleCatalogImport
   ( VehicleCatalogSourceSeed (..),
     VpicModelResult (..),
@@ -39,6 +56,7 @@ import GHC.Generics (Generic)
 import System.Exit (ExitCode (ExitSuccess))
 import System.Process (readProcessWithExitCode)
 
+-- | Curated project-owned seed row used to rebuild the local catalog.
 data VehicleCatalogSourceSeed = VehicleCatalogSourceSeed
   { sourceCatalogId :: String,
     sourceDescription :: String,
@@ -63,6 +81,7 @@ instance FromJSON VehicleCatalogSourceSeed
 
 instance ToJSON VehicleCatalogSourceSeed
 
+-- | Minimal shape of the vPIC API wrapper response.
 data VpicApiResponse a = VpicApiResponse
   { vpicResponseResults :: [a]
   }
@@ -73,6 +92,7 @@ instance FromJSON a => FromJSON (VpicApiResponse a) where
     withObject "VpicApiResponse" $ \objectValue ->
       VpicApiResponse <$> objectValue .: "Results"
 
+-- | Normalized slice of the vPIC model listing payload.
 data VpicModelResult = VpicModelResult
   { vpicResultMakeName :: String,
     vpicResultModelName :: String
@@ -86,6 +106,7 @@ instance FromJSON VpicModelResult where
         <$> objectValue .: "Make_Name"
         <*> objectValue .: "Model_Name"
 
+-- | Normalized FuelEconomy.gov vehicle record used during import.
 data FuelEconomyVehicleRecord = FuelEconomyVehicleRecord
   { fuelEconomyVehicleYear :: Int,
     fuelEconomyVehicleMake :: String,
@@ -99,9 +120,11 @@ data FuelEconomyVehicleRecord = FuelEconomyVehicleRecord
   }
   deriving (Eq, Show, Generic)
 
+-- | Relative path to the checked-in source-seed file.
 defaultVehicleCatalogSourceSeedsRelativePath :: FilePath
 defaultVehicleCatalogSourceSeedsRelativePath = "catalog/vehicle-source-seeds.json"
 
+-- | Load the curated source-seed file from disk.
 loadVehicleCatalogSourceSeeds :: FilePath -> IO [VehicleCatalogSourceSeed]
 loadVehicleCatalogSourceSeeds sourceSeedsPath = do
   decoded <- eitherDecodeFileStrict' sourceSeedsPath
@@ -110,11 +133,13 @@ loadVehicleCatalogSourceSeeds sourceSeedsPath = do
       error ("Unable to load vehicle source seeds from " <> sourceSeedsPath <> ": " <> decodeError)
     Right entries -> pure entries
 
+-- | Decode the vPIC model list payload into a normalized list of models.
 decodeVpicModelResults :: String -> Either String [VpicModelResult]
 decodeVpicModelResults rawPayload = do
   decoded <- eitherDecodeStrict' (BS8.pack rawPayload)
   pure (vpicResponseResults (decoded :: VpicApiResponse VpicModelResult))
 
+-- | Parse the subset of FuelEconomy.gov XML needed by the catalog builder.
 parseFuelEconomyVehicleRecord :: String -> Either String FuelEconomyVehicleRecord
 parseFuelEconomyVehicleRecord rawXml = do
   vehicleYear <- parseRequiredIntTag "year" rawXml
@@ -139,6 +164,8 @@ parseFuelEconomyVehicleRecord rawXml = do
         fuelEconomyVehicleHighwayMpg = highwayMpg
       }
 
+-- | Combine one source seed with upstream records to produce a normalized
+-- catalog import seed.
 buildCatalogImportSeedFromSourceSeed ::
   VehicleCatalogSourceSeed ->
   [VpicModelResult] ->
@@ -172,6 +199,7 @@ buildCatalogImportSeedFromSourceSeed sourceSeed vpicModels fuelEconomyVehicle = 
         importSourceUpdatedAt = sourceSourceUpdatedAt sourceSeed
       }
 
+-- | Build a final catalog entry from already-decoded upstream records.
 buildVehicleCatalogEntryFromSourceSeed ::
   VehicleCatalogSourceSeed ->
   [VpicModelResult] ->
@@ -180,6 +208,8 @@ buildVehicleCatalogEntryFromSourceSeed ::
 buildVehicleCatalogEntryFromSourceSeed sourceSeed vpicModels fuelEconomyVehicle =
   buildVehicleCatalogEntry <$> buildCatalogImportSeedFromSourceSeed sourceSeed vpicModels fuelEconomyVehicle
 
+-- | Fetch live upstream payloads for one source seed and build the final
+-- catalog row.
 buildVehicleCatalogEntryFromLiveSources :: VehicleCatalogSourceSeed -> IO VehicleCatalogEntry
 buildVehicleCatalogEntryFromLiveSources sourceSeed = do
   vpicPayload <- fetchUrl (vpicModelsUrl sourceSeed)
@@ -199,6 +229,7 @@ buildVehicleCatalogEntryFromLiveSources sourceSeed = do
     pure
     (buildVehicleCatalogEntryFromSourceSeed sourceSeed vpicModels fuelEconomyVehicle)
 
+-- | Rebuild the entire local catalog from the curated source-seed list.
 buildCatalogFromLiveSources :: [VehicleCatalogSourceSeed] -> IO [VehicleCatalogEntry]
 buildCatalogFromLiveSources =
   mapM buildVehicleCatalogEntryFromLiveSources

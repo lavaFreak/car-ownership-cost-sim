@@ -1,5 +1,14 @@
 {-# LANGUAGE DeriveGeneric #-}
 
+{-|
+Module      : CarOwnershipCostSim.VehicleCatalog
+Description : Normalized local vehicle catalog types and helpers.
+
+The simulator does not query third-party vehicle data for every web request.
+Instead, it loads a curated local catalog at startup. This module defines the
+shape of that catalog and the small helper functions used to load and transform
+catalog rows.
+-}
 module CarOwnershipCostSim.VehicleCatalog
   ( VpicVehicleIdentity (..),
     FuelEconomyProfile (..),
@@ -17,6 +26,7 @@ import Data.Aeson (FromJSON, ToJSON, eitherDecodeFileStrict')
 import Data.List (find)
 import GHC.Generics (Generic)
 
+-- | Identity fields normalized from NHTSA vPIC.
 data VpicVehicleIdentity = VpicVehicleIdentity
   { vpicYear :: Int,
     vpicMake :: String,
@@ -29,6 +39,7 @@ instance FromJSON VpicVehicleIdentity
 
 instance ToJSON VpicVehicleIdentity
 
+-- | Fuel-economy information normalized from FuelEconomy.gov data.
 data FuelEconomyProfile = FuelEconomyProfile
   { fuelEconomyFuelType :: String,
     fuelEconomyCombinedMpg :: Double,
@@ -41,6 +52,8 @@ instance FromJSON FuelEconomyProfile
 
 instance ToJSON FuelEconomyProfile
 
+-- | Intermediate seed used when building a local catalog entry from upstream
+-- sources plus project-owned assumptions.
 data CatalogImportSeed = CatalogImportSeed
   { importCatalogId :: String,
     importDescription :: String,
@@ -62,6 +75,7 @@ instance FromJSON CatalogImportSeed
 
 instance ToJSON CatalogImportSeed
 
+-- | Stable local catalog row used by the app at runtime.
 data VehicleCatalogEntry = VehicleCatalogEntry
   { catalogId :: String,
     catalogName :: String,
@@ -90,6 +104,7 @@ instance FromJSON VehicleCatalogEntry
 
 instance ToJSON VehicleCatalogEntry
 
+-- | Build a catalog row from a normalized import seed.
 buildVehicleCatalogEntry :: CatalogImportSeed -> VehicleCatalogEntry
 buildVehicleCatalogEntry importSeed =
   let identity = importIdentity importSeed
@@ -117,9 +132,11 @@ buildVehicleCatalogEntry importSeed =
           catalogSourceUpdatedAt = importSourceUpdatedAt importSeed
         }
 
+-- | Relative path to the checked-in catalog file bundled with the app.
 defaultVehicleCatalogRelativePath :: FilePath
 defaultVehicleCatalogRelativePath = "catalog/vehicle-catalog.json"
 
+-- | Load the local catalog from disk or fail loudly if it cannot be decoded.
 loadVehicleCatalog :: FilePath -> IO [VehicleCatalogEntry]
 loadVehicleCatalog catalogPath = do
   decoded <- eitherDecodeFileStrict' catalogPath
@@ -128,6 +145,7 @@ loadVehicleCatalog catalogPath = do
       error ("Unable to load vehicle catalog from " <> catalogPath <> ": " <> decodeError)
     Right entries -> pure entries
 
+-- | Find a catalog row by its stable catalog id.
 lookupVehicleCatalogEntry :: String -> [VehicleCatalogEntry] -> Maybe VehicleCatalogEntry
 lookupVehicleCatalogEntry vehicleId =
   find (\entry -> catalogId entry == vehicleId)

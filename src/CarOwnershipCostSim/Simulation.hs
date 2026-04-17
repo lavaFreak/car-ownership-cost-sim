@@ -1,3 +1,20 @@
+{-|
+Module      : CarOwnershipCostSim.Simulation
+Description : Monte Carlo ownership-cost engine and input validation.
+
+This module is the core of the project. It combines:
+
+- deterministic ownership formulas such as financing, taxes, inflation, and
+  recurring annual costs
+- stochastic inputs modeled with bounded normal distributions and Bernoulli-like
+  repair shock events
+- summary generation that turns many sampled outcomes into a response the web
+  app can explain
+
+The current implementation returns both a summary across many runs and one
+sampled yearly timeline so the frontend can show not just "how much" a car may
+cost, but also how those costs accumulate over time.
+-}
 module CarOwnershipCostSim.Simulation
   ( simulateMany,
     simulateRequestWithSeed,
@@ -17,6 +34,10 @@ import CarOwnershipCostSim.Types
   )
 import System.Random (StdGen, mkStdGen, randomR)
 
+-- | Run the simulation repeatedly for a fixed input scenario and random seed.
+--
+-- Each iteration advances the RNG state and produces one complete sampled
+-- ownership path summarized as a 'CostBreakdown'.
 simulateMany :: Int -> SimulationInput -> Int -> [CostBreakdown]
 simulateMany requestedIterations simulationInput seed =
   let iterations = max 1 requestedIterations
@@ -27,6 +48,10 @@ simulateMany requestedIterations simulationInput seed =
       let (breakdown, nextGen) = simulateCostBreakdown simulationInput gen
        in go (remaining - 1) nextGen (breakdown : acc)
 
+-- | Execute a request with a concrete seed and produce the API response.
+--
+-- The response includes aggregate statistics across all iterations plus a
+-- single example timeline derived from the same seed for explanation purposes.
 simulateRequestWithSeed :: Int -> SimulationRequest -> SimulationResponse
 simulateRequestWithSeed seed request =
   let iterations = max 1 (requestIterations request)
@@ -44,6 +69,10 @@ simulateRequestWithSeed seed request =
           responseExampleYearlyBreakdown = exampleYearlyBreakdown
         }
 
+-- | Validate a request before any simulation work is performed.
+--
+-- Validation stays separate from the sampling code so both the API layer and
+-- the test suite can reject invalid inputs consistently.
 validateSimulationRequest :: SimulationRequest -> [String]
 validateSimulationRequest request =
   concat
@@ -52,6 +81,7 @@ validateSimulationRequest request =
       validateSimulationInput (requestInput request)
     ]
 
+-- | Derive summary statistics from the sampled total-cost outputs.
 summarizeTotals :: Int -> Double -> [Double] -> SimulationSummary
 summarizeTotals iterations totalMilesDriven totals =
   SimulationSummary
@@ -80,11 +110,18 @@ costPerMile totalMilesDriven totalCost
   | totalMilesDriven <= 0 = Nothing
   | otherwise = Just (totalCost / totalMilesDriven)
 
+-- | Simulate one sampled ownership path and return only the aggregate cost
+-- categories needed for bulk Monte Carlo runs.
 simulateCostBreakdown :: SimulationInput -> StdGen -> (CostBreakdown, StdGen)
 simulateCostBreakdown simulationInput initialGen =
   let (breakdown, _, finalGen) = simulateDetailedCostBreakdown simulationInput initialGen
    in (breakdown, finalGen)
 
+-- | Simulate one sampled ownership path with both aggregate and yearly output.
+--
+-- The deterministic formulas in this function answer "how do we convert one set
+-- of sampled values into ownership cost?" Monte Carlo behavior comes from
+-- calling this repeatedly with different random draws.
 simulateDetailedCostBreakdown :: SimulationInput -> StdGen -> (CostBreakdown, [YearlyCostBreakdown], StdGen)
 simulateDetailedCostBreakdown simulationInput initialGen =
   let yearsOwned = max 1 (simulationYearsOwned simulationInput)
@@ -247,6 +284,7 @@ data FinancingSnapshot = FinancingSnapshot
     financingRemainingBalance :: Double
   }
 
+-- | Precompute financing information shared by the final and yearly breakdowns.
 buildFinancingSnapshot :: SimulationInput -> FinancingSnapshot
 buildFinancingSnapshot simulationInput =
   let purchasePrice = max 0 (simulationPurchasePrice simulationInput)
@@ -369,6 +407,8 @@ data YearlyLoanBreakdown = YearlyLoanBreakdown
     yearlyLoanBalanceEnd :: Double
   }
 
+-- | Split one ownership year into loan payment, principal, interest, and ending
+-- balance components.
 loanBreakdownForYear :: FinancingSnapshot -> Int -> YearlyLoanBreakdown
 loanBreakdownForYear financing yearIndex =
   let monthsPaidBeforeYear = max 0 ((yearIndex - 1) * 12)
@@ -442,17 +482,20 @@ annualMilesForYear :: Double -> Double -> Int -> Double
 annualMilesForYear baseAnnualMiles annualMileageChangeRate yearIndex =
   max 0 (baseAnnualMiles * (1 + annualMileageChangeRate) ** fromIntegral (max 0 (yearIndex - 1)))
 
+-- | Convert annual mileage into gallons consumed for the year.
 gallonsDrivenForYear :: Double -> Double -> Double
 gallonsDrivenForYear yearlyMiles milesPerGallon
   | milesPerGallon <= 0 = 0
   | otherwise = yearlyMiles / milesPerGallon
 
+-- | Count how many tire replacement thresholds are crossed within one year.
 tireReplacementCount :: Double -> Double -> Double -> Int
 tireReplacementCount tireLifeMiles milesBeforeYear milesAfterYear
   | tireLifeMiles <= 0 = 0
   | otherwise =
       max 0 (floor (milesAfterYear / tireLifeMiles) - floor (milesBeforeYear / tireLifeMiles))
 
+-- | Compute the total modeled miles across the ownership horizon.
 totalMilesDrivenForInput :: SimulationInput -> Double
 totalMilesDrivenForInput simulationInput =
   sum
@@ -461,6 +504,7 @@ totalMilesDrivenForInput simulationInput =
         [1 .. max 1 (simulationYearsOwned simulationInput)]
     )
 
+-- | Validate the simulation input fields independently of the transport layer.
 validateSimulationInput :: SimulationInput -> [String]
 validateSimulationInput simulationInput =
   concat
@@ -497,6 +541,7 @@ validateSimulationInput simulationInput =
       validateBoundedNormal "Annual depreciation rate" True (simulationAnnualDepreciationRate simulationInput)
     ]
 
+-- | Shared validation logic for bounded-normal distribution parameters.
 validateBoundedNormal :: String -> Bool -> BoundedNormal -> [String]
 validateBoundedNormal label isRate boundedNormal =
   let lowerBound = boundedNormalLowerBound boundedNormal
@@ -526,6 +571,7 @@ validateBoundedNormal label isRate boundedNormal =
             else []
         ]
 
+-- | Emit an error message when a validation condition fails.
 require :: Bool -> String -> [String]
 require condition message =
   if condition

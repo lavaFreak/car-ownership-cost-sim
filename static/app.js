@@ -1,3 +1,12 @@
+/*
+ * Browser entrypoint for the simulator UI.
+ *
+ * Responsibilities in this file:
+ * - translate form inputs into the backend JSON payload shape
+ * - validate inputs early so common mistakes never hit the API
+ * - keep URL-backed share links in sync with the current scenario
+ * - render summary, breakdown, and yearly timeline results returned by the API
+ */
 const form = document.getElementById("sim-form");
 const vehiclePresetSelect = document.getElementById("vehicle-preset");
 const presetDescription = document.getElementById("preset-description");
