@@ -8,7 +8,12 @@
  * - render summary, breakdown, and yearly timeline results returned by the API
  */
 const form = document.getElementById("sim-form");
+const vehicleYearSelect = document.getElementById("vehicle-year");
+const vehicleMakeSelect = document.getElementById("vehicle-make");
+const vehicleModelSelect = document.getElementById("vehicle-model");
+const vehicleTrimSelect = document.getElementById("vehicle-trim");
 const vehiclePresetSelect = document.getElementById("vehicle-preset");
+const vehicleLookupStatus = document.getElementById("vehicle-lookup-status");
 const presetDescription = document.getElementById("preset-description");
 const submitButton = form.querySelector('button[type="submit"]');
 const saveComparisonButton = document.getElementById("save-comparison-button");
@@ -46,6 +51,7 @@ const preciseCurrency = new Intl.NumberFormat("en-US", {
 });
 
 let hasSuccessfulRun = false;
+let vehicleCatalog = [];
 let vehiclePresets = [];
 let pendingPresetSelection = { presetId: "", hasFieldOverrides: false };
 let latestRun = null;
@@ -53,8 +59,11 @@ let comparisonBaseline = null;
 
 const comparisonStorageKey = "carOwnershipComparisonBaseline.v1";
 
+const defaultVehicleLookupStatus =
+  "Choose year, make, and model to autofill known vehicle assumptions. You can still edit any value manually afterward.";
+
 const defaultPresetDescription =
-  "Pick a curated vehicle profile to prefill car-specific assumptions without changing your mileage or loan setup.";
+  "Or choose an exact catalog match directly. Any autofilled values can still be edited manually.";
 
 const shareFieldNames = [
   "purchasePrice",
@@ -141,13 +150,155 @@ function cloneData(value) {
   return JSON.parse(JSON.stringify(value));
 }
 
+function populateSelect(select, placeholder, values, selectedValue = "", disabled = false) {
+  select.innerHTML = "";
+
+  const placeholderOption = document.createElement("option");
+  placeholderOption.value = "";
+  placeholderOption.textContent = placeholder;
+  select.appendChild(placeholderOption);
+
+  values.forEach((value) => {
+    const option = document.createElement("option");
+    option.value = String(value);
+    option.textContent = String(value);
+    select.appendChild(option);
+  });
+
+  const hasSelectedValue = values.some((value) => String(value) === String(selectedValue));
+  select.value = hasSelectedValue ? String(selectedValue) : "";
+  select.disabled = disabled || values.length === 0;
+}
+
+function sortedUniqueYears(entries) {
+  return [...new Set(entries.map((entry) => entry.catalogYear))].sort((left, right) => right - left);
+}
+
+function sortedUniqueStrings(values) {
+  return [...new Set(values)].sort((left, right) => left.localeCompare(right));
+}
+
+function matchingCatalogEntries({
+  year = "",
+  make = "",
+  model = "",
+  trim = "",
+} = {}) {
+  return vehicleCatalog.filter((entry) => {
+    if (year && String(entry.catalogYear) !== String(year)) {
+      return false;
+    }
+
+    if (make && entry.catalogMake !== make) {
+      return false;
+    }
+
+    if (model && entry.catalogModel !== model) {
+      return false;
+    }
+
+    if (trim && entry.catalogTrim !== trim) {
+      return false;
+    }
+
+    return true;
+  });
+}
+
+function setVehicleLookupStatus(message = defaultVehicleLookupStatus) {
+  vehicleLookupStatus.textContent = message;
+}
+
+function refreshVehicleLookupOptions({
+  year = vehicleYearSelect.value,
+  make = vehicleMakeSelect.value,
+  model = vehicleModelSelect.value,
+  trim = vehicleTrimSelect.value,
+} = {}) {
+  const yearValues = sortedUniqueYears(vehicleCatalog);
+  populateSelect(vehicleYearSelect, "Choose year", yearValues, year, vehicleCatalog.length === 0);
+
+  const activeYear = vehicleYearSelect.value;
+  const makeValues = activeYear
+    ? sortedUniqueStrings(matchingCatalogEntries({ year: activeYear }).map((entry) => entry.catalogMake))
+    : [];
+  populateSelect(vehicleMakeSelect, activeYear ? "Choose make" : "Choose year first", makeValues, make, !activeYear);
+
+  const activeMake = vehicleMakeSelect.value;
+  const modelValues =
+    activeYear && activeMake
+      ? sortedUniqueStrings(
+          matchingCatalogEntries({ year: activeYear, make: activeMake }).map((entry) => entry.catalogModel)
+        )
+      : [];
+  populateSelect(
+    vehicleModelSelect,
+    activeMake ? "Choose model" : "Choose make first",
+    modelValues,
+    model,
+    !activeYear || !activeMake
+  );
+
+  const activeModel = vehicleModelSelect.value;
+  const trimValues =
+    activeYear && activeMake && activeModel
+      ? sortedUniqueStrings(
+          matchingCatalogEntries({ year: activeYear, make: activeMake, model: activeModel }).map(
+            (entry) => entry.catalogTrim
+          )
+        )
+      : [];
+  populateSelect(
+    vehicleTrimSelect,
+    activeModel ? "Choose trim" : "Choose model first",
+    trimValues,
+    trim,
+    !activeYear || !activeMake || !activeModel
+  );
+}
+
+function setVehicleLookupFromEntry(entry) {
+  refreshVehicleLookupOptions({
+    year: String(entry.catalogYear),
+    make: entry.catalogMake,
+    model: entry.catalogModel,
+    trim: entry.catalogTrim,
+  });
+}
+
+function selectedCatalogEntryFromLookup() {
+  const year = vehicleYearSelect.value;
+  const make = vehicleMakeSelect.value;
+  const model = vehicleModelSelect.value;
+
+  if (!year || !make || !model) {
+    return null;
+  }
+
+  const matches = matchingCatalogEntries({ year, make, model, trim: vehicleTrimSelect.value });
+  if (matches.length === 1) {
+    return matches[0];
+  }
+
+  if (vehicleTrimSelect.value) {
+    return matches.find((entry) => entry.catalogTrim === vehicleTrimSelect.value) || null;
+  }
+
+  return null;
+}
+
 function selectedPresetName() {
   if (!vehiclePresetSelect.value) {
     return "Custom scenario";
   }
 
   const preset = vehiclePresets.find((item) => item.presetId === vehiclePresetSelect.value);
-  return preset ? preset.presetName : "Custom scenario";
+  if (preset) {
+    return preset.presetName;
+  }
+
+  const catalogEntry = vehicleCatalog.find((entry) => entry.catalogId === vehiclePresetSelect.value);
+  return catalogEntry ? catalogEntry.catalogName : "Custom scenario";
 }
 
 function buildScenarioLabel(values) {
@@ -255,7 +406,29 @@ function calculateCombinedMpg(cityShare, cityMpg, highwayMpg) {
 }
 
 function presetDescriptionText(preset) {
-  return `${preset.presetDescription} Prefills price, city/highway MPG, insurance, registration, maintenance, depreciation, resale, and repair-risk assumptions.`;
+  return `${preset.presetDescription} Prefills purchase price, city/highway MPG, insurance, registration, maintenance, depreciation, resale, and repair-risk assumptions. You can still edit any field manually afterward.`;
+}
+
+function presetLikeFromCatalogEntry(catalogEntry) {
+  return {
+    presetId: catalogEntry.catalogId,
+    presetName: catalogEntry.catalogName,
+    presetDescription: catalogEntry.catalogDescription,
+    presetPurchasePrice: catalogEntry.catalogPurchasePrice,
+    presetCityMilesPerGallon: catalogEntry.catalogCityMpg ?? catalogEntry.catalogCombinedMpg,
+    presetHighwayMilesPerGallon: catalogEntry.catalogHighwayMpg ?? catalogEntry.catalogCombinedMpg,
+    presetMilesPerGallon: catalogEntry.catalogCombinedMpg,
+    presetAnnualInsurance: catalogEntry.catalogAnnualInsurance,
+    presetAnnualRegistration: catalogEntry.catalogAnnualRegistration,
+    presetAnnualMaintenance: catalogEntry.catalogAnnualMaintenance,
+    presetAnnualDepreciationRate: catalogEntry.catalogAnnualDepreciationRate,
+    presetFirstYearDepreciationBonus: catalogEntry.catalogFirstYearDepreciationBonus,
+    presetResidualValueFloorPercent: catalogEntry.catalogResidualValueFloorPercent,
+    presetExpectedAnnualMilesForResale: catalogEntry.catalogExpectedAnnualMilesForResale,
+    presetExtraMileageDepreciationPerMile: catalogEntry.catalogExtraMileageDepreciationPerMile,
+    presetRepairShockProbability: catalogEntry.catalogRepairShockProbability,
+    presetRepairShockCost: catalogEntry.catalogRepairShockCost,
+  };
 }
 
 function applyVehiclePreset(preset) {
@@ -292,7 +465,25 @@ function applyVehiclePreset(preset) {
   hideFeedback(formFeedback);
   hideToolFeedback();
   presetDescription.textContent = presetDescriptionText(preset);
-  statusLine.textContent = `Applied the ${preset.presetName} preset. Review the assumptions, then run the simulation.`;
+  statusLine.textContent = `Loaded ${preset.presetName}. Review the assumptions, make any manual edits you want, then run the simulation.`;
+}
+
+function applyVehicleCatalogSelectionById(vehicleId) {
+  const catalogEntry = vehicleCatalog.find((entry) => entry.catalogId === vehicleId);
+  const preset =
+    vehiclePresets.find((item) => item.presetId === vehicleId) ||
+    (catalogEntry ? presetLikeFromCatalogEntry(catalogEntry) : null);
+
+  if (!preset || !catalogEntry) {
+    return;
+  }
+
+  vehiclePresetSelect.value = vehicleId;
+  setVehicleLookupFromEntry(catalogEntry);
+  applyVehiclePreset(preset);
+  setVehicleLookupStatus(
+    `${catalogEntry.catalogName} selected. Known car-specific assumptions were autofilled, and you can still edit any value manually.`
+  );
 }
 
 function populateVehiclePresets(presets) {
@@ -308,6 +499,31 @@ function populateVehiclePresets(presets) {
   `;
 }
 
+async function loadVehicleCatalog() {
+  try {
+    const response = await fetch("/api/catalog");
+    const payload = await response.json();
+
+    if (!response.ok || !Array.isArray(payload)) {
+      throw new Error("Vehicle catalog could not be loaded.");
+    }
+
+    vehicleCatalog = payload;
+    refreshVehicleLookupOptions();
+    setVehicleLookupStatus(defaultVehicleLookupStatus);
+  } catch (error) {
+    vehicleCatalog = [];
+    populateSelect(vehicleYearSelect, "Catalog unavailable", [], "", true);
+    populateSelect(vehicleMakeSelect, "Catalog unavailable", [], "", true);
+    populateSelect(vehicleModelSelect, "Catalog unavailable", [], "", true);
+    populateSelect(vehicleTrimSelect, "Catalog unavailable", [], "", true);
+    setVehicleLookupStatus(
+      error.message ||
+        "Vehicle catalog could not be loaded, so car-specific fields will need to be entered manually."
+    );
+  }
+}
+
 async function loadVehiclePresets() {
   try {
     const response = await fetch("/api/presets");
@@ -319,11 +535,11 @@ async function loadVehiclePresets() {
 
     vehiclePresets = payload;
     populateVehiclePresets(vehiclePresets);
-    syncPresetSelectionFromQuery();
   } catch (error) {
     vehiclePresetSelect.innerHTML = '<option value="">Presets unavailable</option>';
     presetDescription.textContent =
-      error.message || "Vehicle presets could not be loaded, so the starter assumptions are still available.";
+      error.message ||
+      "Vehicle presets could not be loaded, but you can still enter assumptions manually.";
   }
 }
 
@@ -383,22 +599,33 @@ function applyScenarioFromQuery() {
 function syncPresetSelectionFromQuery() {
   if (!pendingPresetSelection.presetId) {
     presetDescription.textContent = defaultPresetDescription;
+    setVehicleLookupStatus(defaultVehicleLookupStatus);
     return;
   }
 
-  const preset = vehiclePresets.find((item) => item.presetId === pendingPresetSelection.presetId);
+  const catalogEntry = vehicleCatalog.find((entry) => entry.catalogId === pendingPresetSelection.presetId);
+  const preset =
+    vehiclePresets.find((item) => item.presetId === pendingPresetSelection.presetId) ||
+    (catalogEntry ? presetLikeFromCatalogEntry(catalogEntry) : null);
+
   if (!preset) {
     return;
   }
 
-  vehiclePresetSelect.value = preset.presetId;
+  if (catalogEntry) {
+    setVehicleLookupFromEntry(catalogEntry);
+  }
 
   if (!pendingPresetSelection.hasFieldOverrides) {
-    applyVehiclePreset(preset);
+    applyVehicleCatalogSelectionById(preset.presetId);
     return;
   }
 
+  vehiclePresetSelect.value = preset.presetId;
   presetDescription.textContent = presetDescriptionText(preset);
+  setVehicleLookupStatus(
+    `${preset.presetName} selected from the shared scenario. Some autofilled values were overridden in the shared link, and you can still edit any field manually.`
+  );
 }
 
 function buildRequestPayload(values) {
@@ -844,6 +1071,8 @@ function renderInitialResultsState() {
 function resetScenarioForm() {
   form.reset();
   vehiclePresetSelect.value = "";
+  refreshVehicleLookupOptions();
+  setVehicleLookupStatus(defaultVehicleLookupStatus);
   presetDescription.textContent = defaultPresetDescription;
   clearFieldErrors();
   hideFeedback(formFeedback);
@@ -1709,6 +1938,61 @@ async function runSimulation() {
   }
 }
 
+function clearVehicleSelectionState() {
+  vehiclePresetSelect.value = "";
+  presetDescription.textContent = defaultPresetDescription;
+}
+
+function maybeApplyVehicleLookupSelection() {
+  const year = vehicleYearSelect.value;
+  const make = vehicleMakeSelect.value;
+  const model = vehicleModelSelect.value;
+
+  if (!year || !make || !model) {
+    clearVehicleSelectionState();
+    setVehicleLookupStatus(
+      year
+        ? "Choose make and model to autofill known vehicle assumptions."
+        : defaultVehicleLookupStatus
+    );
+    return;
+  }
+
+  const baseMatches = matchingCatalogEntries({ year, make, model });
+  if (baseMatches.length === 0) {
+    clearVehicleSelectionState();
+    setVehicleLookupStatus(
+      `No catalog match is loaded yet for ${year} ${make} ${model}. You can still enter assumptions manually.`
+    );
+    return;
+  }
+
+  if (baseMatches.length === 1) {
+    if (vehicleTrimSelect.value !== baseMatches[0].catalogTrim) {
+      refreshVehicleLookupOptions({
+        year,
+        make,
+        model,
+        trim: baseMatches[0].catalogTrim,
+      });
+    }
+
+    applyVehicleCatalogSelectionById(baseMatches[0].catalogId);
+    return;
+  }
+
+  const exactEntry = selectedCatalogEntryFromLookup();
+  if (exactEntry) {
+    applyVehicleCatalogSelectionById(exactEntry.catalogId);
+    return;
+  }
+
+  clearVehicleSelectionState();
+  setVehicleLookupStatus(
+    `Multiple ${year} ${make} ${model} trims are available. Choose a trim to autofill the exact vehicle.`
+  );
+}
+
 form.addEventListener("submit", (event) => {
   event.preventDefault();
   runSimulation();
@@ -1751,28 +2035,52 @@ clearComparisonButton.addEventListener("click", () => {
   clearSavedBaseline();
 });
 
+vehicleYearSelect.addEventListener("change", () => {
+  refreshVehicleLookupOptions({ year: vehicleYearSelect.value });
+  maybeApplyVehicleLookupSelection();
+});
+
+vehicleMakeSelect.addEventListener("change", () => {
+  refreshVehicleLookupOptions({
+    year: vehicleYearSelect.value,
+    make: vehicleMakeSelect.value,
+  });
+  maybeApplyVehicleLookupSelection();
+});
+
+vehicleModelSelect.addEventListener("change", () => {
+  refreshVehicleLookupOptions({
+    year: vehicleYearSelect.value,
+    make: vehicleMakeSelect.value,
+    model: vehicleModelSelect.value,
+  });
+  maybeApplyVehicleLookupSelection();
+});
+
+vehicleTrimSelect.addEventListener("change", () => {
+  maybeApplyVehicleLookupSelection();
+});
+
 vehiclePresetSelect.addEventListener("change", (event) => {
   const presetId = event.target.value;
 
   if (!presetId) {
+    refreshVehicleLookupOptions({ year: "", make: "", model: "", trim: "" });
+    setVehicleLookupStatus(defaultVehicleLookupStatus);
     presetDescription.textContent = defaultPresetDescription;
     pendingPresetSelection = { presetId: "", hasFieldOverrides: false };
     return;
   }
 
-  const preset = vehiclePresets.find((item) => item.presetId === presetId);
-  if (!preset) {
-    return;
-  }
-
-  applyVehiclePreset(preset);
+  applyVehicleCatalogSelectionById(presetId);
 });
 
 async function initializeApp() {
   loadPersistedComparisonBaseline();
   renderInitialResultsState();
   applyScenarioFromQuery();
-  await loadVehiclePresets();
+  await Promise.all([loadVehicleCatalog(), loadVehiclePresets()]);
+  syncPresetSelectionFromQuery();
   runSimulation();
 }
 

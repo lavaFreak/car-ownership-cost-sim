@@ -32,14 +32,48 @@
           </div>
 
           <div class="preset-shell">
+            <div class="vehicle-picker-grid">
+              <label for="vehicle-year">
+                Year
+                <select id="vehicle-year" name="vehicleYear">
+                  <option value="">Loading years...</option>
+                </select>
+              </label>
+
+              <label for="vehicle-make">
+                Make
+                <select id="vehicle-make" name="vehicleMake" disabled>
+                  <option value="">Choose year first</option>
+                </select>
+              </label>
+
+              <label for="vehicle-model">
+                Model
+                <select id="vehicle-model" name="vehicleModel" disabled>
+                  <option value="">Choose make first</option>
+                </select>
+              </label>
+
+              <label for="vehicle-trim">
+                Trim
+                <select id="vehicle-trim" name="vehicleTrim" disabled>
+                  <option value="">Choose model first</option>
+                </select>
+              </label>
+            </div>
+
+            <p id="vehicle-lookup-status" class="preset-description">
+              Choose year, make, and model to autofill known vehicle assumptions. You can still edit any value manually afterward.
+            </p>
+
             <label for="vehicle-preset">
-              Vehicle preset
+              Exact catalog match
               <select id="vehicle-preset" name="vehiclePreset">
                 <option value="">Loading presets...</option>
               </select>
             </label>
             <p id="preset-description" class="preset-description">
-              Pick a curated vehicle profile to prefill car-specific assumptions without changing your mileage or loan setup.
+              Or choose an exact catalog match directly. Any autofilled values can still be edited manually.
             </p>
           </div>
 
