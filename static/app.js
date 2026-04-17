@@ -76,6 +76,10 @@ const shareFieldNames = [
   "repairShockStdDev",
   "depreciationMeanPercent",
   "depreciationStdDevPercent",
+  "firstYearDepreciationBonusPercent",
+  "residualValueFloorPercent",
+  "expectedAnnualMilesForResale",
+  "extraMileageDepreciationPerMile",
   "iterations",
   "seed",
 ];
@@ -148,6 +152,10 @@ function collectFormValues() {
     repairShockStdDev: numericValue("repairShockStdDev"),
     depreciationMeanPercent: numericValue("depreciationMeanPercent"),
     depreciationStdDevPercent: numericValue("depreciationStdDevPercent"),
+    firstYearDepreciationBonusPercent: numericValue("firstYearDepreciationBonusPercent"),
+    residualValueFloorPercent: numericValue("residualValueFloorPercent"),
+    expectedAnnualMilesForResale: numericValue("expectedAnnualMilesForResale"),
+    extraMileageDepreciationPerMile: numericValue("extraMileageDepreciationPerMile"),
     iterations: numericValue("iterations"),
     seed: optionalIntegerValue("seed"),
   };
@@ -163,7 +171,7 @@ function buildBoundedNormal(mean, stdDev, floor, ceiling) {
 }
 
 function presetDescriptionText(preset) {
-  return `${preset.presetDescription} Prefills price, MPG, insurance, registration, maintenance, depreciation, and repair-risk assumptions.`;
+  return `${preset.presetDescription} Prefills price, MPG, insurance, registration, maintenance, depreciation, resale, and repair-risk assumptions.`;
 }
 
 function applyVehiclePreset(preset) {
@@ -177,6 +185,19 @@ function applyVehiclePreset(preset) {
   setNumericField(
     "depreciationStdDevPercent",
     (preset.presetAnnualDepreciationRate.boundedNormalStdDev * 100).toFixed(1)
+  );
+  setNumericField(
+    "firstYearDepreciationBonusPercent",
+    (preset.presetFirstYearDepreciationBonus * 100).toFixed(1)
+  );
+  setNumericField(
+    "residualValueFloorPercent",
+    Math.round(preset.presetResidualValueFloorPercent * 100)
+  );
+  setNumericField("expectedAnnualMilesForResale", Math.round(preset.presetExpectedAnnualMilesForResale));
+  setNumericField(
+    "extraMileageDepreciationPerMile",
+    preset.presetExtraMileageDepreciationPerMile.toFixed(2)
   );
   setNumericField("repairShockProbabilityPercent", Math.round(preset.presetRepairShockProbability * 100));
   setNumericField("repairShockMean", Math.round(preset.presetRepairShockCost.boundedNormalMean));
@@ -321,6 +342,10 @@ function buildRequestPayload(values) {
       simulationLoanTermMonths: values.loanTermMonths,
       simulationTireReplacementCost: values.tireReplacementCost,
       simulationTireLifeMiles: values.tireLifeMiles,
+      simulationFirstYearDepreciationBonus: values.firstYearDepreciationBonusPercent / 100,
+      simulationResidualValueFloorPercent: values.residualValueFloorPercent / 100,
+      simulationExpectedAnnualMilesForResale: values.expectedAnnualMilesForResale,
+      simulationExtraMileageDepreciationPerMile: values.extraMileageDepreciationPerMile,
       simulationRepairShockProbability: values.repairShockProbabilityPercent / 100,
       simulationRepairShockCost: buildBoundedNormal(
         values.repairShockMean,
@@ -399,6 +424,8 @@ function renderBreakdownPlaceholder() {
     { label: "Tolls and road fees", value: "After a run" },
     { label: "Inspection and emissions", value: "After a run" },
     { label: "Tires", value: "After a run" },
+    { label: "Mileage resale penalty", value: "After a run" },
+    { label: "Resale floor", value: "After a run" },
     { label: "Resale value", value: "After a run" },
     { label: "Total ownership cost", value: "After a run" },
   ]);
@@ -410,6 +437,7 @@ function renderInsightPlaceholder() {
     { label: "10-90 spread", value: "After a run" },
     { label: "Modeled miles", value: "After a run" },
     { label: "Sampled end equity", value: "After a run" },
+    { label: "Ending resale value", value: "After a run" },
     { label: "Repair-shock share", value: "After a run" },
   ]);
 }
@@ -428,6 +456,10 @@ function renderYearlyBreakdownPlaceholder() {
             <div><dt>Inflation factor</dt><dd>After a run</dd></div>
             <div><dt>Loan interest</dt><dd>After a run</dd></div>
             <div><dt>Tires</dt><dd>After a run</dd></div>
+            <div><dt>Expected cumulative miles</dt><dd>After a run</dd></div>
+            <div><dt>Depreciation rate</dt><dd>After a run</dd></div>
+            <div><dt>Mileage resale penalty</dt><dd>After a run</dd></div>
+            <div><dt>Resale floor</dt><dd>After a run</dd></div>
             <div><dt>Repair shocks</dt><dd>After a run</dd></div>
             <div><dt>Ending value</dt><dd>After a run</dd></div>
             <div><dt>Remaining loan</dt><dd>After a run</dd></div>
@@ -738,6 +770,50 @@ function validateFormValues(values) {
   }
 
   if (
+    validateRequiredNumber(errors, values, "firstYearDepreciationBonusPercent", "First-year depreciation bonus") &&
+    (values.firstYearDepreciationBonusPercent < 0 || values.firstYearDepreciationBonusPercent > 100)
+  ) {
+    pushValidationError(
+      errors,
+      "firstYearDepreciationBonusPercent",
+      "First-year depreciation bonus must be between 0% and 100%."
+    );
+  }
+
+  if (
+    validateRequiredNumber(errors, values, "residualValueFloorPercent", "Residual value floor") &&
+    (values.residualValueFloorPercent < 0 || values.residualValueFloorPercent > 100)
+  ) {
+    pushValidationError(
+      errors,
+      "residualValueFloorPercent",
+      "Residual value floor must be between 0% and 100%."
+    );
+  }
+
+  if (
+    validateRequiredNumber(errors, values, "expectedAnnualMilesForResale", "Expected annual resale miles") &&
+    values.expectedAnnualMilesForResale < 0
+  ) {
+    pushValidationError(
+      errors,
+      "expectedAnnualMilesForResale",
+      "Expected annual resale miles cannot be negative."
+    );
+  }
+
+  if (
+    validateRequiredNumber(errors, values, "extraMileageDepreciationPerMile", "Extra-mile resale penalty") &&
+    values.extraMileageDepreciationPerMile < 0
+  ) {
+    pushValidationError(
+      errors,
+      "extraMileageDepreciationPerMile",
+      "Extra-mile resale penalty cannot be negative."
+    );
+  }
+
+  if (
     validateRequiredInteger(errors, values, "iterations", "Iterations") &&
     (values.iterations < 1 || values.iterations > 100000)
   ) {
@@ -889,6 +965,8 @@ function renderBreakdown(response) {
     { label: "Tolls and road fees", value: currency.format(sample.costTolls) },
     { label: "Inspection and emissions", value: currency.format(sample.costInspection) },
     { label: "Tires", value: currency.format(sample.costTires) },
+    { label: "Mileage resale penalty", value: currency.format(sample.costMileageDepreciationPenalty) },
+    { label: "Resale floor", value: currency.format(sample.costResidualValueFloor) },
     { label: "Resale value", value: currency.format(sample.costResaleValue) },
     { label: "Total ownership cost", value: currency.format(sample.costTotal) },
   ]);
@@ -923,6 +1001,10 @@ function renderInsights(response) {
     {
       label: "Sampled end equity",
       value: currency.format(endingEquity),
+    },
+    {
+      label: "Ending resale value",
+      value: currency.format(response.responseExampleBreakdown.costResaleValue),
     },
     {
       label: "Repair-shock share",
@@ -960,6 +1042,10 @@ function renderYearlyBreakdown(response) {
             <div><dt>Loan payments</dt><dd>${currency.format(year.yearlyLoanPayments)}</dd></div>
             <div><dt>Loan interest</dt><dd>${currency.format(year.yearlyLoanInterest)}</dd></div>
             <div><dt>Tires</dt><dd>${currency.format(year.yearlyTires)}</dd></div>
+            <div><dt>Expected cumulative miles</dt><dd>${formatMiles(year.yearlyExpectedCumulativeMiles)}</dd></div>
+            <div><dt>Depreciation rate</dt><dd>${(year.yearlyDepreciationRateApplied * 100).toFixed(1)}%</dd></div>
+            <div><dt>Mileage resale penalty</dt><dd>${currency.format(year.yearlyMileageDepreciationPenalty)}</dd></div>
+            <div><dt>Resale floor</dt><dd>${currency.format(year.yearlyResidualFloorValue)}</dd></div>
             <div><dt>Depreciation loss</dt><dd>${currency.format(year.yearlyDepreciationLoss)}</dd></div>
             <div><dt>Ending value</dt><dd>${currency.format(year.yearlyEndingVehicleValue)}</dd></div>
             <div><dt>Remaining loan</dt><dd>${currency.format(year.yearlyRemainingLoanBalance)}</dd></div>

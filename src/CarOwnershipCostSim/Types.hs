@@ -67,6 +67,10 @@ data SimulationInput = SimulationInput
     simulationLoanTermMonths :: Int,
     simulationTireReplacementCost :: Double,
     simulationTireLifeMiles :: Double,
+    simulationFirstYearDepreciationBonus :: Double,
+    simulationResidualValueFloorPercent :: Double,
+    simulationExpectedAnnualMilesForResale :: Double,
+    simulationExtraMileageDepreciationPerMile :: Double,
     simulationRepairShockProbability :: Double,
     simulationRepairShockCost :: BoundedNormal,
     simulationFuelPrice :: BoundedNormal,
@@ -113,6 +117,8 @@ data CostBreakdown = CostBreakdown
     costTolls :: Double,
     costInspection :: Double,
     costTires :: Double,
+    costMileageDepreciationPenalty :: Double,
+    costResidualValueFloor :: Double,
     costResaleValue :: Double,
     costTotal :: Double
   }
@@ -146,6 +152,10 @@ data YearlyCostBreakdown = YearlyCostBreakdown
     yearlyTolls :: Double,
     yearlyInspection :: Double,
     yearlyTires :: Double,
+    yearlyExpectedCumulativeMiles :: Double,
+    yearlyMileageDepreciationPenalty :: Double,
+    yearlyDepreciationRateApplied :: Double,
+    yearlyResidualFloorValue :: Double,
     yearlyDepreciationLoss :: Double,
     yearlyEndingVehicleValue :: Double,
     yearlyRemainingLoanBalance :: Double,
@@ -222,6 +232,10 @@ exampleSimulationRequest =
             simulationLoanTermMonths = 60,
             simulationTireReplacementCost = 950,
             simulationTireLifeMiles = 45000,
+            simulationFirstYearDepreciationBonus = 0.08,
+            simulationResidualValueFloorPercent = 0.22,
+            simulationExpectedAnnualMilesForResale = 12000,
+            simulationExtraMileageDepreciationPerMile = 0.08,
             simulationRepairShockProbability = 0.12,
             simulationRepairShockCost =
               BoundedNormal

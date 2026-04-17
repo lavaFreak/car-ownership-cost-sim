@@ -26,6 +26,10 @@
       "boundedNormalLowerBound": 0.05,
       "boundedNormalUpperBound": 0.24
     },
+    "catalogFirstYearDepreciationBonus": 0.09,
+    "catalogResidualValueFloorPercent": 0.38,
+    "catalogExpectedAnnualMilesForResale": 12000,
+    "catalogExtraMileageDepreciationPerMile": 0.12,
     "catalogRepairShockProbability": 0.08,
     "catalogRepairShockCost": {
       "boundedNormalMean": 1200,
@@ -63,6 +67,10 @@
       "boundedNormalLowerBound": 0.06,
       "boundedNormalUpperBound": 0.27
     },
+    "catalogFirstYearDepreciationBonus": 0.11,
+    "catalogResidualValueFloorPercent": 0.33,
+    "catalogExpectedAnnualMilesForResale": 12000,
+    "catalogExtraMileageDepreciationPerMile": 0.13,
     "catalogRepairShockProbability": 0.1,
     "catalogRepairShockCost": {
       "boundedNormalMean": 1500,
@@ -100,6 +108,10 @@
       "boundedNormalLowerBound": 0.07,
       "boundedNormalUpperBound": 0.28
     },
+    "catalogFirstYearDepreciationBonus": 0.1,
+    "catalogResidualValueFloorPercent": 0.37,
+    "catalogExpectedAnnualMilesForResale": 12000,
+    "catalogExtraMileageDepreciationPerMile": 0.14,
     "catalogRepairShockProbability": 0.12,
     "catalogRepairShockCost": {
       "boundedNormalMean": 1800,
@@ -137,6 +149,10 @@
       "boundedNormalLowerBound": 0.07,
       "boundedNormalUpperBound": 0.3
     },
+    "catalogFirstYearDepreciationBonus": 0.12,
+    "catalogResidualValueFloorPercent": 0.3,
+    "catalogExpectedAnnualMilesForResale": 12000,
+    "catalogExtraMileageDepreciationPerMile": 0.15,
     "catalogRepairShockProbability": 0.15,
     "catalogRepairShockCost": {
       "boundedNormalMean": 2100,

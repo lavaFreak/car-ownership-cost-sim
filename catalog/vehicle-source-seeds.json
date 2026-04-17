@@ -23,6 +23,10 @@
       "boundedNormalLowerBound": 0.05,
       "boundedNormalUpperBound": 0.24
     },
+    "sourceFirstYearDepreciationBonus": 0.09,
+    "sourceResidualValueFloorPercent": 0.38,
+    "sourceExpectedAnnualMilesForResale": 12000,
+    "sourceExtraMileageDepreciationPerMile": 0.12,
     "sourceRepairShockProbability": 0.08,
     "sourceRepairShockCost": {
       "boundedNormalMean": 1200,
@@ -56,6 +60,10 @@
       "boundedNormalLowerBound": 0.06,
       "boundedNormalUpperBound": 0.27
     },
+    "sourceFirstYearDepreciationBonus": 0.11,
+    "sourceResidualValueFloorPercent": 0.33,
+    "sourceExpectedAnnualMilesForResale": 12000,
+    "sourceExtraMileageDepreciationPerMile": 0.13,
     "sourceRepairShockProbability": 0.1,
     "sourceRepairShockCost": {
       "boundedNormalMean": 1500,
@@ -89,6 +97,10 @@
       "boundedNormalLowerBound": 0.07,
       "boundedNormalUpperBound": 0.28
     },
+    "sourceFirstYearDepreciationBonus": 0.1,
+    "sourceResidualValueFloorPercent": 0.37,
+    "sourceExpectedAnnualMilesForResale": 12000,
+    "sourceExtraMileageDepreciationPerMile": 0.14,
     "sourceRepairShockProbability": 0.12,
     "sourceRepairShockCost": {
       "boundedNormalMean": 1800,
@@ -122,6 +134,10 @@
       "boundedNormalLowerBound": 0.07,
       "boundedNormalUpperBound": 0.3
     },
+    "sourceFirstYearDepreciationBonus": 0.12,
+    "sourceResidualValueFloorPercent": 0.3,
+    "sourceExpectedAnnualMilesForResale": 12000,
+    "sourceExtraMileageDepreciationPerMile": 0.15,
     "sourceRepairShockProbability": 0.15,
     "sourceRepairShockCost": {
       "boundedNormalMean": 2100,

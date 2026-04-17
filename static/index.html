@@ -200,6 +200,30 @@
             </fieldset>
 
             <fieldset>
+              <legend>Resale modeling</legend>
+
+              <label>
+                First-year depreciation bonus (%)
+                <input name="firstYearDepreciationBonusPercent" type="number" min="0" max="100" step="0.5" value="8" required />
+              </label>
+
+              <label>
+                Residual value floor (% of purchase price)
+                <input name="residualValueFloorPercent" type="number" min="0" max="100" step="1" value="22" required />
+              </label>
+
+              <label>
+                Expected annual miles for resale
+                <input name="expectedAnnualMilesForResale" type="number" min="0" step="500" value="12000" required />
+              </label>
+
+              <label>
+                Extra-mile resale penalty ($/mile)
+                <input name="extraMileageDepreciationPerMile" type="number" min="0" step="0.01" value="0.08" required />
+              </label>
+            </fieldset>
+
+            <fieldset>
               <legend>Simulation controls</legend>
 
               <label>

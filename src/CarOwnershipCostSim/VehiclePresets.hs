@@ -31,6 +31,10 @@ data VehiclePreset = VehiclePreset
     presetAnnualRegistration :: Double,
     presetAnnualMaintenance :: BoundedNormal,
     presetAnnualDepreciationRate :: BoundedNormal,
+    presetFirstYearDepreciationBonus :: Double,
+    presetResidualValueFloorPercent :: Double,
+    presetExpectedAnnualMilesForResale :: Double,
+    presetExtraMileageDepreciationPerMile :: Double,
     presetRepairShockProbability :: Double,
     presetRepairShockCost :: BoundedNormal
   }
@@ -58,6 +62,10 @@ vehiclePresetFromCatalog catalogEntry =
       presetAnnualRegistration = catalogAnnualRegistration catalogEntry,
       presetAnnualMaintenance = catalogAnnualMaintenance catalogEntry,
       presetAnnualDepreciationRate = catalogAnnualDepreciationRate catalogEntry,
+      presetFirstYearDepreciationBonus = catalogFirstYearDepreciationBonus catalogEntry,
+      presetResidualValueFloorPercent = catalogResidualValueFloorPercent catalogEntry,
+      presetExpectedAnnualMilesForResale = catalogExpectedAnnualMilesForResale catalogEntry,
+      presetExtraMileageDepreciationPerMile = catalogExtraMileageDepreciationPerMile catalogEntry,
       presetRepairShockProbability = catalogRepairShockProbability catalogEntry,
       presetRepairShockCost = catalogRepairShockCost catalogEntry
     }

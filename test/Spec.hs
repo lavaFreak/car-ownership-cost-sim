@@ -67,6 +67,8 @@ tests =
       TestLabel "zero APR financing tracks partial payoff correctly" zeroAprFinancingTest,
       TestLabel "loan payments stop after the payoff year" loanPayoffHorizonTest,
       TestLabel "full depreciation floors resale at zero" fullDepreciationFloorTest,
+      TestLabel "first-year depreciation bonus and residual floor shape resale value" firstYearBonusAndResidualFloorTest,
+      TestLabel "extra mileage lowers resale value year by year" mileageResalePenaltyTest,
       TestLabel "mileage growth and tire wear affect deterministic totals" mileageGrowthAndTireWearTest,
       TestLabel "local recurring costs inflate over time" localRecurringCostsInflationTest,
       TestLabel "vehicle catalog loads and drives presets" vehicleCatalogTest,
@@ -115,6 +117,10 @@ deterministicCashPurchaseTest =
                     simulationLoanTermMonths = 0,
                     simulationTireReplacementCost = 0,
                     simulationTireLifeMiles = 40000,
+                    simulationFirstYearDepreciationBonus = 0,
+                    simulationResidualValueFloorPercent = 0,
+                    simulationExpectedAnnualMilesForResale = 0,
+                    simulationExtraMileageDepreciationPerMile = 0,
                     simulationRepairShockProbability = 0,
                     simulationRepairShockCost =
                       BoundedNormal
@@ -195,6 +201,10 @@ purchaseTaxAndFeesTest =
                     simulationLoanTermMonths = 12,
                     simulationTireReplacementCost = 0,
                     simulationTireLifeMiles = 40000,
+                    simulationFirstYearDepreciationBonus = 0,
+                    simulationResidualValueFloorPercent = 0,
+                    simulationExpectedAnnualMilesForResale = 0,
+                    simulationExtraMileageDepreciationPerMile = 0,
                     simulationRepairShockProbability = 0,
                     simulationRepairShockCost =
                       BoundedNormal
@@ -266,6 +276,10 @@ inflationTest =
                     simulationLoanTermMonths = 0,
                     simulationTireReplacementCost = 0,
                     simulationTireLifeMiles = 40000,
+                    simulationFirstYearDepreciationBonus = 0,
+                    simulationResidualValueFloorPercent = 0,
+                    simulationExpectedAnnualMilesForResale = 0,
+                    simulationExtraMileageDepreciationPerMile = 0,
                     simulationRepairShockProbability = 0,
                     simulationRepairShockCost =
                       BoundedNormal
@@ -342,6 +356,10 @@ repairShockTest =
                     simulationLoanTermMonths = 0,
                     simulationTireReplacementCost = 0,
                     simulationTireLifeMiles = 40000,
+                    simulationFirstYearDepreciationBonus = 0,
+                    simulationResidualValueFloorPercent = 0,
+                    simulationExpectedAnnualMilesForResale = 0,
+                    simulationExtraMileageDepreciationPerMile = 0,
                     simulationRepairShockProbability = 1,
                     simulationRepairShockCost =
                       BoundedNormal
@@ -472,6 +490,63 @@ fullDepreciationFloorTest =
         assertClose "zero-value floor persists through later years" 0 (yearlyEndingVehicleValue yearThree)
       _ -> assertFailure "Expected exactly three yearly breakdown rows."
 
+firstYearBonusAndResidualFloorTest :: Test
+firstYearBonusAndResidualFloorTest =
+  TestCase $ do
+    let request =
+          deterministicRequest
+            37
+            baselineSimulationInput
+              { simulationPurchasePrice = 20000,
+                simulationYearsOwned = 3,
+                simulationAnnualDepreciationRate = deterministicBoundedNormal 0.4,
+                simulationFirstYearDepreciationBonus = 0.2,
+                simulationResidualValueFloorPercent = 0.3
+              }
+        response = simulateRequestWithSeed 37 request
+        breakdown = responseExampleBreakdown response
+        yearlyBreakdown = responseExampleYearlyBreakdown response
+    assertClose "residual floor is exposed in the example breakdown" 6000 (costResidualValueFloor breakdown)
+    assertClose "resale value respects the configured floor" 6000 (costResaleValue breakdown)
+    assertClose "depreciation total reflects the floor-limited path" 14000 (costTotal breakdown)
+    case yearlyBreakdown of
+      [yearOne, yearTwo, yearThree] -> do
+        assertClose "year one gets the first-year depreciation bonus" 0.6 (yearlyDepreciationRateApplied yearOne)
+        assertClose "later years fall back to the sampled depreciation rate" 0.4 (yearlyDepreciationRateApplied yearTwo)
+        assertClose "the residual floor is carried through each year" 6000 (yearlyResidualFloorValue yearThree)
+        assertClose "year one depreciation loss reflects the bonus rate" 12000 (yearlyDepreciationLoss yearOne)
+        assertClose "year two lands on the residual floor" 6000 (yearlyEndingVehicleValue yearTwo)
+        assertClose "year three cannot drop below the residual floor" 6000 (yearlyEndingVehicleValue yearThree)
+      _ -> assertFailure "Expected exactly three yearly breakdown rows."
+
+mileageResalePenaltyTest :: Test
+mileageResalePenaltyTest =
+  TestCase $ do
+    let request =
+          deterministicRequest
+            39
+            baselineSimulationInput
+              { simulationPurchasePrice = 20000,
+                simulationYearsOwned = 2,
+                simulationAnnualMiles = 15000,
+                simulationExpectedAnnualMilesForResale = 10000,
+                simulationExtraMileageDepreciationPerMile = 0.2
+              }
+        response = simulateRequestWithSeed 39 request
+        breakdown = responseExampleBreakdown response
+        yearlyBreakdown = responseExampleYearlyBreakdown response
+    assertClose "incremental mileage penalties accumulate into the breakdown" 2000 (costMileageDepreciationPenalty breakdown)
+    assertClose "resale value drops by the mileage penalty when other depreciation is flat" 18000 (costResaleValue breakdown)
+    assertClose "total ownership cost reflects the resale hit from extra mileage" 2000 (costTotal breakdown)
+    case yearlyBreakdown of
+      [yearOne, yearTwo] -> do
+        assertClose "year one expected cumulative miles are tracked" 10000 (yearlyExpectedCumulativeMiles yearOne)
+        assertClose "year one mileage penalty reflects the first overage band" 1000 (yearlyMileageDepreciationPenalty yearOne)
+        assertClose "year two expected cumulative miles keep increasing" 20000 (yearlyExpectedCumulativeMiles yearTwo)
+        assertClose "year two mileage penalty only charges the new overage" 1000 (yearlyMileageDepreciationPenalty yearTwo)
+        assertClose "year two resale value includes both mileage penalties" 18000 (yearlyEndingVehicleValue yearTwo)
+      _ -> assertFailure "Expected exactly two yearly breakdown rows."
+
 mileageGrowthAndTireWearTest :: Test
 mileageGrowthAndTireWearTest =
   TestCase $ do
@@ -584,6 +659,10 @@ catalogImportSeedTest =
                       boundedNormalLowerBound = 0.05,
                       boundedNormalUpperBound = Just 0.24
                     },
+                importFirstYearDepreciationBonus = 0.1,
+                importResidualValueFloorPercent = 0.34,
+                importExpectedAnnualMilesForResale = 12000,
+                importExtraMileageDepreciationPerMile = 0.11,
                 importRepairShockProbability = 0.07,
                 importRepairShockCost =
                   BoundedNormal
@@ -599,6 +678,10 @@ catalogImportSeedTest =
     assertEqual "fuel type comes from imported fuel economy data" "hybrid-gasoline" (catalogFuelType catalogEntry)
     assertClose "combined MPG is preserved" 57 (catalogCombinedMpg catalogEntry)
     assertClose "purchase price is preserved" 28900 (catalogPurchasePrice catalogEntry)
+    assertClose "first-year depreciation bonus is preserved" 0.1 (catalogFirstYearDepreciationBonus catalogEntry)
+    assertClose "residual floor percent is preserved" 0.34 (catalogResidualValueFloorPercent catalogEntry)
+    assertClose "expected annual resale miles are preserved" 12000 (catalogExpectedAnnualMilesForResale catalogEntry)
+    assertClose "extra-mile resale penalty is preserved" 0.11 (catalogExtraMileageDepreciationPerMile catalogEntry)
 
 vehicleSourceSeedLoadTest :: Test
 vehicleSourceSeedLoadTest =
@@ -682,6 +765,10 @@ sourceSeedCatalogBuildTest =
     assertEqual "Corolla fuel type is normalized from official data" "hybrid-gasoline" (catalogFuelType corollaCatalogEntry)
     assertEqual "Civic import uses curated display model" "Civic Hatchback" (vpicModel (importIdentity civicCatalogImportSeed))
     assertEqual "Civic import keeps official fuel type mapping" "gasoline" (fuelEconomyFuelType (importFuelEconomy civicCatalogImportSeed))
+    assertBool "Corolla entry carries a positive resale floor" (catalogResidualValueFloorPercent corollaCatalogEntry > 0)
+    assertBool "Corolla entry carries an extra-mile resale penalty" (catalogExtraMileageDepreciationPerMile corollaCatalogEntry > 0)
+    assertBool "Civic import keeps curated first-year depreciation bonus" (importFirstYearDepreciationBonus civicCatalogImportSeed > 0)
+    assertClose "Civic import keeps expected annual resale miles" 12000 (importExpectedAnnualMilesForResale civicCatalogImportSeed)
 
 sourceSeedValidationFailureTest :: Test
 sourceSeedValidationFailureTest =
@@ -856,6 +943,10 @@ invalidInputValidationTest =
                     simulationLoanTermMonths = -12,
                     simulationTireReplacementCost = -50,
                     simulationTireLifeMiles = 0,
+                    simulationFirstYearDepreciationBonus = 1.2,
+                    simulationResidualValueFloorPercent = 1.2,
+                    simulationExpectedAnnualMilesForResale = -100,
+                    simulationExtraMileageDepreciationPerMile = -0.1,
                     simulationRepairShockProbability = 1.2,
                     simulationRepairShockCost =
                       BoundedNormal
@@ -905,6 +996,10 @@ invalidInputValidationTest =
     assertBool "loan term is validated" ("Loan term cannot be negative." `elem` validationErrors)
     assertBool "tire cost is validated" ("Tire replacement cost cannot be negative." `elem` validationErrors)
     assertBool "tire life is validated" ("Tire life must be greater than 0 miles." `elem` validationErrors)
+    assertBool "first-year depreciation bonus is validated" ("First-year depreciation bonus should be expressed as a decimal between 0 and 1." `elem` validationErrors)
+    assertBool "residual floor is validated" ("Residual value floor should be expressed as a decimal between 0 and 1." `elem` validationErrors)
+    assertBool "expected annual resale miles are validated" ("Expected annual resale miles cannot be negative." `elem` validationErrors)
+    assertBool "extra-mile resale penalty is validated" ("Extra-mile resale penalty cannot be negative." `elem` validationErrors)
     assertBool "rate bounds are validated" ("Annual depreciation rate upper bound must be less than or equal to 1." `elem` validationErrors)
 
 boundedNormalValidationTest :: Test
@@ -967,6 +1062,10 @@ assertVehicleCatalogEntryLooksUsable catalogEntry = do
   assertBool "catalog entry has a name" (not (null (catalogName catalogEntry)))
   assertBool "catalog purchase price is positive" (catalogPurchasePrice catalogEntry > 0)
   assertBool "catalog MPG is positive" (catalogCombinedMpg catalogEntry > 0)
+  assertBool "catalog first-year depreciation bonus is in range" (catalogFirstYearDepreciationBonus catalogEntry >= 0 && catalogFirstYearDepreciationBonus catalogEntry <= 1)
+  assertBool "catalog residual floor is in range" (catalogResidualValueFloorPercent catalogEntry >= 0 && catalogResidualValueFloorPercent catalogEntry <= 1)
+  assertBool "catalog expected annual resale miles are non-negative" (catalogExpectedAnnualMilesForResale catalogEntry >= 0)
+  assertBool "catalog extra-mile penalty is non-negative" (catalogExtraMileageDepreciationPerMile catalogEntry >= 0)
   assertBool
     "catalog repair shock probability is in range"
     (catalogRepairShockProbability catalogEntry >= 0 && catalogRepairShockProbability catalogEntry <= 1)
@@ -976,6 +1075,10 @@ assertVehiclePresetLooksUsable preset = do
   assertBool "preset has a name" (not (null (presetName preset)))
   assertBool "preset purchase price is positive" (presetPurchasePrice preset > 0)
   assertBool "preset MPG is positive" (presetMilesPerGallon preset > 0)
+  assertBool "preset first-year depreciation bonus is in range" (presetFirstYearDepreciationBonus preset >= 0 && presetFirstYearDepreciationBonus preset <= 1)
+  assertBool "preset residual floor is in range" (presetResidualValueFloorPercent preset >= 0 && presetResidualValueFloorPercent preset <= 1)
+  assertBool "preset expected annual resale miles are non-negative" (presetExpectedAnnualMilesForResale preset >= 0)
+  assertBool "preset extra-mile penalty is non-negative" (presetExtraMileageDepreciationPerMile preset >= 0)
   assertBool "preset repair shock probability is in range" (presetRepairShockProbability preset >= 0 && presetRepairShockProbability preset <= 1)
 
 assertVehicleSourceSeedLooksUsable :: VehicleCatalogSourceSeed -> Assertion
@@ -985,6 +1088,10 @@ assertVehicleSourceSeedLooksUsable sourceSeed = do
   assertBool "source seed has a display model" (not (null (sourceCatalogModel sourceSeed)))
   assertBool "source seed has a base model for matching" (not (null (sourceBaseModel sourceSeed)))
   assertBool "source seed uses a positive FuelEconomy.gov vehicle id" (sourceFuelEconomyVehicleId sourceSeed > 0)
+  assertBool "source seed first-year depreciation bonus is in range" (sourceFirstYearDepreciationBonus sourceSeed >= 0 && sourceFirstYearDepreciationBonus sourceSeed <= 1)
+  assertBool "source seed residual floor is in range" (sourceResidualValueFloorPercent sourceSeed >= 0 && sourceResidualValueFloorPercent sourceSeed <= 1)
+  assertBool "source seed expected annual resale miles are non-negative" (sourceExpectedAnnualMilesForResale sourceSeed >= 0)
+  assertBool "source seed extra-mile penalty is non-negative" (sourceExtraMileageDepreciationPerMile sourceSeed >= 0)
 
 loadDefaultVehicleSourceSeeds :: IO [VehicleCatalogSourceSeed]
 loadDefaultVehicleSourceSeeds = do
@@ -1044,6 +1151,7 @@ assertResponseInvariants seed = do
   assertClose "toll totals stay aligned with the yearly timeline" (sum (map yearlyTolls yearlyBreakdown)) (costTolls exampleBreakdown)
   assertClose "inspection totals stay aligned with the yearly timeline" (sum (map yearlyInspection yearlyBreakdown)) (costInspection exampleBreakdown)
   assertClose "tire totals stay aligned with the yearly timeline" (sum (map yearlyTires yearlyBreakdown)) (costTires exampleBreakdown)
+  assertClose "mileage penalty totals stay aligned with the yearly timeline" (sum (map yearlyMileageDepreciationPenalty yearlyBreakdown)) (costMileageDepreciationPenalty exampleBreakdown)
   assertClose "loan payment totals stay aligned with the yearly timeline" (sum (map yearlyLoanPayments yearlyBreakdown)) (costLoanPaymentsMade exampleBreakdown)
   assertClose "loan interest totals stay aligned with the yearly timeline" (sum (map yearlyLoanInterest yearlyBreakdown)) (costLoanInterest exampleBreakdown)
   assertClose "upfront payment stays aligned with the yearly timeline" (sum (map yearlyUpfrontPayment yearlyBreakdown)) (costUpfrontPayment exampleBreakdown)
@@ -1057,6 +1165,7 @@ assertResponseInvariants seed = do
     lastYear : _ -> do
       assertClose "resale value stays aligned with the final yearly vehicle value" (yearlyEndingVehicleValue lastYear) (costResaleValue exampleBreakdown)
       assertClose "remaining balance stays aligned with the final yearly loan balance" (yearlyRemainingLoanBalance lastYear) (costRemainingLoanBalance exampleBreakdown)
+      assertClose "residual floor stays aligned with the final yearly floor value" (yearlyResidualFloorValue lastYear) (costResidualValueFloor exampleBreakdown)
     [] ->
       assertFailure "Expected at least one yearly breakdown row."
 
@@ -1150,6 +1259,10 @@ invalidSimulationRequest =
             simulationLoanTermMonths = -12,
             simulationTireReplacementCost = -50,
             simulationTireLifeMiles = 0,
+            simulationFirstYearDepreciationBonus = 1.2,
+            simulationResidualValueFloorPercent = 1.2,
+            simulationExpectedAnnualMilesForResale = -100,
+            simulationExtraMileageDepreciationPerMile = -0.1,
             simulationRepairShockProbability = 1.2,
             simulationRepairShockCost =
               BoundedNormal
@@ -1221,6 +1334,10 @@ baselineSimulationInput =
       simulationLoanTermMonths = 0,
       simulationTireReplacementCost = 0,
       simulationTireLifeMiles = 40000,
+      simulationFirstYearDepreciationBonus = 0,
+      simulationResidualValueFloorPercent = 0,
+      simulationExpectedAnnualMilesForResale = 0,
+      simulationExtraMileageDepreciationPerMile = 0,
       simulationRepairShockProbability = 0,
       simulationRepairShockCost = deterministicBoundedNormal 0,
       simulationFuelPrice = deterministicBoundedNormal 0,
@@ -1252,6 +1369,10 @@ fallbackVehicleSourceSeed =
       sourceAnnualRegistration = 1,
       sourceAnnualMaintenance = fallbackBoundedNormal,
       sourceAnnualDepreciationRate = fallbackBoundedNormal,
+      sourceFirstYearDepreciationBonus = 0,
+      sourceResidualValueFloorPercent = 0,
+      sourceExpectedAnnualMilesForResale = 0,
+      sourceExtraMileageDepreciationPerMile = 0,
       sourceRepairShockProbability = 0,
       sourceRepairShockCost = fallbackBoundedNormal,
       sourceSourceUpdatedAt = "2026-04-16"
@@ -1295,6 +1416,10 @@ fallbackCatalogImportSeed =
       importAnnualRegistration = 1,
       importAnnualMaintenance = fallbackBoundedNormal,
       importAnnualDepreciationRate = fallbackBoundedNormal,
+      importFirstYearDepreciationBonus = 0,
+      importResidualValueFloorPercent = 0,
+      importExpectedAnnualMilesForResale = 0,
+      importExtraMileageDepreciationPerMile = 0,
       importRepairShockProbability = 0,
       importRepairShockCost = fallbackBoundedNormal,
       importSourceName = "fallback",

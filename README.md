@@ -120,6 +120,14 @@ The current MVP models uncertainty with bounded normal distributions for:
 - annual depreciation rate
 - annual repair shock cost when a repair shock occurs
 
+The current catalog-backed resale model also includes deterministic resale
+inputs for:
+
+- a first-year depreciation bonus
+- a residual value floor as a percent of purchase price
+- an expected annual mileage baseline for resale
+- an extra-mile resale penalty for driving above that baseline
+
 For each simulation run, the app estimates total ownership cost as:
 
 ```text
@@ -146,6 +154,9 @@ The yearly model now also applies:
 - annual inflation to recurring costs such as fuel, maintenance, insurance, registration, parking, tolls, inspection, tires, and repair shocks
 - annual mileage change so fuel use and tire wear can grow or shrink over time
 - loan amortization with interest tracked separately from principal in the yearly breakdown
+- a first-year resale hit on top of the sampled annual depreciation rate
+- a residual value floor so resale cannot fall below a configured minimum
+- a mileage-based resale penalty when the ownership path runs above expected miles
 - year-by-year sampled traces for the example scenario
 
 This is still intentionally compact, but it now captures more of the front
@@ -241,12 +252,15 @@ The repository already includes an initial simulation engine, a Scotty-based web
 server, a lightweight frontend, curated vehicle presets, and a growing test
 suite. The current app can now model taxes and fees, inflation, repair-shock
 tail risk, yearly sample traces, annual mileage change, tire replacement
-timing, local recurring costs, and catalog-backed vehicle presets while keeping
+timing, local recurring costs, and a richer resale path with first-year
+depreciation, mileage penalties, and floor-limited residual value while keeping
 the web layer lightweight. It also now includes a first importer layer that
 uses curated source seeds plus official `vPIC` and `FuelEconomy.gov` payloads
-to refresh the local vehicle catalog. The automated checks now cover simulation
-invariants, API routes, financing edge cases, deterministic mileage and wear
-logic, and a lightweight in-process smoke test for the web assets.
+to refresh the local vehicle catalog, and that catalog now carries resale
+defaults all the way through to the browser presets. The automated checks now
+cover simulation invariants, API routes, financing edge cases, deterministic
+mileage and wear logic, resale-floor behavior, mileage-based resale penalties,
+and a lightweight in-process smoke test for the web assets.
 
 The repository also includes a basic GitHub Actions workflow that runs the main
 build and test checks on pushes and pull requests.
@@ -259,7 +273,7 @@ easier to navigate as the project grows.
 
 - compare multiple vehicles side by side
 - support alternative probability distributions
-- improve the resale model so it is not driven only by annual depreciation
+- calibrate resale defaults from richer market-value inputs instead of only curated heuristics
 - add state-specific taxes and registration rules
 - expand the importer beyond curated vehicle IDs into richer discovery flows
 - broaden automated testing with API-contract, route, and browser-level coverage

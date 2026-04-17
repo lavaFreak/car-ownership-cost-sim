@@ -140,6 +140,10 @@ simulateDetailedCostBreakdown simulationInput initialGen =
       annualInspectionCost = max 0 (simulationAnnualInspection simulationInput)
       tireReplacementCost = max 0 (simulationTireReplacementCost simulationInput)
       tireLifeMiles = max 0 (simulationTireLifeMiles simulationInput)
+      firstYearDepreciationBonus = max 0 (simulationFirstYearDepreciationBonus simulationInput)
+      residualValueFloorPercent = max 0 (simulationResidualValueFloorPercent simulationInput)
+      expectedAnnualMilesForResale = max 0 (simulationExpectedAnnualMilesForResale simulationInput)
+      extraMileageDepreciationPerMile = max 0 (simulationExtraMileageDepreciationPerMile simulationInput)
       repairShockProbability = max 0 (simulationRepairShockProbability simulationInput)
       (sampledYears, finalGen) =
         simulateYears
@@ -155,6 +159,10 @@ simulateDetailedCostBreakdown simulationInput initialGen =
           (simulationAnnualDepreciationRate simulationInput)
           tireReplacementCost
           tireLifeMiles
+          firstYearDepreciationBonus
+          residualValueFloorPercent
+          expectedAnnualMilesForResale
+          extraMileageDepreciationPerMile
           initialGen
       financing = buildFinancingSnapshot simulationInput
       yearlyBreakdowns =
@@ -171,6 +179,11 @@ simulateDetailedCostBreakdown simulationInput initialGen =
       tollsCost = sum (map yearlyTolls yearlyBreakdowns)
       inspectionCost = sum (map yearlyInspection yearlyBreakdowns)
       tireCost = sum (map yearlyTires yearlyBreakdowns)
+      mileageDepreciationPenalty = sum (map yearlyMileageDepreciationPenalty yearlyBreakdowns)
+      residualValueFloor =
+        case sampledYears of
+          [] -> 0
+          _ -> purchasePrice * residualValueFloorPercent
       resaleValue =
         case sampledYears of
           [] -> purchasePrice
@@ -207,6 +220,8 @@ simulateDetailedCostBreakdown simulationInput initialGen =
             costTolls = tollsCost,
             costInspection = inspectionCost,
             costTires = tireCost,
+            costMileageDepreciationPenalty = mileageDepreciationPenalty,
+            costResidualValueFloor = residualValueFloor,
             costResaleValue = resaleValue,
             costTotal = totalCost
           },
@@ -221,6 +236,10 @@ data SampledYear = SampledYear
     sampledYearMaintenanceCost :: Double,
     sampledYearRepairShockCost :: Double,
     sampledYearTireCost :: Double,
+    sampledYearExpectedCumulativeMiles :: Double,
+    sampledYearMileageDepreciationPenalty :: Double,
+    sampledYearDepreciationRateApplied :: Double,
+    sampledYearResidualFloorValue :: Double,
     sampledYearDepreciationLoss :: Double,
     sampledYearEndingVehicleValue :: Double
   }
@@ -238,9 +257,13 @@ simulateYears ::
   BoundedNormal ->
   Double ->
   Double ->
+  Double ->
+  Double ->
+  Double ->
+  Double ->
   StdGen ->
   ([SampledYear], StdGen)
-simulateYears yearsRemaining carValue baseAnnualMiles annualMileageChangeRate milesPerGallon fuelModel maintenanceModel repairShockProbability repairShockModel depreciationModel tireReplacementCost tireLifeMiles =
+simulateYears yearsRemaining carValue baseAnnualMiles annualMileageChangeRate milesPerGallon fuelModel maintenanceModel repairShockProbability repairShockModel depreciationModel tireReplacementCost tireLifeMiles firstYearDepreciationBonus residualValueFloorPercent expectedAnnualMilesForResale extraMileageDepreciationPerMile =
   go yearsRemaining 1 carValue 0 []
   where
     go 0 _ _ _ acc gen = (reverse acc, gen)
@@ -250,6 +273,15 @@ simulateYears yearsRemaining carValue baseAnnualMiles annualMileageChangeRate mi
           tireCost =
             tireReplacementCost
               * fromIntegral (tireReplacementCount tireLifeMiles priorMilesDriven (priorMilesDriven + yearlyMiles))
+          actualCumulativeMiles = priorMilesDriven + yearlyMiles
+          expectedCumulativeMiles = expectedCumulativeMilesForYear expectedAnnualMilesForResale yearIndex
+          mileagePenalty =
+            incrementalMileageDepreciationPenalty
+              expectedAnnualMilesForResale
+              extraMileageDepreciationPerMile
+              yearIndex
+              priorMilesDriven
+              actualCumulativeMiles
           (fuelPrice, gen1) = sampleBoundedNormal fuelModel gen0
           (maintenanceCost, gen2) = sampleBoundedNormal maintenanceModel gen1
           (repairShockRoll, gen3) = randomR (0.0, 1.0 :: Double) gen2
@@ -257,8 +289,12 @@ simulateYears yearsRemaining carValue baseAnnualMiles annualMileageChangeRate mi
             if repairShockRoll < repairShockProbability
               then sampleBoundedNormal repairShockModel gen3
               else (0, gen3)
-          (depreciationRate, gen5) = sampleBoundedNormal depreciationModel gen4
-          nextValue = max 0 (currentValue * (1 - depreciationRate))
+          (sampledDepreciationRate, gen5) = sampleBoundedNormal depreciationModel gen4
+          depreciationRate =
+            effectiveDepreciationRate sampledDepreciationRate firstYearDepreciationBonus yearIndex
+          residualFloorValue = carValue * residualValueFloorPercent
+          nextValue =
+            nextVehicleValue currentValue depreciationRate mileagePenalty residualFloorValue
           sampledYear =
             SampledYear
               { sampledYearMilesDriven = yearlyMiles,
@@ -267,6 +303,10 @@ simulateYears yearsRemaining carValue baseAnnualMiles annualMileageChangeRate mi
                 sampledYearMaintenanceCost = maintenanceCost,
                 sampledYearRepairShockCost = repairShockCost,
                 sampledYearTireCost = tireCost,
+                sampledYearExpectedCumulativeMiles = expectedCumulativeMiles,
+                sampledYearMileageDepreciationPenalty = mileagePenalty,
+                sampledYearDepreciationRateApplied = depreciationRate,
+                sampledYearResidualFloorValue = residualFloorValue,
                 sampledYearDepreciationLoss = max 0 (currentValue - nextValue),
                 sampledYearEndingVehicleValue = nextValue
               }
@@ -393,6 +433,10 @@ buildYearlyCostBreakdown financing purchaseTax upfrontFees annualInflationRate a
           yearlyTolls = inflatedTollsCost,
           yearlyInspection = inflatedInspectionCost,
           yearlyTires = inflatedTireCost,
+          yearlyExpectedCumulativeMiles = sampledYearExpectedCumulativeMiles sampledYear,
+          yearlyMileageDepreciationPenalty = sampledYearMileageDepreciationPenalty sampledYear,
+          yearlyDepreciationRateApplied = sampledYearDepreciationRateApplied sampledYear,
+          yearlyResidualFloorValue = sampledYearResidualFloorValue sampledYear,
           yearlyDepreciationLoss = sampledYearDepreciationLoss sampledYear,
           yearlyEndingVehicleValue = endingVehicleValue,
           yearlyRemainingLoanBalance = yearEndLoanBalance,
@@ -488,6 +532,34 @@ gallonsDrivenForYear yearlyMiles milesPerGallon
   | milesPerGallon <= 0 = 0
   | otherwise = yearlyMiles / milesPerGallon
 
+expectedCumulativeMilesForYear :: Double -> Int -> Double
+expectedCumulativeMilesForYear expectedAnnualMiles yearIndex =
+  max 0 expectedAnnualMiles * fromIntegral (max 0 yearIndex)
+
+incrementalMileageDepreciationPenalty :: Double -> Double -> Int -> Double -> Double -> Double
+incrementalMileageDepreciationPenalty expectedAnnualMiles penaltyPerMile yearIndex milesBeforeYear milesAfterYear =
+  let expectedMilesBeforeYear = expectedCumulativeMilesForYear expectedAnnualMiles (yearIndex - 1)
+      expectedMilesAfterYear = expectedCumulativeMilesForYear expectedAnnualMiles yearIndex
+      overageBeforeYear = max 0 (milesBeforeYear - expectedMilesBeforeYear)
+      overageAfterYear = max 0 (milesAfterYear - expectedMilesAfterYear)
+      incrementalOverage = max 0 (overageAfterYear - overageBeforeYear)
+   in incrementalOverage * max 0 penaltyPerMile
+
+effectiveDepreciationRate :: Double -> Double -> Int -> Double
+effectiveDepreciationRate sampledDepreciationRate firstYearBonus yearIndex =
+  let adjustedRate =
+        sampledDepreciationRate
+          + if yearIndex == 1
+            then firstYearBonus
+            else 0
+   in max 0 (min 1 adjustedRate)
+
+nextVehicleValue :: Double -> Double -> Double -> Double -> Double
+nextVehicleValue currentValue depreciationRate mileagePenalty residualFloorValue =
+  let depreciatedValue = currentValue * (1 - depreciationRate)
+      penaltyAdjustedValue = depreciatedValue - mileagePenalty
+   in max residualFloorValue (max 0 penaltyAdjustedValue)
+
 -- | Count how many tire replacement thresholds are crossed within one year.
 tireReplacementCount :: Double -> Double -> Double -> Int
 tireReplacementCount tireLifeMiles milesBeforeYear milesAfterYear
@@ -533,6 +605,12 @@ validateSimulationInput simulationInput =
       require (simulationLoanTermMonths simulationInput >= 0) "Loan term cannot be negative.",
       require (simulationTireReplacementCost simulationInput >= 0) "Tire replacement cost cannot be negative.",
       require (simulationTireLifeMiles simulationInput > 0) "Tire life must be greater than 0 miles.",
+      require (simulationFirstYearDepreciationBonus simulationInput >= 0) "First-year depreciation bonus cannot be negative.",
+      require (simulationFirstYearDepreciationBonus simulationInput <= 1) "First-year depreciation bonus should be expressed as a decimal between 0 and 1.",
+      require (simulationResidualValueFloorPercent simulationInput >= 0) "Residual value floor cannot be negative.",
+      require (simulationResidualValueFloorPercent simulationInput <= 1) "Residual value floor should be expressed as a decimal between 0 and 1.",
+      require (simulationExpectedAnnualMilesForResale simulationInput >= 0) "Expected annual resale miles cannot be negative.",
+      require (simulationExtraMileageDepreciationPerMile simulationInput >= 0) "Extra-mile resale penalty cannot be negative.",
       require (simulationRepairShockProbability simulationInput >= 0) "Repair shock probability cannot be negative.",
       require (simulationRepairShockProbability simulationInput <= 1) "Repair shock probability should be expressed as a decimal between 0 and 1.",
       validateBoundedNormal "Repair shock cost" False (simulationRepairShockCost simulationInput),

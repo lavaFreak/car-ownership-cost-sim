@@ -39,6 +39,10 @@ The following pieces are deterministic once a scenario input is fixed:
 - annual inspection and emissions
 - loan APR and loan term
 - tire replacement cost and tire life
+- first-year depreciation bonus
+- residual value floor percent
+- expected annual miles for resale
+- extra-mile resale penalty
 
 These inputs determine:
 
@@ -48,6 +52,8 @@ These inputs determine:
 - gallons consumed by year
 - tire replacement timing from cumulative miles
 - recurring local ownership costs
+- the floor-limited part of the resale path
+- how much extra driving reduces resale value
 
 ## Stochastic parts of the model
 
@@ -85,6 +91,10 @@ For each modeled year, the simulator currently computes:
 - inflated insurance, registration, parking, toll, and inspection costs
 - loan payment, principal, interest, and remaining balance
 - depreciation loss and ending vehicle value
+- first-year depreciation bonus on top of the sampled annual rate
+- mileage-driven resale penalties when actual cumulative miles exceed the
+  expected resale baseline
+- a residual value floor applied to the ending vehicle value
 
 The yearly breakdown is returned to the frontend so the UI can explain how one
 sampled path evolves over time.
@@ -117,6 +127,8 @@ Important interpretation note:
 - remaining loan balance is added separately because it still has to be settled
   when the vehicle is sold
 - resale value offsets ownership cost at the end of the horizon
+- mileage penalties affect total cost indirectly by lowering resale value rather
+  than appearing as a separate cash expense
 
 ## Output semantics
 
@@ -139,8 +151,9 @@ important simplifications:
 
 - uncertainty inputs are chosen from project assumptions, not yet calibrated
   from large real-world datasets
-- depreciation is still a yearly rate process, not a market-comparable resale
-  model
+- depreciation and resale are still heuristic rather than market-comparable,
+  even though the model now includes first-year loss, mileage penalties, and a
+  floor on residual value
 - fuel use is based on one blended MPG value, not separate city and highway
   behavior
 - maintenance and repair shocks are independent draws rather than age- or
@@ -153,7 +166,8 @@ important simplifications:
 
 The highest-value modeling improvements from here are:
 
-1. market-driven resale logic instead of only annual depreciation
+1. market-driven resale logic calibrated from valuation data instead of only
+   curated depreciation heuristics
 2. richer fuel-use assumptions such as city/highway or commute/weekend splits
 3. maintenance and repair distributions that change with age and mileage
 4. state-specific registration and tax rules

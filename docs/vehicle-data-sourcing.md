@@ -12,6 +12,8 @@ lookup. The current simulation model either already uses or will soon need:
 - fuel economy and fuel type
 - a baseline purchase price or MSRP
 - a baseline resale or market value input for depreciation
+- resale-curve hints such as first-year drop, mileage sensitivity, and residual
+  floor assumptions
 - maintenance schedule or at least maintenance cost baselines
 - repair-risk signals for "shock" events
 - possibly recalls, warranty, and powertrain metadata later
@@ -348,6 +350,10 @@ Suggested fields:
 - repair_shock_std_dev
 - depreciation_mean
 - depreciation_std_dev
+- first_year_depreciation_bonus
+- residual_value_floor_percent
+- expected_annual_miles_for_resale
+- extra_mileage_depreciation_per_mile
 - source_name
 - source_updated_at
 - imported_at
