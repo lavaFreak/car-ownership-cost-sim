@@ -239,6 +239,12 @@
 
             <div class="scenario-tools">
               <button type="submit">Run simulation</button>
+              <button id="save-comparison-button" type="button" class="button-secondary" disabled>
+                Save current as baseline
+              </button>
+              <button id="clear-comparison-button" type="button" class="button-secondary" disabled>
+                Clear baseline
+              </button>
               <button id="copy-link-button" type="button" class="button-secondary">Copy share link</button>
               <button id="reset-form-button" type="button" class="button-secondary">Reset starter inputs</button>
             </div>
@@ -273,6 +279,16 @@
           <div class="analysis-shell">
             <h3>Scenario signals</h3>
             <div id="insight-grid" class="summary-grid"></div>
+          </div>
+
+          <div class="analysis-shell comparison-shell">
+            <div class="comparison-heading">
+              <h3>Scenario comparison</h3>
+              <p id="comparison-status">
+                Save a successful run as a baseline, then tweak the inputs and run another scenario to compare them.
+              </p>
+            </div>
+            <div id="comparison-grid" class="comparison-grid"></div>
           </div>
 
           <div class="breakdown-shell">

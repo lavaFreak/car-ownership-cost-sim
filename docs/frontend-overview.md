@@ -21,7 +21,8 @@ The frontend controller currently does five jobs:
 2. validate inputs before sending a request
 3. convert form data into the backend JSON request shape
 4. keep shareable URLs in sync with the current scenario
-5. render the API response into cards, yearly rows, and simple canvas charts
+5. render the API response into cards, comparison views, yearly rows, and
+   simple canvas charts
 
 ## Form structure
 
@@ -70,14 +71,29 @@ The frontend maintains a URL-backed scenario state:
 This is useful for debugging, demos, and comparing scenarios without requiring
 accounts or persistence.
 
+## Comparison mode
+
+The frontend now supports a lightweight comparison workflow entirely in the
+browser:
+
+- save any successful run as a baseline
+- tweak the scenario and run again
+- compare the current run against the saved baseline with side-by-side cards
+- overlay the current and baseline distributions and yearly sampled paths
+
+The saved baseline is also cached in browser local storage so a refresh does
+not immediately lose the comparison context.
+
 ## Results rendering
 
-The frontend currently renders four views of the simulation response:
+The frontend currently renders five views of the simulation response:
 
 - summary cards
   - mean, median, percentile band, cost-per-mile, min, max
 - scenario signals
   - quick derived interpretations of the run
+- scenario comparison
+  - side-by-side current vs baseline cards for cost, resale, and equity
 - one sampled scenario
   - category-level breakdown for a single path
 - yearly snapshot
@@ -85,8 +101,8 @@ The frontend currently renders four views of the simulation response:
 
 Two simple canvas charts complement those cards:
 
-- histogram of total sampled costs
-- bar chart of one sampled yearly cost path
+- histogram of total sampled costs, with a baseline overlay when saved
+- bar chart of one sampled yearly cost path, with a baseline overlay when saved
 
 ## Styling approach
 
@@ -110,7 +126,7 @@ dependencies:
 ## Current limitations
 
 - charts are custom canvas drawings rather than a charting library
-- there is no side-by-side comparison mode yet
-- the UI does not persist scenarios beyond shareable URLs
+- comparison is session-oriented and single-baseline rather than multi-vehicle
+  portfolio analysis
 - browser-level automated tests are not yet present; coverage is currently route
   and logic oriented

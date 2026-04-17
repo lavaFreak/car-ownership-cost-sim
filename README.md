@@ -254,13 +254,16 @@ suite. The current app can now model taxes and fees, inflation, repair-shock
 tail risk, yearly sample traces, annual mileage change, tire replacement
 timing, local recurring costs, and a richer resale path with first-year
 depreciation, mileage penalties, and floor-limited residual value while keeping
-the web layer lightweight. It also now includes a first importer layer that
-uses curated source seeds plus official `vPIC` and `FuelEconomy.gov` payloads
-to refresh the local vehicle catalog, and that catalog now carries resale
-defaults all the way through to the browser presets. The automated checks now
-cover simulation invariants, API routes, financing edge cases, deterministic
-mileage and wear logic, resale-floor behavior, mileage-based resale penalties,
-and a lightweight in-process smoke test for the web assets.
+the web layer lightweight. The frontend now also supports side-by-side
+comparison by letting users pin a baseline run, compare later scenarios against
+it with delta cards, and overlay the baseline on the distribution and yearly
+charts. It also now includes a first importer layer that uses curated source
+seeds plus official `vPIC` and `FuelEconomy.gov` payloads to refresh the local
+vehicle catalog, and that catalog now carries resale defaults all the way
+through to the browser presets. The automated checks now cover simulation
+invariants, API routes, financing edge cases, deterministic mileage and wear
+logic, resale-floor behavior, mileage-based resale penalties, and a
+lightweight in-process smoke test for the web assets.
 
 The repository also includes a basic GitHub Actions workflow that runs the main
 build and test checks on pushes and pull requests.
@@ -271,7 +274,7 @@ easier to navigate as the project grows.
 
 ## Near-Term Next Tasks
 
-- compare multiple vehicles side by side
+- expand comparison mode beyond one saved baseline into richer multi-vehicle workflows
 - support alternative probability distributions
 - calibrate resale defaults from richer market-value inputs instead of only curated heuristics
 - add state-specific taxes and registration rules

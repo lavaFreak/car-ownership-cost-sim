@@ -392,6 +392,94 @@ canvas {
   font-size: 1.2rem;
 }
 
+.comparison-shell {
+  margin-top: 1rem;
+}
+
+.comparison-heading {
+  margin-bottom: 0.75rem;
+}
+
+.comparison-heading p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.55;
+}
+
+.comparison-grid {
+  display: grid;
+  gap: 0.85rem;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.comparison-card,
+.comparison-empty {
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  padding: 1rem;
+  background: rgba(255, 255, 255, 0.58);
+}
+
+.comparison-card .label,
+.comparison-empty .label {
+  display: block;
+  margin-bottom: 0.55rem;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.comparison-values {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.comparison-value {
+  padding: 0.7rem;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.62);
+}
+
+.comparison-value strong {
+  display: block;
+  margin-top: 0.18rem;
+  font-size: 1.05rem;
+}
+
+.comparison-side {
+  display: block;
+  color: var(--muted);
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.comparison-delta {
+  margin-top: 0.85rem;
+  font-weight: 700;
+}
+
+.comparison-delta.is-better {
+  color: #1e6a4f;
+}
+
+.comparison-delta.is-worse {
+  color: #9a3817;
+}
+
+.comparison-delta.is-flat {
+  color: var(--muted);
+}
+
+.comparison-empty {
+  color: var(--muted);
+  line-height: 1.55;
+}
+
+.comparison-empty p {
+  margin: 0;
+}
+
 @media (max-width: 920px) {
   .workspace {
     grid-template-columns: 1fr;
