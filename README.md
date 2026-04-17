@@ -100,6 +100,13 @@ for deeper context:
 - [docs/simulation-model.md](/Users/garion/Work/projects/car-ownership-cost-sim/docs/simulation-model.md)
   Explains the current Monte Carlo model, deterministic formulas, stochastic
   inputs, and modeling limits.
+- [docs/api-reference.md](/Users/garion/Work/projects/car-ownership-cost-sim/docs/api-reference.md)
+  Documents the current HTTP endpoints and the main request and response
+  payloads.
+- [docs/frontend-overview.md](/Users/garion/Work/projects/car-ownership-cost-sim/docs/frontend-overview.md)
+  Explains how the static browser UI is structured and how it maps onto the API.
+- [docs/testing-and-workflows.md](/Users/garion/Work/projects/car-ownership-cost-sim/docs/testing-and-workflows.md)
+  Documents the local development commands, CI checks, and catalog refresh flow.
 - [docs/vehicle-data-sourcing.md](/Users/garion/Work/projects/car-ownership-cost-sim/docs/vehicle-data-sourcing.md)
   Explains the current strategy for acquiring vehicle data and why the project
   favors APIs plus a local catalog over scraping-first approaches.

@@ -1,5 +1,17 @@
 {-# LANGUAGE OverloadedStrings #-}
 
+{-|
+Integration-style regression suite for the project.
+
+This test module intentionally mixes three layers of coverage:
+
+- deterministic simulation-model checks
+- importer and catalog normalization checks
+- in-process web route checks
+
+Keeping them together makes it easy to run one command and know whether the
+core ownership model, the data-refresh path, and the web API still agree.
+-}
 module Main (main) where
 
 import CarOwnershipCostSim.Simulation (simulateRequestWithSeed, validateSimulationRequest)

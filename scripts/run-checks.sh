@@ -1,5 +1,10 @@
 #!/usr/bin/env bash
 
+# Unified local verification entrypoint used by both developers and CI.
+#
+# The script keeps Cabal's writable state under /tmp by default so it behaves
+# well in sandboxed environments.
+
 set -euo pipefail
 
 CABAL_DIR="${CABAL_DIR:-/tmp/cabal}"

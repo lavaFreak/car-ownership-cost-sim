@@ -1,3 +1,9 @@
+/*
+ * Visual system for the simulator UI.
+ *
+ * The styling intentionally keeps the frontend dependency-free while still
+ * giving the app a clear presentation layer separate from the logic in app.js.
+ */
 :root {
   --bg-top: #f3ebe0;
   --bg-bottom: #d7e5ef;

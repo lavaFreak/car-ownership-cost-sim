@@ -11,6 +11,11 @@ maintainer:         garion@example.com
 category:           Web
 extra-source-files:
     README.md
+    docs/architecture-overview.md
+    docs/simulation-model.md
+    docs/api-reference.md
+    docs/frontend-overview.md
+    docs/testing-and-workflows.md
     catalog/vehicle-source-seeds.json
     docs/vehicle-data-sourcing.md
     static/index.html
@@ -34,6 +39,8 @@ common shared-properties
     ghc-options:
         -Wall
 
+-- Core project library containing the simulation engine, catalog layer,
+-- and reusable web app definition.
 library
     import:           shared-properties
     hs-source-dirs:   src
@@ -80,6 +87,8 @@ executable build-vehicle-catalog
         aeson >=2.1 && <2.3,
         car-ownership-cost-sim
 
+-- Unified regression suite covering the simulation model, catalog import path,
+-- and in-process route behavior.
 test-suite car-ownership-cost-sim-test
     import:           shared-properties
     autogen-modules:
