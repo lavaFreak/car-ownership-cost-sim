@@ -30,6 +30,7 @@ The frontend controller currently does six jobs:
 The scenario form is grouped into these sections:
 
 - vehicle and usage
+- EV charging mix
 - fixed annual costs
 - wear items
 - financing
@@ -52,6 +53,8 @@ Those lookup controls intentionally:
 - autofill car-specific defaults such as city/highway efficiency, fuel type,
   and maintenance
   assumptions
+- switch the EV-specific charging controls on automatically for electric
+  catalog entries while still leaving every value editable
 - keep the exact-match dropdown in sync with the current filters and search
   text
 - still allow every numeric assumption to be manually edited afterward
@@ -65,6 +68,7 @@ Presets intentionally:
 - prefill vehicle-specific defaults such as city/highway efficiency, fuel type,
   energy-price assumptions, and maintenance
   assumptions
+- apply EV-friendly charging defaults when the selected vehicle is electric
 - leave scenario-specific choices like mileage and financing under user control
 - come from the local catalog so they stay reproducible
 
@@ -117,7 +121,8 @@ The frontend currently renders five views of the simulation response:
 - one sampled scenario
   - category-level breakdown for a single path
 - yearly snapshot
-  - annual timeline for that sampled path, including city/highway fuel split
+  - annual timeline for that sampled path, including city/highway energy split
+    and EV charging-overhead details when relevant
 
 Two simple canvas charts complement those cards:
 

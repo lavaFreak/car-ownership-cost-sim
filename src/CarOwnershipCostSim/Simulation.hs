@@ -135,6 +135,8 @@ simulateDetailedCostBreakdown simulationInput initialGen =
       baseAnnualMiles = max 0 (simulationAnnualMiles simulationInput)
       cityDrivingShare = clampUnitInterval (simulationCityDrivingShare simulationInput)
       fuelType = normalizeFuelType (simulationFuelType simulationInput)
+      homeChargingShare = clampUnitInterval (simulationHomeChargingShare simulationInput)
+      chargingLossRate = clampChargingLossRate (simulationChargingLossRate simulationInput)
       combinedMilesPerGallon = max 0 (simulationMilesPerGallon simulationInput)
       cityMilesPerGallon = positiveOrFallback (simulationCityMilesPerGallon simulationInput) combinedMilesPerGallon
       highwayMilesPerGallon = positiveOrFallback (simulationHighwayMilesPerGallon simulationInput) combinedMilesPerGallon
@@ -158,9 +160,12 @@ simulateDetailedCostBreakdown simulationInput initialGen =
           annualMileageChangeRate
           cityDrivingShare
           fuelType
+          homeChargingShare
+          chargingLossRate
           cityMilesPerGallon
           highwayMilesPerGallon
           (simulationFuelPrice simulationInput)
+          (simulationPublicChargingPrice simulationInput)
           (simulationAnnualMaintenance simulationInput)
           repairShockProbability
           (simulationRepairShockCost simulationInput)
@@ -268,6 +273,9 @@ simulateYears ::
   String ->
   Double ->
   Double ->
+  Double ->
+  Double ->
+  BoundedNormal ->
   BoundedNormal ->
   BoundedNormal ->
   Double ->
@@ -281,7 +289,7 @@ simulateYears ::
   Double ->
   StdGen ->
   ([SampledYear], StdGen)
-simulateYears yearsRemaining carValue baseAnnualMiles annualMileageChangeRate cityDrivingShare fuelType cityMilesPerGallon highwayMilesPerGallon fuelModel maintenanceModel repairShockProbability repairShockModel depreciationModel tireReplacementCost tireLifeMiles firstYearDepreciationBonus residualValueFloorPercent expectedAnnualMilesForResale extraMileageDepreciationPerMile initialGen =
+simulateYears yearsRemaining carValue baseAnnualMiles annualMileageChangeRate cityDrivingShare fuelType homeChargingShare chargingLossRate cityMilesPerGallon highwayMilesPerGallon fuelModel publicChargingPriceModel maintenanceModel repairShockProbability repairShockModel depreciationModel tireReplacementCost tireLifeMiles firstYearDepreciationBonus residualValueFloorPercent expectedAnnualMilesForResale extraMileageDepreciationPerMile initialGen =
   go yearsRemaining 1 carValue 0 [] initialGen
   where
     go 0 _ _ _ acc gen = (reverse acc, gen)
@@ -295,6 +303,15 @@ simulateYears yearsRemaining carValue baseAnnualMiles annualMileageChangeRate ci
           cityGallons = liquidFuelGallonsForYear fuelType cityMiles cityMilesPerGallon
           highwayGallons = liquidFuelGallonsForYear fuelType highwayMiles highwayMilesPerGallon
           annualGallons = cityGallons + highwayGallons
+          annualPurchasedEnergyUnits = purchasedEnergyUnitsForYear fuelType annualEnergyUnits chargingLossRate
+          homePurchasedEnergyUnits =
+            if isElectricFuelType fuelType
+              then annualPurchasedEnergyUnits * homeChargingShare
+              else annualPurchasedEnergyUnits
+          publicPurchasedEnergyUnits =
+            if isElectricFuelType fuelType
+              then max 0 (annualPurchasedEnergyUnits - homePurchasedEnergyUnits)
+              else 0
           tireCost =
             tireReplacementCost
               * fromIntegral (tireReplacementCount tireLifeMiles priorMilesDriven (priorMilesDriven + yearlyMiles))
@@ -308,13 +325,21 @@ simulateYears yearsRemaining carValue baseAnnualMiles annualMileageChangeRate ci
               priorMilesDriven
               actualCumulativeMiles
           (fuelPrice, gen1) = sampleBoundedNormal fuelModel gen0
-          (maintenanceCost, gen2) = sampleBoundedNormal maintenanceModel gen1
-          (repairShockRoll, gen3) = randomR (0.0, 1.0 :: Double) gen2
-          (repairShockCost, gen4) =
+          (publicChargingPrice, gen2) =
+            if isElectricFuelType fuelType
+              then sampleBoundedNormal publicChargingPriceModel gen1
+              else (0, gen1)
+          annualEnergyCost =
+            if isElectricFuelType fuelType
+              then homePurchasedEnergyUnits * fuelPrice + publicPurchasedEnergyUnits * publicChargingPrice
+              else annualEnergyUnits * fuelPrice
+          (maintenanceCost, gen3) = sampleBoundedNormal maintenanceModel gen2
+          (repairShockRoll, gen4) = randomR (0.0, 1.0 :: Double) gen3
+          (repairShockCost, gen5) =
             if repairShockRoll < repairShockProbability
-              then sampleBoundedNormal repairShockModel gen3
-              else (0, gen3)
-          (sampledDepreciationRate, gen5) = sampleBoundedNormal depreciationModel gen4
+              then sampleBoundedNormal repairShockModel gen4
+              else (0, gen4)
+          (sampledDepreciationRate, gen6) = sampleBoundedNormal depreciationModel gen5
           depreciationRate =
             effectiveDepreciationRate sampledDepreciationRate firstYearDepreciationBonus yearIndex
           residualFloorValue = carValue * residualValueFloorPercent
@@ -331,7 +356,7 @@ simulateYears yearsRemaining carValue baseAnnualMiles annualMileageChangeRate ci
                 sampledYearFuelGallons = annualGallons,
                 sampledYearCityFuelGallons = cityGallons,
                 sampledYearHighwayFuelGallons = highwayGallons,
-                sampledYearFuelCost = annualEnergyUnits * fuelPrice,
+                sampledYearFuelCost = annualEnergyCost,
                 sampledYearMaintenanceCost = maintenanceCost,
                 sampledYearRepairShockCost = repairShockCost,
                 sampledYearTireCost = tireCost,
@@ -342,7 +367,7 @@ simulateYears yearsRemaining carValue baseAnnualMiles annualMileageChangeRate ci
                 sampledYearDepreciationLoss = max 0 (currentValue - nextValue),
                 sampledYearEndingVehicleValue = nextValue
               }
-       in go (remaining - 1) (yearIndex + 1) nextValue (priorMilesDriven + yearlyMiles) (sampledYear : acc) gen5
+       in go (remaining - 1) (yearIndex + 1) nextValue (priorMilesDriven + yearlyMiles) (sampledYear : acc) gen6
 
 data FinancingSnapshot = FinancingSnapshot
   { financingUpfrontPayment :: Double,
@@ -595,6 +620,16 @@ electricKilowattHoursForYear yearlyMiles milesPerGallonEquivalent
   | milesPerGallonEquivalent <= 0 = 0
   | otherwise = yearlyMiles * kilowattHoursPerGallonEquivalent / milesPerGallonEquivalent
 
+purchasedEnergyUnitsForYear :: String -> Double -> Double -> Double
+purchasedEnergyUnitsForYear fuelType energyUnits chargingLossRate
+  | isElectricFuelType fuelType = purchasedElectricKilowattHours energyUnits chargingLossRate
+  | otherwise = energyUnits
+
+purchasedElectricKilowattHours :: Double -> Double -> Double
+purchasedElectricKilowattHours deliveredKilowattHours chargingLossRate
+  | deliveredKilowattHours <= 0 = 0
+  | otherwise = deliveredKilowattHours / max 1.0e-6 (1 - clampChargingLossRate chargingLossRate)
+
 kilowattHoursPerGallonEquivalent :: Double
 kilowattHoursPerGallonEquivalent = 33.7
 
@@ -608,6 +643,10 @@ normalizeFuelType rawFuelType
 isElectricFuelType :: String -> Bool
 isElectricFuelType fuelType =
   normalizeFuelType fuelType == "electric"
+
+clampChargingLossRate :: Double -> Double
+clampChargingLossRate =
+  max 0 . min 0.99
 
 expectedCumulativeMilesForYear :: Double -> Int -> Double
 expectedCumulativeMilesForYear expectedAnnualMiles yearIndex =
@@ -674,6 +713,10 @@ validateSimulationInput simulationInput =
       require (simulationCityDrivingShare simulationInput >= 0) "City driving share cannot be negative.",
       require (simulationCityDrivingShare simulationInput <= 1) "City driving share should be expressed as a decimal between 0 and 1.",
       require (normalizeFuelType (simulationFuelType simulationInput) `elem` ["gasoline", "hybrid-gasoline", "plug-in-hybrid", "diesel", "electric"]) "Fuel type must be gasoline, hybrid-gasoline, plug-in-hybrid, diesel, or electric.",
+      require (simulationHomeChargingShare simulationInput >= 0) "Home charging share cannot be negative.",
+      require (simulationHomeChargingShare simulationInput <= 1) "Home charging share should be expressed as a decimal between 0 and 1.",
+      require (simulationChargingLossRate simulationInput >= 0) "Charging loss rate cannot be negative.",
+      require (simulationChargingLossRate simulationInput < 1) "Charging loss rate should be expressed as a decimal between 0 and less than 1.",
       require (simulationMilesPerGallon simulationInput > 0) "Combined efficiency must be greater than 0.",
       require (simulationCityMilesPerGallon simulationInput > 0) "City efficiency must be greater than 0.",
       require (simulationHighwayMilesPerGallon simulationInput > 0) "Highway efficiency must be greater than 0.",
@@ -697,6 +740,7 @@ validateSimulationInput simulationInput =
       require (simulationRepairShockProbability simulationInput <= 1) "Repair shock probability should be expressed as a decimal between 0 and 1.",
       validateBoundedNormal "Repair shock cost" False (simulationRepairShockCost simulationInput),
       validateBoundedNormal "Energy price" False (simulationFuelPrice simulationInput),
+      validateBoundedNormal "Public charging price" False (simulationPublicChargingPrice simulationInput),
       validateBoundedNormal "Annual maintenance" False (simulationAnnualMaintenance simulationInput),
       validateBoundedNormal "Annual depreciation rate" True (simulationAnnualDepreciationRate simulationInput)
     ]

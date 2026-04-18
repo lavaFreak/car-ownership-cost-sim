@@ -59,6 +59,8 @@ data SimulationInput = SimulationInput
     simulationAnnualMileageChangeRate :: Double,
     simulationCityDrivingShare :: Double,
     simulationFuelType :: String,
+    simulationHomeChargingShare :: Double,
+    simulationChargingLossRate :: Double,
     simulationMilesPerGallon :: Double,
     simulationCityMilesPerGallon :: Double,
     simulationHighwayMilesPerGallon :: Double,
@@ -78,6 +80,7 @@ data SimulationInput = SimulationInput
     simulationRepairShockProbability :: Double,
     simulationRepairShockCost :: BoundedNormal,
     simulationFuelPrice :: BoundedNormal,
+    simulationPublicChargingPrice :: BoundedNormal,
     simulationAnnualMaintenance :: BoundedNormal,
     simulationAnnualDepreciationRate :: BoundedNormal
   }
@@ -235,6 +238,8 @@ exampleSimulationRequest =
             simulationAnnualMileageChangeRate = 0.02,
             simulationCityDrivingShare = 0.58,
             simulationFuelType = "gasoline",
+            simulationHomeChargingShare = 0.82,
+            simulationChargingLossRate = 0.1,
             simulationMilesPerGallon = 32,
             simulationCityMilesPerGallon = 28,
             simulationHighwayMilesPerGallon = 38,
@@ -265,6 +270,13 @@ exampleSimulationRequest =
                   boundedNormalStdDev = 0.55,
                   boundedNormalLowerBound = 2.4,
                   boundedNormalUpperBound = Just 6.5
+                },
+            simulationPublicChargingPrice =
+              BoundedNormal
+                { boundedNormalMean = 0.43,
+                  boundedNormalStdDev = 0.1,
+                  boundedNormalLowerBound = 0.2,
+                  boundedNormalUpperBound = Just 0.95
                 },
             simulationAnnualMaintenance =
               BoundedNormal

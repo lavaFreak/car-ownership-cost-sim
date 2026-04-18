@@ -28,7 +28,9 @@ The check script currently runs:
 3. `node --check static/app.js`
 
 It also defaults Cabal state into `/tmp`-backed directories so the command
-works more reliably in sandboxed or ephemeral environments.
+works more reliably in sandboxed or ephemeral environments. If that temporary
+Cabal home does not already have a package index, the script now falls back to
+the normal user Cabal home automatically.
 
 ## What the test suite covers
 

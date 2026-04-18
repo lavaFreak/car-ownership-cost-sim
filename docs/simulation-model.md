@@ -35,6 +35,8 @@ The following pieces are deterministic once a scenario input is fixed:
 - city efficiency
 - highway efficiency
 - fuel or powertrain type
+- home charging share for EVs
+- charging loss rate for EVs
 - annual insurance
 - annual registration
 - annual parking
@@ -53,6 +55,7 @@ These inputs determine:
 - yearly inflation multipliers
 - miles driven by year
 - city and highway gallons consumed by year
+- EV purchased-from-grid kWh after charging losses and home/public split
 - tire replacement timing from cumulative miles
 - recurring local ownership costs
 - the floor-limited part of the resale path
@@ -63,6 +66,7 @@ These inputs determine:
 The following inputs are sampled during each run:
 
 - fuel price
+- public charging price for EVs
 - annual maintenance
 - annual depreciation rate
 - repair shock event occurrence
@@ -88,6 +92,7 @@ For each modeled year, the simulator currently computes:
 - miles driven for the year
 - city and highway miles for the year
 - city and highway energy consumed for the year
+- EV purchased-from-grid energy after charging losses
 - sampled fuel or charging cost
 - sampled maintenance cost
 - sampled repair shock cost, if triggered
@@ -159,7 +164,8 @@ important simplifications:
   even though the model now includes first-year loss, mileage penalties, and a
   floor on residual value
 - energy use now distinguishes city and highway efficiency, and EVs now switch
-  to charging-cost math, but the model still assumes one fixed city-driving
+  to charging-cost math with separate home and public electricity pricing plus
+  charging-loss overhead, but the model still assumes one fixed city-driving
   share across the full ownership horizon
 - maintenance and repair shocks are independent draws rather than age- or
   mileage-conditioned processes

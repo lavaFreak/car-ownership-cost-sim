@@ -43,6 +43,8 @@ The request body is JSON with this top-level shape:
     "simulationAnnualMileageChangeRate": 0.02,
     "simulationCityDrivingShare": 0.58,
     "simulationFuelType": "gasoline",
+    "simulationHomeChargingShare": 0.82,
+    "simulationChargingLossRate": 0.1,
     "simulationMilesPerGallon": 32,
     "simulationCityMilesPerGallon": 28,
     "simulationHighwayMilesPerGallon": 38,
@@ -67,6 +69,12 @@ The request body is JSON with this top-level shape:
       "boundedNormalStdDev": 0.55,
       "boundedNormalLowerBound": 2.4,
       "boundedNormalUpperBound": 6.5
+    },
+    "simulationPublicChargingPrice": {
+      "boundedNormalMean": 0.43,
+      "boundedNormalStdDev": 0.1,
+      "boundedNormalLowerBound": 0.2,
+      "boundedNormalUpperBound": 0.95
     },
     "simulationAnnualMaintenance": {
       "boundedNormalMean": 850,
@@ -96,6 +104,15 @@ The request body is JSON with this top-level shape:
 - bounded-normal inputs are used for uncertain variables
 - `simulationFuelType` controls whether the energy-price distribution is
   interpreted as dollars per gallon or dollars per kWh
+- `simulationHomeChargingShare` and `simulationChargingLossRate` only affect
+  EV scenarios
+  - they model how much charging happens at home and how much purchased
+    electricity is lost before it reaches the battery
+- `simulationFuelPrice` is the main energy-price distribution
+  - for gasoline-like vehicles it is fuel price per gallon
+  - for EVs it is home electricity price per kWh
+- `simulationPublicChargingPrice` is only used for EVs
+  - it models away-from-home charging price per kWh
 - `simulationMilesPerGallon` is the derived blended efficiency for the chosen
   city/highway split
   - for gasoline-like vehicles it is MPG

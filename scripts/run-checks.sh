@@ -2,13 +2,23 @@
 
 # Unified local verification entrypoint used by both developers and CI.
 #
-# The script keeps Cabal's writable state under /tmp by default so it behaves
-# well in sandboxed environments.
+# The script prefers a throwaway Cabal home under /tmp when it already has a
+# package index, but it falls back to the user's normal Cabal home when /tmp is
+# empty. That keeps sandboxed runs tidy without breaking local verification on a
+# fresh machine.
 
 set -euo pipefail
 
-CABAL_DIR="${CABAL_DIR:-/tmp/cabal}"
-XDG_CACHE_HOME="${XDG_CACHE_HOME:-/tmp/xdg}"
+default_cabal_dir="/tmp/cabal"
+default_xdg_cache_home="/tmp/xdg"
+
+if [[ ! -e "${default_cabal_dir}/packages/hackage.haskell.org/01-index.cache" && -e "${HOME}/.cabal/packages/hackage.haskell.org/01-index.cache" ]]; then
+  default_cabal_dir="${HOME}/.cabal"
+  default_xdg_cache_home="${HOME}/.cache"
+fi
+
+CABAL_DIR="${CABAL_DIR:-${default_cabal_dir}}"
+XDG_CACHE_HOME="${XDG_CACHE_HOME:-${default_xdg_cache_home}}"
 CABAL_STORE_DIR="${CABAL_STORE_DIR:-${CABAL_DIR}/store}"
 
 echo "==> cabal build"

@@ -18,6 +18,7 @@ const vehicleLookupStatus = document.getElementById("vehicle-lookup-status");
 const vehicleMatchCount = document.getElementById("vehicle-match-count");
 const presetDescription = document.getElementById("preset-description");
 const fuelTypeSelect = document.getElementById("fuel-type");
+const evChargingFieldset = document.getElementById("ev-charging-fieldset");
 const cityEfficiencyLabel = document.getElementById("city-efficiency-label");
 const highwayEfficiencyLabel = document.getElementById("highway-efficiency-label");
 const energyPriceMeanLabel = document.getElementById("energy-price-mean-label");
@@ -82,6 +83,8 @@ const shareFieldNames = [
   "annualMileageChangePercent",
   "cityDrivingSharePercent",
   "fuelType",
+  "homeChargingSharePercent",
+  "chargingLossPercent",
   "cityMilesPerGallon",
   "highwayMilesPerGallon",
   "annualInsurance",
@@ -96,6 +99,8 @@ const shareFieldNames = [
   "tireLifeMiles",
   "fuelMean",
   "fuelStdDev",
+  "publicChargingMean",
+  "publicChargingStdDev",
   "maintenanceMean",
   "maintenanceStdDev",
   "repairShockProbabilityPercent",
@@ -160,12 +165,21 @@ function isElectricFuelType(value) {
 function defaultEnergyPriceProfile(fuelType) {
   switch (normalizedFuelType(fuelType)) {
     case "electric":
-      return { mean: 0.17, stdDev: 0.05 };
+      return { mean: 0.16, stdDev: 0.04 };
     case "diesel":
       return { mean: 4.15, stdDev: 0.6 };
     default:
       return { mean: 3.75, stdDev: 0.55 };
   }
+}
+
+function defaultEvChargingProfile() {
+  return {
+    homeSharePercent: 82,
+    chargingLossPercent: 10,
+    publicMean: 0.43,
+    publicStdDev: 0.1,
+  };
 }
 
 function energyCostLabel(fuelType) {
@@ -183,13 +197,15 @@ function efficiencyLabelPrefix(fuelType) {
 function applyFuelTypeLabels(fuelType = fuelTypeSelect.value) {
   const normalized = normalizedFuelType(fuelType);
   const efficiencyLabel = efficiencyLabelPrefix(normalized);
+  const isElectric = isElectricFuelType(normalized);
 
   cityEfficiencyLabel.textContent = `City ${efficiencyLabel}`;
   highwayEfficiencyLabel.textContent = `Highway ${efficiencyLabel}`;
+  evChargingFieldset.hidden = !isElectric;
 
-  if (isElectricFuelType(normalized)) {
-    energyPriceMeanLabel.textContent = "Electricity price mean ($/kWh)";
-    energyPriceStdDevLabel.textContent = "Electricity price std dev";
+  if (isElectric) {
+    energyPriceMeanLabel.textContent = "Home electricity price mean ($/kWh)";
+    energyPriceStdDevLabel.textContent = "Home electricity price std dev";
     return;
   }
 
@@ -201,6 +217,16 @@ function applyEnergyDefaultsForFuelType(fuelType) {
   const defaults = defaultEnergyPriceProfile(fuelType);
   setNumericField("fuelMean", defaults.mean.toFixed(2));
   setNumericField("fuelStdDev", defaults.stdDev.toFixed(2));
+
+  if (!isElectricFuelType(fuelType)) {
+    return;
+  }
+
+  const chargingDefaults = defaultEvChargingProfile();
+  setNumericField("homeChargingSharePercent", chargingDefaults.homeSharePercent);
+  setNumericField("chargingLossPercent", chargingDefaults.chargingLossPercent);
+  setNumericField("publicChargingMean", chargingDefaults.publicMean.toFixed(2));
+  setNumericField("publicChargingStdDev", chargingDefaults.publicStdDev.toFixed(2));
 }
 
 function showToolFeedback(message, isError = false) {
@@ -546,6 +572,8 @@ function collectFormValues() {
     annualMileageChangePercent: numericValue("annualMileageChangePercent"),
     cityDrivingSharePercent: numericValue("cityDrivingSharePercent"),
     fuelType: normalizedFuelType(fieldValue("fuelType")),
+    homeChargingSharePercent: numericValue("homeChargingSharePercent"),
+    chargingLossPercent: numericValue("chargingLossPercent"),
     cityMilesPerGallon: numericValue("cityMilesPerGallon"),
     highwayMilesPerGallon: numericValue("highwayMilesPerGallon"),
     annualInsurance: numericValue("annualInsurance"),
@@ -560,6 +588,8 @@ function collectFormValues() {
     tireLifeMiles: numericValue("tireLifeMiles"),
     fuelMean: numericValue("fuelMean"),
     fuelStdDev: numericValue("fuelStdDev"),
+    publicChargingMean: numericValue("publicChargingMean"),
+    publicChargingStdDev: numericValue("publicChargingStdDev"),
     maintenanceMean: numericValue("maintenanceMean"),
     maintenanceStdDev: numericValue("maintenanceStdDev"),
     repairShockProbabilityPercent: numericValue("repairShockProbabilityPercent"),
@@ -848,6 +878,8 @@ function buildRequestPayload(values) {
       simulationAnnualMileageChangeRate: values.annualMileageChangePercent / 100,
       simulationCityDrivingShare: cityDrivingShare,
       simulationFuelType: values.fuelType,
+      simulationHomeChargingShare: values.homeChargingSharePercent / 100,
+      simulationChargingLossRate: values.chargingLossPercent / 100,
       simulationMilesPerGallon: combinedMilesPerGallon,
       simulationCityMilesPerGallon: values.cityMilesPerGallon,
       simulationHighwayMilesPerGallon: values.highwayMilesPerGallon,
@@ -877,6 +909,12 @@ function buildRequestPayload(values) {
         values.fuelStdDev,
         Math.max(0, values.fuelMean - values.fuelStdDev * 3),
         values.fuelMean + values.fuelStdDev * 3
+      ),
+      simulationPublicChargingPrice: buildBoundedNormal(
+        values.publicChargingMean,
+        values.publicChargingStdDev,
+        Math.max(0, values.publicChargingMean - values.publicChargingStdDev * 3),
+        values.publicChargingMean + values.publicChargingStdDev * 3
       ),
       simulationAnnualMaintenance: buildBoundedNormal(
         values.maintenanceMean,
@@ -1385,6 +1423,28 @@ function validateFormValues(values) {
   }
 
   if (
+    validateRequiredNumber(errors, values, "homeChargingSharePercent", "Home charging share") &&
+    (values.homeChargingSharePercent < 0 || values.homeChargingSharePercent > 100)
+  ) {
+    pushValidationError(
+      errors,
+      "homeChargingSharePercent",
+      "Home charging share must be between 0% and 100%."
+    );
+  }
+
+  if (
+    validateRequiredNumber(errors, values, "chargingLossPercent", "Charging loss") &&
+    (values.chargingLossPercent < 0 || values.chargingLossPercent >= 100)
+  ) {
+    pushValidationError(
+      errors,
+      "chargingLossPercent",
+      "Charging loss must be between 0% and less than 100%."
+    );
+  }
+
+  if (
     validateRequiredNumber(errors, values, "cityMilesPerGallon", "City efficiency") &&
     values.cityMilesPerGallon <= 0
   ) {
@@ -1468,6 +1528,24 @@ function validateFormValues(values) {
 
   if (validateRequiredNumber(errors, values, "fuelStdDev", "Energy price standard deviation") && values.fuelStdDev < 0) {
     pushValidationError(errors, "fuelStdDev", "Energy price standard deviation cannot be negative.");
+  }
+
+  if (
+    validateRequiredNumber(errors, values, "publicChargingMean", "Public charging price mean") &&
+    values.publicChargingMean < 0
+  ) {
+    pushValidationError(errors, "publicChargingMean", "Public charging price mean cannot be negative.");
+  }
+
+  if (
+    validateRequiredNumber(errors, values, "publicChargingStdDev", "Public charging standard deviation") &&
+    values.publicChargingStdDev < 0
+  ) {
+    pushValidationError(
+      errors,
+      "publicChargingStdDev",
+      "Public charging standard deviation cannot be negative."
+    );
   }
 
   if (
@@ -1700,6 +1778,34 @@ function formatEnergyUnits(value, fuelType) {
   return `${Math.round(value).toLocaleString()} ${unitLabel}`;
 }
 
+function formatPercentage(value) {
+  return `${value.toFixed(1)}%`;
+}
+
+function latestScenarioValues() {
+  return latestRun?.inputValues || null;
+}
+
+function electricChargingBreakdown(deliveredEnergyUnits, values) {
+  const homeSharePercent = Number.isFinite(values?.homeChargingSharePercent) ? values.homeChargingSharePercent : 0;
+  const chargingLossPercent = Number.isFinite(values?.chargingLossPercent) ? values.chargingLossPercent : 0;
+  const homeShare = Math.max(0, Math.min(1, homeSharePercent / 100));
+  const chargingLossRate = Math.max(0, Math.min(0.99, chargingLossPercent / 100));
+  const purchasedEnergyUnits =
+    deliveredEnergyUnits > 0 ? deliveredEnergyUnits / Math.max(1.0e-6, 1 - chargingLossRate) : 0;
+  const homeEnergyUnits = purchasedEnergyUnits * homeShare;
+  const publicEnergyUnits = Math.max(0, purchasedEnergyUnits - homeEnergyUnits);
+  const chargingOverhead = Math.max(0, purchasedEnergyUnits - deliveredEnergyUnits);
+
+  return {
+    purchasedEnergyUnits,
+    homeEnergyUnits,
+    publicEnergyUnits,
+    chargingOverhead,
+    chargingLossPercent: chargingLossRate * 100,
+  };
+}
+
 function renderSummary(response) {
   const summary = response.responseSummary;
   renderCards(summaryGrid, [
@@ -1744,6 +1850,7 @@ function renderInsights(response) {
   const summary = response.responseSummary;
   const yearlyBreakdown = response.responseExampleYearlyBreakdown || [];
   const fuelType = latestRun?.fuelType || normalizedFuelType(fuelTypeSelect.value);
+  const scenarioValues = latestScenarioValues();
   const yearsOwned = Math.max(1, yearlyBreakdown.length || 1);
   const spread = summary.summaryP90TotalCost - summary.summaryP10TotalCost;
   const endingEquity = yearlyBreakdown.length
@@ -1752,12 +1859,15 @@ function renderInsights(response) {
   const totalEnergyUnits = yearlyBreakdown.reduce((sum, year) => sum + year.yearlyEnergyUnitsConsumed, 0);
   const blendedEfficiency =
     totalEnergyUnits > 0 ? summary.summaryTotalMilesDriven / totalEnergyUnits : null;
+  const chargingProfile = isElectricFuelType(fuelType)
+    ? electricChargingBreakdown(totalEnergyUnits, scenarioValues)
+    : null;
   const repairShockShare =
     response.responseExampleBreakdown.costTotal <= 0
       ? null
       : response.responseExampleBreakdown.costRepairShocks / response.responseExampleBreakdown.costTotal;
 
-  renderCards(insightGrid, [
+  const insightCards = [
     {
       label: "Typical yearly cost",
       value: currency.format(summary.summaryMedianTotalCost / yearsOwned),
@@ -1771,7 +1881,7 @@ function renderInsights(response) {
       value: formatMiles(summary.summaryTotalMilesDriven),
     },
     {
-      label: isElectricFuelType(fuelType) ? "Blended sample mi/kWh" : "Blended sample MPG",
+      label: isElectricFuelType(fuelType) ? "Delivered sample mi/kWh" : "Blended sample MPG",
       value: blendedEfficiency === null ? "N/A" : blendedEfficiency.toFixed(1),
     },
     {
@@ -1786,12 +1896,25 @@ function renderInsights(response) {
       label: "Repair-shock share",
       value: repairShockShare === null ? "N/A" : `${Math.round(repairShockShare * 100)}%`,
     },
-  ]);
+  ];
+
+  if (chargingProfile) {
+    insightCards.push({
+      label: "Charging overhead",
+      value:
+        chargingProfile.purchasedEnergyUnits <= 0
+          ? "N/A"
+          : formatPercentage((chargingProfile.chargingOverhead / chargingProfile.purchasedEnergyUnits) * 100),
+    });
+  }
+
+  renderCards(insightGrid, insightCards);
 }
 
 function renderYearlyBreakdown(response) {
   const yearlyBreakdown = response.responseExampleYearlyBreakdown || [];
   const fuelType = latestRun?.fuelType || normalizedFuelType(fuelTypeSelect.value);
+  const scenarioValues = latestScenarioValues();
 
   if (!yearlyBreakdown.length) {
     renderYearlyBreakdownPlaceholder();
@@ -1799,19 +1922,29 @@ function renderYearlyBreakdown(response) {
   }
 
   yearlyGrid.innerHTML = yearlyBreakdown
-    .map(
-      (year) => `
-        <article class="yearly-card">
-          <h4>Year ${year.yearlyYear}</h4>
-          <dl>
-            <div><dt>Miles driven</dt><dd>${formatMiles(year.yearlyMilesDriven)}</dd></div>
-            <div><dt>City + highway miles</dt><dd>${formatMiles(year.yearlyCityMilesDriven)} / ${formatMiles(
-              year.yearlyHighwayMilesDriven
-            )}</dd></div>
-            <div><dt>${isElectricFuelType(fuelType) ? "Charging used" : "Fuel burned"}</dt><dd>${formatEnergyUnits(
-              year.yearlyEnergyUnitsConsumed,
+    .map((year) => {
+      const chargingProfile = isElectricFuelType(fuelType)
+        ? electricChargingBreakdown(year.yearlyEnergyUnitsConsumed, scenarioValues)
+        : null;
+      const energySection = chargingProfile
+        ? `
+            <div><dt>Battery energy used</dt><dd>${formatEnergyUnits(year.yearlyEnergyUnitsConsumed, fuelType)}</dd></div>
+            <div><dt>Purchased from grid</dt><dd>${formatEnergyUnits(
+              chargingProfile.purchasedEnergyUnits,
               fuelType
             )}</dd></div>
+            <div><dt>Home + public charging</dt><dd>${formatEnergyUnits(
+              chargingProfile.homeEnergyUnits,
+              fuelType
+            )} / ${formatEnergyUnits(chargingProfile.publicEnergyUnits, fuelType)}</dd></div>
+            <div><dt>City + highway battery use</dt><dd>${formatEnergyUnits(
+              year.yearlyCityEnergyUnitsConsumed,
+              fuelType
+            )} / ${formatEnergyUnits(year.yearlyHighwayEnergyUnitsConsumed, fuelType)}</dd></div>
+            <div><dt>Charging loss</dt><dd>${formatPercentage(chargingProfile.chargingLossPercent)}</dd></div>
+          `
+        : `
+            <div><dt>Fuel burned</dt><dd>${formatEnergyUnits(year.yearlyEnergyUnitsConsumed, fuelType)}</dd></div>
             <div><dt>City + highway ${energyUnitLabel(fuelType)}</dt><dd>${formatEnergyUnits(
               year.yearlyCityEnergyUnitsConsumed,
               fuelType
@@ -1819,6 +1952,17 @@ function renderYearlyBreakdown(response) {
               year.yearlyHighwayEnergyUnitsConsumed,
               fuelType
             )}</dd></div>
+          `;
+
+      return `
+        <article class="yearly-card">
+          <h4>Year ${year.yearlyYear}</h4>
+          <dl>
+            <div><dt>Miles driven</dt><dd>${formatMiles(year.yearlyMilesDriven)}</dd></div>
+            <div><dt>City + highway miles</dt><dd>${formatMiles(year.yearlyCityMilesDriven)} / ${formatMiles(
+              year.yearlyHighwayMilesDriven
+            )}</dd></div>
+            ${energySection}
             <div><dt>Total for year</dt><dd>${currency.format(year.yearlyTotalCost)}</dd></div>
             <div><dt>Year 1 purchase costs</dt><dd>${currency.format(year.yearlyPurchaseTax + year.yearlyUpfrontFees)}</dd></div>
             <div><dt>Insurance + registration</dt><dd>${currency.format(
@@ -1842,8 +1986,8 @@ function renderYearlyBreakdown(response) {
             <div><dt>Estimated equity</dt><dd>${currency.format(year.yearlyEstimatedEquity)}</dd></div>
           </dl>
         </article>
-      `
-    )
+      `;
+    })
     .join("");
 }
 
@@ -2125,6 +2269,7 @@ async function runSimulation() {
     latestRun = {
       label: buildScenarioLabel(values),
       fuelType: normalizedFuelType(values.fuelType),
+      inputValues: cloneData(values),
       response: cloneData(payload),
     };
     replaceUrlWithCurrentScenario();

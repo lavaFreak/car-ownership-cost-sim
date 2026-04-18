@@ -22,6 +22,7 @@ The app asks for values such as:
 - miles driven per year
 - annual mileage change over time
 - city-driving share plus city and highway efficiency
+- EV charging mix, home/public electricity pricing, and charging loss
 - yearly insurance, registration, parking, tolls, and inspection
 - tire replacement assumptions
 - assumptions about energy price, maintenance, and depreciation
@@ -164,7 +165,7 @@ The yearly model now also applies:
 - annual inflation to recurring costs such as fuel, maintenance, insurance, registration, parking, tolls, inspection, tires, and repair shocks
 - annual mileage change so fuel use and tire wear can grow or shrink over time
 - city/highway energy use using a configurable city-driving share instead of one flat efficiency assumption
-- EV charging cost modeling that uses electricity price per kWh instead of gasoline price
+- EV charging cost modeling that uses electricity price per kWh instead of gasoline price, including home/public charging mix and charging-loss overhead
 - loan amortization with interest tracked separately from principal in the yearly breakdown
 - a first-year resale hit on top of the sampled annual depreciation rate
 - a residual value floor so resale cannot fall below a configured minimum
@@ -207,6 +208,10 @@ For a quick local verification pass:
 ```bash
 ./scripts/run-checks.sh
 ```
+
+The check script now prefers a temporary `/tmp` Cabal home when it already has
+an index, but it automatically falls back to the normal user Cabal home when
+that temporary cache is empty.
 
 To rebuild the local catalog from the current API-backed source seeds and
 roster:

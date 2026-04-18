@@ -80,6 +80,7 @@ tests =
       TestLabel "mileage growth and tire wear affect deterministic totals" mileageGrowthAndTireWearTest,
       TestLabel "city and highway MPG split shapes fuel costs" cityHighwayFuelSplitTest,
       TestLabel "electric vehicles use charging costs instead of gas prices" electricChargingCostTest,
+      TestLabel "EV charging mix and losses change purchased energy cost" electricChargingMixAndLossTest,
       TestLabel "local recurring costs inflate over time" localRecurringCostsInflationTest,
       TestLabel "vehicle catalog loads and drives presets" vehicleCatalogTest,
       TestLabel "catalog import seeds build normalized entries" catalogImportSeedTest,
@@ -126,6 +127,8 @@ deterministicCashPurchaseTest =
                     simulationAnnualMileageChangeRate = 0,
                     simulationCityDrivingShare = 0.5,
                     simulationFuelType = "gasoline",
+                    simulationHomeChargingShare = 0,
+                    simulationChargingLossRate = 0,
                     simulationMilesPerGallon = 30,
                     simulationCityMilesPerGallon = 30,
                     simulationHighwayMilesPerGallon = 30,
@@ -157,6 +160,7 @@ deterministicCashPurchaseTest =
                           boundedNormalLowerBound = 4,
                           boundedNormalUpperBound = Just 4
                         },
+                    simulationPublicChargingPrice = deterministicBoundedNormal 0,
                     simulationAnnualMaintenance =
                       BoundedNormal
                         { boundedNormalMean = 500,
@@ -214,6 +218,8 @@ purchaseTaxAndFeesTest =
                     simulationAnnualMileageChangeRate = 0,
                     simulationCityDrivingShare = 0.5,
                     simulationFuelType = "gasoline",
+                    simulationHomeChargingShare = 0,
+                    simulationChargingLossRate = 0,
                     simulationMilesPerGallon = 30,
                     simulationCityMilesPerGallon = 30,
                     simulationHighwayMilesPerGallon = 30,
@@ -245,6 +251,7 @@ purchaseTaxAndFeesTest =
                           boundedNormalLowerBound = 4,
                           boundedNormalUpperBound = Just 4
                         },
+                    simulationPublicChargingPrice = deterministicBoundedNormal 0,
                     simulationAnnualMaintenance =
                       BoundedNormal
                         { boundedNormalMean = 0,
@@ -293,6 +300,8 @@ inflationTest =
                     simulationAnnualMileageChangeRate = 0,
                     simulationCityDrivingShare = 0.5,
                     simulationFuelType = "gasoline",
+                    simulationHomeChargingShare = 0,
+                    simulationChargingLossRate = 0,
                     simulationMilesPerGallon = 30,
                     simulationCityMilesPerGallon = 30,
                     simulationHighwayMilesPerGallon = 30,
@@ -324,6 +333,7 @@ inflationTest =
                           boundedNormalLowerBound = 1,
                           boundedNormalUpperBound = Just 1
                         },
+                    simulationPublicChargingPrice = deterministicBoundedNormal 0,
                     simulationAnnualMaintenance =
                       BoundedNormal
                         { boundedNormalMean = 200,
@@ -377,6 +387,8 @@ repairShockTest =
                     simulationAnnualMileageChangeRate = 0,
                     simulationCityDrivingShare = 0.5,
                     simulationFuelType = "gasoline",
+                    simulationHomeChargingShare = 0,
+                    simulationChargingLossRate = 0,
                     simulationMilesPerGallon = 30,
                     simulationCityMilesPerGallon = 30,
                     simulationHighwayMilesPerGallon = 30,
@@ -408,6 +420,7 @@ repairShockTest =
                           boundedNormalLowerBound = 0,
                           boundedNormalUpperBound = Just 0
                         },
+                    simulationPublicChargingPrice = deterministicBoundedNormal 0,
                     simulationAnnualMaintenance =
                       BoundedNormal
                         { boundedNormalMean = 0,
@@ -655,10 +668,13 @@ electricChargingCostTest =
                 simulationAnnualMiles = 10000,
                 simulationCityDrivingShare = 0.5,
                 simulationFuelType = "electric",
+                simulationHomeChargingShare = 1,
+                simulationChargingLossRate = 0,
                 simulationMilesPerGallon = 100,
                 simulationCityMilesPerGallon = 100,
                 simulationHighwayMilesPerGallon = 100,
-                simulationFuelPrice = deterministicBoundedNormal 0.15
+                simulationFuelPrice = deterministicBoundedNormal 0.15,
+                simulationPublicChargingPrice = deterministicBoundedNormal 0.45
               }
         response = simulateRequestWithSeed 46 request
         breakdown = responseExampleBreakdown response
@@ -673,6 +689,38 @@ electricChargingCostTest =
         assertClose "city energy is tracked separately" (expectedKilowattHours / 2) (yearlyCityEnergyUnitsConsumed yearOne)
         assertClose "highway energy is tracked separately" (expectedKilowattHours / 2) (yearlyHighwayEnergyUnitsConsumed yearOne)
       _ -> assertFailure "Expected exactly one yearly breakdown row."
+
+electricChargingMixAndLossTest :: Test
+electricChargingMixAndLossTest =
+  TestCase $ do
+    let request =
+          deterministicRequest
+            47
+            baselineSimulationInput
+              { simulationPurchasePrice = 10000,
+                simulationYearsOwned = 1,
+                simulationAnnualMiles = 10000,
+                simulationCityDrivingShare = 0.5,
+                simulationFuelType = "electric",
+                simulationHomeChargingShare = 0.75,
+                simulationChargingLossRate = 0.1,
+                simulationMilesPerGallon = 100,
+                simulationCityMilesPerGallon = 100,
+                simulationHighwayMilesPerGallon = 100,
+                simulationFuelPrice = deterministicBoundedNormal 0.12,
+                simulationPublicChargingPrice = deterministicBoundedNormal 0.36
+              }
+        response = simulateRequestWithSeed 47 request
+        breakdown = responseExampleBreakdown response
+        deliveredKilowattHours = 10000 * 33.7 / 100
+        purchasedKilowattHours = deliveredKilowattHours / 0.9
+        expectedChargingCost =
+          purchasedKilowattHours * 0.75 * 0.12
+            + purchasedKilowattHours * 0.25 * 0.36
+    assertClose "charging mix and losses change EV operating cost" expectedChargingCost (costFuel breakdown)
+    assertBool
+      "public charging plus losses cost more than the ideal home-only case"
+      (costFuel breakdown > deliveredKilowattHours * 0.12)
 
 localRecurringCostsInflationTest :: Test
 localRecurringCostsInflationTest =
@@ -1198,6 +1246,8 @@ invalidInputValidationTest =
                     simulationAnnualMileageChangeRate = 1.2,
                     simulationCityDrivingShare = 1.2,
                     simulationFuelType = "gasoline",
+                    simulationHomeChargingShare = 1.2,
+                    simulationChargingLossRate = 1.1,
                     simulationMilesPerGallon = 0,
                     simulationCityMilesPerGallon = 0,
                     simulationHighwayMilesPerGallon = 0,
@@ -1229,6 +1279,13 @@ invalidInputValidationTest =
                           boundedNormalLowerBound = 2,
                           boundedNormalUpperBound = Just 5
                         },
+                    simulationPublicChargingPrice =
+                      BoundedNormal
+                        { boundedNormalMean = 0.4,
+                          boundedNormalStdDev = 0.1,
+                          boundedNormalLowerBound = 0.2,
+                          boundedNormalUpperBound = Just 0.8
+                        },
                     simulationAnnualMaintenance =
                       BoundedNormal
                         { boundedNormalMean = 800,
@@ -1256,6 +1313,8 @@ invalidInputValidationTest =
     assertBool "repair shock bounds are validated" ("Repair shock cost standard deviation cannot be negative." `elem` validationErrors)
     assertBool "years owned is validated" ("Years owned must be at least 1." `elem` validationErrors)
     assertBool "city share is validated" ("City driving share should be expressed as a decimal between 0 and 1." `elem` validationErrors)
+    assertBool "home charging share is validated" ("Home charging share should be expressed as a decimal between 0 and 1." `elem` validationErrors)
+    assertBool "charging loss is validated" ("Charging loss rate should be expressed as a decimal between 0 and less than 1." `elem` validationErrors)
     assertBool "fuel efficiency is validated" ("Combined efficiency must be greater than 0." `elem` validationErrors)
     assertBool "city MPG is validated" ("City efficiency must be greater than 0." `elem` validationErrors)
     assertBool "highway MPG is validated" ("Highway efficiency must be greater than 0." `elem` validationErrors)
@@ -1557,6 +1616,8 @@ invalidSimulationRequest =
             simulationAnnualMileageChangeRate = 1.2,
             simulationCityDrivingShare = 1.2,
             simulationFuelType = "gasoline",
+            simulationHomeChargingShare = 1.2,
+            simulationChargingLossRate = 1.1,
             simulationMilesPerGallon = 0,
             simulationCityMilesPerGallon = 0,
             simulationHighwayMilesPerGallon = 0,
@@ -1587,6 +1648,13 @@ invalidSimulationRequest =
                   boundedNormalStdDev = 0.4,
                   boundedNormalLowerBound = 2,
                   boundedNormalUpperBound = Just 5
+                },
+            simulationPublicChargingPrice =
+              BoundedNormal
+                { boundedNormalMean = 0.4,
+                  boundedNormalStdDev = 0.1,
+                  boundedNormalLowerBound = 0.2,
+                  boundedNormalUpperBound = Just 0.8
                 },
             simulationAnnualMaintenance =
               BoundedNormal
@@ -1636,6 +1704,8 @@ baselineSimulationInput =
       simulationAnnualMileageChangeRate = 0,
       simulationCityDrivingShare = 0.5,
       simulationFuelType = "gasoline",
+      simulationHomeChargingShare = 0,
+      simulationChargingLossRate = 0,
       simulationMilesPerGallon = 30,
       simulationCityMilesPerGallon = 30,
       simulationHighwayMilesPerGallon = 30,
@@ -1655,6 +1725,7 @@ baselineSimulationInput =
       simulationRepairShockProbability = 0,
       simulationRepairShockCost = deterministicBoundedNormal 0,
       simulationFuelPrice = deterministicBoundedNormal 0,
+      simulationPublicChargingPrice = deterministicBoundedNormal 0,
       simulationAnnualMaintenance = deterministicBoundedNormal 0,
       simulationAnnualDepreciationRate = deterministicBoundedNormal 0
     }
