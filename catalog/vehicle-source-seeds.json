@@ -146,5 +146,375 @@
       "boundedNormalUpperBound": 5800
     },
     "sourceSourceUpdatedAt": "2026-04-16"
+  },
+  {
+    "sourceCatalogId": "camry-hybrid-le-2024",
+    "sourceDescription": "Efficient midsize hybrid sedan with strong fuel economy and steady resale assumptions.",
+    "sourceYear": 2024,
+    "sourceMake": "Toyota",
+    "sourceCatalogModel": "Camry Hybrid",
+    "sourceTrim": "LE",
+    "sourceBaseModel": "Camry",
+    "sourceFuelEconomyVehicleId": 47092,
+    "sourcePurchasePrice": 28900,
+    "sourceAnnualInsurance": 1760,
+    "sourceAnnualRegistration": 235,
+    "sourceAnnualMaintenance": {
+      "boundedNormalMean": 610,
+      "boundedNormalStdDev": 160,
+      "boundedNormalLowerBound": 250,
+      "boundedNormalUpperBound": 1650
+    },
+    "sourceAnnualDepreciationRate": {
+      "boundedNormalMean": 0.135,
+      "boundedNormalStdDev": 0.03,
+      "boundedNormalLowerBound": 0.05,
+      "boundedNormalUpperBound": 0.24
+    },
+    "sourceFirstYearDepreciationBonus": 0.09,
+    "sourceResidualValueFloorPercent": 0.36,
+    "sourceExpectedAnnualMilesForResale": 12000,
+    "sourceExtraMileageDepreciationPerMile": 0.12,
+    "sourceRepairShockProbability": 0.09,
+    "sourceRepairShockCost": {
+      "boundedNormalMean": 1300,
+      "boundedNormalStdDev": 550,
+      "boundedNormalLowerBound": 300,
+      "boundedNormalUpperBound": 3400
+    },
+    "sourceSourceUpdatedAt": "2026-04-17"
+  },
+  {
+    "sourceCatalogId": "prius-le-2024",
+    "sourceDescription": "High-efficiency hybrid hatchback with low operating costs and very strong resale support.",
+    "sourceYear": 2024,
+    "sourceMake": "Toyota",
+    "sourceCatalogModel": "Prius",
+    "sourceTrim": "LE",
+    "sourceBaseModel": "Prius",
+    "sourceFuelEconomyVehicleId": 47243,
+    "sourcePurchasePrice": 28750,
+    "sourceAnnualInsurance": 1700,
+    "sourceAnnualRegistration": 225,
+    "sourceAnnualMaintenance": {
+      "boundedNormalMean": 540,
+      "boundedNormalStdDev": 140,
+      "boundedNormalLowerBound": 220,
+      "boundedNormalUpperBound": 1450
+    },
+    "sourceAnnualDepreciationRate": {
+      "boundedNormalMean": 0.128,
+      "boundedNormalStdDev": 0.03,
+      "boundedNormalLowerBound": 0.05,
+      "boundedNormalUpperBound": 0.24
+    },
+    "sourceFirstYearDepreciationBonus": 0.08,
+    "sourceResidualValueFloorPercent": 0.39,
+    "sourceExpectedAnnualMilesForResale": 12000,
+    "sourceExtraMileageDepreciationPerMile": 0.11,
+    "sourceRepairShockProbability": 0.08,
+    "sourceRepairShockCost": {
+      "boundedNormalMean": 1200,
+      "boundedNormalStdDev": 500,
+      "boundedNormalLowerBound": 300,
+      "boundedNormalUpperBound": 3200
+    },
+    "sourceSourceUpdatedAt": "2026-04-17"
+  },
+  {
+    "sourceCatalogId": "accord-2024",
+    "sourceDescription": "Mainstream midsize sedan with moderate maintenance expectations and balanced depreciation.",
+    "sourceYear": 2024,
+    "sourceMake": "Honda",
+    "sourceCatalogModel": "Accord",
+    "sourceTrim": "1.5T CVT",
+    "sourceBaseModel": "Accord",
+    "sourceFuelEconomyVehicleId": 47103,
+    "sourcePurchasePrice": 28600,
+    "sourceAnnualInsurance": 1820,
+    "sourceAnnualRegistration": 235,
+    "sourceAnnualMaintenance": {
+      "boundedNormalMean": 660,
+      "boundedNormalStdDev": 180,
+      "boundedNormalLowerBound": 260,
+      "boundedNormalUpperBound": 1750
+    },
+    "sourceAnnualDepreciationRate": {
+      "boundedNormalMean": 0.145,
+      "boundedNormalStdDev": 0.033,
+      "boundedNormalLowerBound": 0.06,
+      "boundedNormalUpperBound": 0.26
+    },
+    "sourceFirstYearDepreciationBonus": 0.1,
+    "sourceResidualValueFloorPercent": 0.33,
+    "sourceExpectedAnnualMilesForResale": 12000,
+    "sourceExtraMileageDepreciationPerMile": 0.13,
+    "sourceRepairShockProbability": 0.1,
+    "sourceRepairShockCost": {
+      "boundedNormalMean": 1500,
+      "boundedNormalStdDev": 650,
+      "boundedNormalLowerBound": 350,
+      "boundedNormalUpperBound": 4000
+    },
+    "sourceSourceUpdatedAt": "2026-04-17"
+  },
+  {
+    "sourceCatalogId": "cr-v-hybrid-fwd-2024",
+    "sourceDescription": "Popular compact crossover hybrid with family-friendly efficiency and moderate running costs.",
+    "sourceYear": 2024,
+    "sourceMake": "Honda",
+    "sourceCatalogModel": "CR-V",
+    "sourceTrim": "2.0L Hybrid FWD",
+    "sourceBaseModel": "CR-V",
+    "sourceFuelEconomyVehicleId": 46694,
+    "sourcePurchasePrice": 35400,
+    "sourceAnnualInsurance": 1910,
+    "sourceAnnualRegistration": 245,
+    "sourceAnnualMaintenance": {
+      "boundedNormalMean": 760,
+      "boundedNormalStdDev": 220,
+      "boundedNormalLowerBound": 300,
+      "boundedNormalUpperBound": 2100
+    },
+    "sourceAnnualDepreciationRate": {
+      "boundedNormalMean": 0.147,
+      "boundedNormalStdDev": 0.034,
+      "boundedNormalLowerBound": 0.06,
+      "boundedNormalUpperBound": 0.27
+    },
+    "sourceFirstYearDepreciationBonus": 0.1,
+    "sourceResidualValueFloorPercent": 0.35,
+    "sourceExpectedAnnualMilesForResale": 12000,
+    "sourceExtraMileageDepreciationPerMile": 0.14,
+    "sourceRepairShockProbability": 0.11,
+    "sourceRepairShockCost": {
+      "boundedNormalMean": 1750,
+      "boundedNormalStdDev": 750,
+      "boundedNormalLowerBound": 400,
+      "boundedNormalUpperBound": 4800
+    },
+    "sourceSourceUpdatedAt": "2026-04-17"
+  },
+  {
+    "sourceCatalogId": "model-3-rwd-2024",
+    "sourceDescription": "Entry Tesla sedan with low routine maintenance, high efficiency, and more volatile depreciation assumptions.",
+    "sourceYear": 2024,
+    "sourceMake": "Tesla",
+    "sourceCatalogModel": "Model 3",
+    "sourceTrim": "RWD",
+    "sourceBaseModel": "Model 3",
+    "sourceFuelEconomyVehicleId": 47909,
+    "sourcePurchasePrice": 38990,
+    "sourceAnnualInsurance": 2300,
+    "sourceAnnualRegistration": 290,
+    "sourceAnnualMaintenance": {
+      "boundedNormalMean": 430,
+      "boundedNormalStdDev": 120,
+      "boundedNormalLowerBound": 120,
+      "boundedNormalUpperBound": 1400
+    },
+    "sourceAnnualDepreciationRate": {
+      "boundedNormalMean": 0.18,
+      "boundedNormalStdDev": 0.05,
+      "boundedNormalLowerBound": 0.08,
+      "boundedNormalUpperBound": 0.34
+    },
+    "sourceFirstYearDepreciationBonus": 0.13,
+    "sourceResidualValueFloorPercent": 0.28,
+    "sourceExpectedAnnualMilesForResale": 12000,
+    "sourceExtraMileageDepreciationPerMile": 0.16,
+    "sourceRepairShockProbability": 0.09,
+    "sourceRepairShockCost": {
+      "boundedNormalMean": 1700,
+      "boundedNormalStdDev": 800,
+      "boundedNormalLowerBound": 400,
+      "boundedNormalUpperBound": 5000
+    },
+    "sourceSourceUpdatedAt": "2026-04-17"
+  },
+  {
+    "sourceCatalogId": "elantra-hybrid-blue-2024",
+    "sourceDescription": "Budget-friendly hybrid sedan with very strong fuel economy and manageable annual costs.",
+    "sourceYear": 2024,
+    "sourceMake": "Hyundai",
+    "sourceCatalogModel": "Elantra Hybrid",
+    "sourceTrim": "Blue",
+    "sourceBaseModel": "Elantra",
+    "sourceFuelEconomyVehicleId": 47350,
+    "sourcePurchasePrice": 25950,
+    "sourceAnnualInsurance": 1670,
+    "sourceAnnualRegistration": 220,
+    "sourceAnnualMaintenance": {
+      "boundedNormalMean": 560,
+      "boundedNormalStdDev": 150,
+      "boundedNormalLowerBound": 220,
+      "boundedNormalUpperBound": 1500
+    },
+    "sourceAnnualDepreciationRate": {
+      "boundedNormalMean": 0.138,
+      "boundedNormalStdDev": 0.032,
+      "boundedNormalLowerBound": 0.05,
+      "boundedNormalUpperBound": 0.25
+    },
+    "sourceFirstYearDepreciationBonus": 0.09,
+    "sourceResidualValueFloorPercent": 0.35,
+    "sourceExpectedAnnualMilesForResale": 12000,
+    "sourceExtraMileageDepreciationPerMile": 0.12,
+    "sourceRepairShockProbability": 0.09,
+    "sourceRepairShockCost": {
+      "boundedNormalMean": 1250,
+      "boundedNormalStdDev": 525,
+      "boundedNormalLowerBound": 300,
+      "boundedNormalUpperBound": 3300
+    },
+    "sourceSourceUpdatedAt": "2026-04-17"
+  },
+  {
+    "sourceCatalogId": "ioniq-5-long-range-rwd-2024",
+    "sourceDescription": "Electric crossover with strong efficiency, low routine maintenance, and higher depreciation uncertainty.",
+    "sourceYear": 2024,
+    "sourceMake": "Hyundai",
+    "sourceCatalogModel": "Ioniq 5",
+    "sourceTrim": "Long Range RWD",
+    "sourceBaseModel": "Ioniq 5",
+    "sourceFuelEconomyVehicleId": 46960,
+    "sourcePurchasePrice": 47200,
+    "sourceAnnualInsurance": 2380,
+    "sourceAnnualRegistration": 300,
+    "sourceAnnualMaintenance": {
+      "boundedNormalMean": 460,
+      "boundedNormalStdDev": 130,
+      "boundedNormalLowerBound": 140,
+      "boundedNormalUpperBound": 1500
+    },
+    "sourceAnnualDepreciationRate": {
+      "boundedNormalMean": 0.185,
+      "boundedNormalStdDev": 0.055,
+      "boundedNormalLowerBound": 0.08,
+      "boundedNormalUpperBound": 0.36
+    },
+    "sourceFirstYearDepreciationBonus": 0.14,
+    "sourceResidualValueFloorPercent": 0.27,
+    "sourceExpectedAnnualMilesForResale": 12000,
+    "sourceExtraMileageDepreciationPerMile": 0.15,
+    "sourceRepairShockProbability": 0.1,
+    "sourceRepairShockCost": {
+      "boundedNormalMean": 1900,
+      "boundedNormalStdDev": 900,
+      "boundedNormalLowerBound": 450,
+      "boundedNormalUpperBound": 5600
+    },
+    "sourceSourceUpdatedAt": "2026-04-17"
+  },
+  {
+    "sourceCatalogId": "cx-5-awd-2024",
+    "sourceDescription": "Well-rounded AWD crossover with moderate fuel economy and somewhat higher maintenance than hybrids.",
+    "sourceYear": 2024,
+    "sourceMake": "Mazda",
+    "sourceCatalogModel": "CX-5",
+    "sourceTrim": "2.5 S AWD",
+    "sourceBaseModel": "CX-5",
+    "sourceFuelEconomyVehicleId": 47152,
+    "sourcePurchasePrice": 32100,
+    "sourceAnnualInsurance": 1930,
+    "sourceAnnualRegistration": 240,
+    "sourceAnnualMaintenance": {
+      "boundedNormalMean": 820,
+      "boundedNormalStdDev": 230,
+      "boundedNormalLowerBound": 320,
+      "boundedNormalUpperBound": 2300
+    },
+    "sourceAnnualDepreciationRate": {
+      "boundedNormalMean": 0.155,
+      "boundedNormalStdDev": 0.036,
+      "boundedNormalLowerBound": 0.07,
+      "boundedNormalUpperBound": 0.29
+    },
+    "sourceFirstYearDepreciationBonus": 0.11,
+    "sourceResidualValueFloorPercent": 0.31,
+    "sourceExpectedAnnualMilesForResale": 12000,
+    "sourceExtraMileageDepreciationPerMile": 0.14,
+    "sourceRepairShockProbability": 0.13,
+    "sourceRepairShockCost": {
+      "boundedNormalMean": 1900,
+      "boundedNormalStdDev": 850,
+      "boundedNormalLowerBound": 450,
+      "boundedNormalUpperBound": 5200
+    },
+    "sourceSourceUpdatedAt": "2026-04-17"
+  },
+  {
+    "sourceCatalogId": "sienna-2wd-2024",
+    "sourceDescription": "Hybrid minivan option with strong efficiency for its size and moderate family-hauler costs.",
+    "sourceYear": 2024,
+    "sourceMake": "Toyota",
+    "sourceCatalogModel": "Sienna",
+    "sourceTrim": "2WD",
+    "sourceBaseModel": "Sienna",
+    "sourceFuelEconomyVehicleId": 47252,
+    "sourcePurchasePrice": 37700,
+    "sourceAnnualInsurance": 1960,
+    "sourceAnnualRegistration": 255,
+    "sourceAnnualMaintenance": {
+      "boundedNormalMean": 780,
+      "boundedNormalStdDev": 210,
+      "boundedNormalLowerBound": 300,
+      "boundedNormalUpperBound": 2100
+    },
+    "sourceAnnualDepreciationRate": {
+      "boundedNormalMean": 0.142,
+      "boundedNormalStdDev": 0.032,
+      "boundedNormalLowerBound": 0.06,
+      "boundedNormalUpperBound": 0.25
+    },
+    "sourceFirstYearDepreciationBonus": 0.1,
+    "sourceResidualValueFloorPercent": 0.34,
+    "sourceExpectedAnnualMilesForResale": 12000,
+    "sourceExtraMileageDepreciationPerMile": 0.14,
+    "sourceRepairShockProbability": 0.11,
+    "sourceRepairShockCost": {
+      "boundedNormalMean": 1700,
+      "boundedNormalStdDev": 700,
+      "boundedNormalLowerBound": 400,
+      "boundedNormalUpperBound": 4500
+    },
+    "sourceSourceUpdatedAt": "2026-04-17"
+  },
+  {
+    "sourceCatalogId": "hr-v-fwd-2024",
+    "sourceDescription": "Subcompact crossover with approachable purchase price and moderate ownership costs.",
+    "sourceYear": 2024,
+    "sourceMake": "Honda",
+    "sourceCatalogModel": "HR-V",
+    "sourceTrim": "FWD",
+    "sourceBaseModel": "HR-V",
+    "sourceFuelEconomyVehicleId": 46588,
+    "sourcePurchasePrice": 25400,
+    "sourceAnnualInsurance": 1710,
+    "sourceAnnualRegistration": 225,
+    "sourceAnnualMaintenance": {
+      "boundedNormalMean": 650,
+      "boundedNormalStdDev": 175,
+      "boundedNormalLowerBound": 250,
+      "boundedNormalUpperBound": 1700
+    },
+    "sourceAnnualDepreciationRate": {
+      "boundedNormalMean": 0.149,
+      "boundedNormalStdDev": 0.034,
+      "boundedNormalLowerBound": 0.06,
+      "boundedNormalUpperBound": 0.27
+    },
+    "sourceFirstYearDepreciationBonus": 0.1,
+    "sourceResidualValueFloorPercent": 0.32,
+    "sourceExpectedAnnualMilesForResale": 12000,
+    "sourceExtraMileageDepreciationPerMile": 0.13,
+    "sourceRepairShockProbability": 0.1,
+    "sourceRepairShockCost": {
+      "boundedNormalMean": 1450,
+      "boundedNormalStdDev": 600,
+      "boundedNormalLowerBound": 350,
+      "boundedNormalUpperBound": 3900
+    },
+    "sourceSourceUpdatedAt": "2026-04-17"
   }
 ]

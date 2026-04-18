@@ -732,7 +732,7 @@ vehicleSourceSeedLoadTest =
   TestCase $ do
     sourceSeedPath <- getDataFileName defaultVehicleCatalogSourceSeedsRelativePath
     sourceSeeds <- loadVehicleCatalogSourceSeeds sourceSeedPath
-    assertEqual "the starter source seed set stays at four vehicles" 4 (length sourceSeeds)
+    assertEqual "the starter source seed set stays at fourteen vehicles" 14 (length sourceSeeds)
     mapM_ assertVehicleSourceSeedLooksUsable sourceSeeds
 
 vpicFixtureDecodingTest :: Test
