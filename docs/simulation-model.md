@@ -24,6 +24,7 @@ The implementation entrypoints are:
 
 The following pieces are deterministic once a scenario input is fixed:
 
+- optional region profile selection and backend region-default toggle
 - purchase price
 - down payment
 - sales tax
@@ -91,6 +92,9 @@ Repair shocks add one more stochastic step:
 - if that draw falls below the configured repair-shock probability, the model
   samples a repair-shock cost for that year
 
+When backend region defaults are enabled, those sampled price distributions are
+resolved from the selected region profile before simulation starts.
+
 ## Yearly ownership logic
 
 For each modeled year, the simulator currently computes:
@@ -120,6 +124,26 @@ sampled path evolves over time. That response now includes explicit electric
 miles, liquid-fuel miles, purchased energy, home/public charging energy, and
 charging-loss units instead of leaving the frontend to infer them from the
 request.
+
+## Region-aware calibration
+
+The simulator can now treat location as a backend-owned modeling input instead
+of only a browser convenience.
+
+When `simulationApplyRegionDefaults` is enabled and
+`simulationRegionProfile` points at a supported profile, the backend resolves:
+
+- sales tax rate
+- annual registration cost
+- gasoline or diesel price distribution
+- home charging price distribution
+- public charging price distribution
+- home charging share
+- charging-loss rate
+
+That resolution happens before validation and before Monte Carlo sampling, so
+the same calibrated input drives both the simulation engine and the API
+contract.
 
 ## Total cost formula
 
@@ -186,8 +210,8 @@ important simplifications:
   mileage-conditioned processes
 - financing assumes a standard amortizing loan and does not model refinancing,
   late payments, or early payoff decisions
-- taxes and fees are still driven by scenario inputs; region profiles currently
-  provide browser-side defaults rather than backend rule tables
+- region calibration is still profile-based rather than state-by-state or
+  ZIP-code-specific
 
 ## Best next modeling upgrades
 

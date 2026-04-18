@@ -169,6 +169,22 @@ label:last-child {
   margin-bottom: 0;
 }
 
+.checkbox-label {
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 0.8rem;
+}
+
+.checkbox-label input {
+  width: auto;
+  margin: 0;
+}
+
+.checkbox-label span {
+  color: var(--ink);
+  font-weight: 600;
+}
+
 input,
 select {
   width: 100%;
@@ -178,6 +194,13 @@ select {
   background: rgba(255, 255, 255, 0.92);
   color: var(--ink);
   font: inherit;
+}
+
+input:disabled,
+select:disabled {
+  color: rgba(31, 38, 48, 0.65);
+  background: rgba(236, 223, 205, 0.65);
+  cursor: not-allowed;
 }
 
 input:focus,

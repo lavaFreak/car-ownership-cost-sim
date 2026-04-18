@@ -23,6 +23,9 @@ The app is split into four layers:
 
 - [src/CarOwnershipCostSim/Types.hs](/Users/garion/Work/projects/car-ownership-cost-sim/src/CarOwnershipCostSim/Types.hs)
   Shared request and response schema for the backend, tests, and browser.
+- [src/CarOwnershipCostSim/RegionProfiles.hs](/Users/garion/Work/projects/car-ownership-cost-sim/src/CarOwnershipCostSim/RegionProfiles.hs)
+  Shared region-calibration profiles plus the backend logic that resolves
+  location-sensitive defaults into a simulation input.
 - [src/CarOwnershipCostSim/Simulation.hs](/Users/garion/Work/projects/car-ownership-cost-sim/src/CarOwnershipCostSim/Simulation.hs)
   Core ownership-cost engine, yearly modeling, and input validation.
 - [src/CarOwnershipCostSim/Statistics.hs](/Users/garion/Work/projects/car-ownership-cost-sim/src/CarOwnershipCostSim/Statistics.hs)
@@ -61,15 +64,18 @@ The app is split into four layers:
 The normal runtime path looks like this:
 
 1. The browser loads `/`, which serves the static UI.
-2. The frontend fetches `/api/catalog` for lookup/search state and
+2. The frontend fetches `/api/catalog` for lookup/search state,
+   `/api/regions` for backend-owned location calibration profiles, and
    `/api/presets` for preset metadata.
 3. The user edits inputs and submits the form.
 4. `static/app.js` validates the form and builds a `SimulationRequest`.
 5. `POST /api/simulate` decodes the JSON payload in `WebApp.hs`.
 6. `validateSimulationRequest` rejects invalid scenarios before sampling.
-7. `simulateRequestWithSeed` runs the Monte Carlo engine and returns a
+7. If backend region defaults are enabled, `RegionProfiles.hs` resolves the
+   selected region into concrete tax, registration, and energy assumptions.
+8. `simulateRequestWithSeed` runs the Monte Carlo engine and returns a
    `SimulationResponse`.
-8. The frontend renders summary cards, an example breakdown, yearly cards, and
+9. The frontend renders summary cards, an example breakdown, yearly cards, and
    charts from that response.
 
 ## Catalog refresh flow

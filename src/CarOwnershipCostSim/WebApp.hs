@@ -16,6 +16,7 @@ module CarOwnershipCostSim.WebApp
   )
 where
 
+import CarOwnershipCostSim.RegionProfiles (allRegionProfiles)
 import CarOwnershipCostSim.Simulation (simulateRequestWithSeed, validateSimulationRequest)
 import CarOwnershipCostSim.Types (SimulationRequest (..), exampleSimulationRequest)
 import CarOwnershipCostSim.VehicleCatalog (VehicleCatalogEntry)
@@ -60,6 +61,9 @@ appRoutes vehicleCatalog staticAssets = do
 
   get "/api/catalog" $
     json vehicleCatalog
+
+  get "/api/regions" $
+    json allRegionProfiles
 
   get "/api/presets" $
     json vehiclePresets

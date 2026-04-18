@@ -156,6 +156,15 @@
                 </select>
               </label>
 
+              <label class="checkbox-label">
+                <input id="apply-region-defaults" name="applyRegionDefaults" type="checkbox" checked />
+                <span>Use backend-calibrated region defaults</span>
+              </label>
+
+              <p class="field-group-copy">
+                When enabled, the simulator uses the selected region for sales tax, registration, fuel or electricity pricing, and charging defaults. Turn it off to customize those assumptions manually.
+              </p>
+
               <label>
                 <span id="city-efficiency-label">City MPG</span>
                 <input name="cityMilesPerGallon" type="number" min="1" step="0.1" value="28" required />

@@ -63,6 +63,14 @@ Those lookup controls intentionally:
   text
 - still allow every numeric assumption to be manually edited afterward
 
+The frontend now also treats region defaults as a true backend feature instead
+of a browser-only lookup table:
+
+- the region selector is populated from `GET /api/regions`
+- a dedicated toggle decides whether the backend should enforce regional tax,
+  registration, fuel, and charging defaults
+- turning that toggle off unlocks those fields for fully manual modeling
+
 ## Presets
 
 The preset dropdown is populated from `GET /api/presets`.
@@ -101,6 +109,7 @@ The frontend maintains a URL-backed scenario state:
 - opening a shared link restores the scenario fields
 - presets can be part of that shared state as well
 - region profile defaults can be part of that shared state as well
+- the backend-region-defaults toggle can also be part of shared state
 
 This is useful for debugging, demos, and comparing scenarios without requiring
 accounts or persistence.
@@ -117,6 +126,21 @@ browser:
 
 The saved baseline is also cached in browser local storage so a refresh does
 not immediately lose the comparison context.
+
+## Region-calibration behavior
+
+When backend region defaults are enabled, the frontend intentionally treats a
+small set of inputs as region-managed:
+
+- sales tax
+- annual registration
+- fuel or home-electricity price mean and standard deviation
+- public charging price mean and standard deviation when relevant
+- plug-in charging mix and charging-loss assumptions
+
+Those controls stay visible so the user can see what the backend is using, but
+they are locked until the toggle is turned off. This keeps the UI aligned with
+what the backend will actually simulate.
 
 ## Results rendering
 

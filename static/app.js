@@ -19,6 +19,7 @@ const vehicleMatchCount = document.getElementById("vehicle-match-count");
 const presetDescription = document.getElementById("preset-description");
 const fuelTypeSelect = document.getElementById("fuel-type");
 const locationProfileSelect = document.getElementById("location-profile");
+const applyRegionDefaultsCheckbox = document.getElementById("apply-region-defaults");
 const plugInHybridFieldset = document.getElementById("plug-in-hybrid-fieldset");
 const chargingFieldset = document.getElementById("charging-fieldset");
 const homeChargingMeanField = document.getElementById("home-charging-mean-field");
@@ -65,6 +66,8 @@ const preciseCurrency = new Intl.NumberFormat("en-US", {
 let hasSuccessfulRun = false;
 let vehicleCatalog = [];
 let vehiclePresets = [];
+let regionProfiles = [];
+let regionProfilesById = Object.create(null);
 let pendingPresetSelection = { presetId: "", hasFieldOverrides: false, hasFuelTypeOverride: false };
 let latestRun = null;
 let comparisonBaseline = null;
@@ -88,6 +91,7 @@ const shareFieldNames = [
   "cityDrivingSharePercent",
   "fuelType",
   "locationProfile",
+  "applyRegionDefaults",
   "homeChargingSharePercent",
   "chargingLossPercent",
   "plugInElectricDrivingSharePercent",
@@ -127,62 +131,18 @@ const shareFieldNames = [
 ];
 
 const knownFuelTypes = ["gasoline", "hybrid-gasoline", "plug-in-hybrid", "diesel", "electric"];
-const regionProfiles = {
-  national: {
-    label: "National average",
-    salesTaxPercent: 6.75,
-    annualRegistration: 220,
-    gasoline: { mean: 3.75, stdDev: 0.55 },
-    diesel: { mean: 4.15, stdDev: 0.6 },
-    homeElectricity: { mean: 0.16, stdDev: 0.04 },
-    publicCharging: { mean: 0.43, stdDev: 0.1 },
-  },
-  "mountain-west": {
-    label: "Mountain West",
-    salesTaxPercent: 6.2,
-    annualRegistration: 210,
-    gasoline: { mean: 3.48, stdDev: 0.42 },
-    diesel: { mean: 3.92, stdDev: 0.47 },
-    homeElectricity: { mean: 0.14, stdDev: 0.03 },
-    publicCharging: { mean: 0.4, stdDev: 0.09 },
-  },
-  "west-coast": {
-    label: "West Coast",
-    salesTaxPercent: 8.4,
-    annualRegistration: 320,
-    gasoline: { mean: 4.75, stdDev: 0.58 },
-    diesel: { mean: 5.15, stdDev: 0.62 },
-    homeElectricity: { mean: 0.26, stdDev: 0.05 },
-    publicCharging: { mean: 0.53, stdDev: 0.1 },
-  },
-  "texas-south": {
-    label: "Texas / Gulf South",
-    salesTaxPercent: 6.4,
-    annualRegistration: 120,
-    gasoline: { mean: 3.2, stdDev: 0.38 },
-    diesel: { mean: 3.7, stdDev: 0.43 },
-    homeElectricity: { mean: 0.13, stdDev: 0.03 },
-    publicCharging: { mean: 0.39, stdDev: 0.08 },
-  },
-  midwest: {
-    label: "Midwest",
-    salesTaxPercent: 7.1,
-    annualRegistration: 190,
-    gasoline: { mean: 3.42, stdDev: 0.4 },
-    diesel: { mean: 3.86, stdDev: 0.45 },
-    homeElectricity: { mean: 0.15, stdDev: 0.03 },
-    publicCharging: { mean: 0.41, stdDev: 0.09 },
-  },
-  northeast: {
-    label: "Northeast",
-    salesTaxPercent: 7.0,
-    annualRegistration: 260,
-    gasoline: { mean: 3.88, stdDev: 0.48 },
-    diesel: { mean: 4.28, stdDev: 0.53 },
-    homeElectricity: { mean: 0.22, stdDev: 0.05 },
-    publicCharging: { mean: 0.49, stdDev: 0.1 },
-  },
-};
+const regionManagedFieldNames = [
+  "salesTaxPercent",
+  "annualRegistration",
+  "fuelMean",
+  "fuelStdDev",
+  "homeChargingMean",
+  "homeChargingStdDev",
+  "publicChargingMean",
+  "publicChargingStdDev",
+  "homeChargingSharePercent",
+  "chargingLossPercent",
+];
 
 function fieldValue(name) {
   return form.elements[name].value.trim();
@@ -200,6 +160,10 @@ function numericValue(name) {
 
 function optionalIntegerValue(name) {
   return numericValue(name);
+}
+
+function checkboxValue(name) {
+  return Boolean(form.elements[name]?.checked);
 }
 
 function setNumericField(name, value) {
@@ -236,32 +200,90 @@ function usesChargingFuelType(value) {
   return isElectricFuelType(value) || isPlugInHybridFuelType(value);
 }
 
+function regionOptionLabel(regionProfile) {
+  return regionProfile?.regionLabel || regionProfile?.label || "Unknown region";
+}
+
+function populateRegionProfileOptions(selectedValue = locationProfileSelect.value || "national") {
+  if (regionProfiles.length === 0) {
+    return;
+  }
+
+  locationProfileSelect.innerHTML = regionProfiles
+    .map(
+      (regionProfile) => `
+        <option value="${regionProfile.regionId}">${regionOptionLabel(regionProfile)}</option>
+      `
+    )
+    .join("");
+
+  const fallbackRegionId = regionProfilesById[selectedValue] ? selectedValue : "national";
+  locationProfileSelect.value = regionProfilesById[fallbackRegionId] ? fallbackRegionId : regionProfiles[0].regionId;
+}
+
 function selectedRegionProfile() {
-  return regionProfiles[locationProfileSelect.value] || regionProfiles.national;
+  const selectedRegionId = locationProfileSelect.value || "national";
+  return regionProfilesById[selectedRegionId] || regionProfilesById.national || null;
 }
 
 function defaultEnergyPriceProfile(fuelType, regionProfile = selectedRegionProfile()) {
+  if (!regionProfile) {
+    return null;
+  }
+
   switch (normalizedFuelType(fuelType)) {
     case "electric":
-      return regionProfile.homeElectricity;
+      return regionProfile.regionHomeChargingPrice;
     case "plug-in-hybrid":
-      return regionProfile.gasoline;
+      return regionProfile.regionGasolinePrice;
     case "diesel":
-      return regionProfile.diesel;
+      return regionProfile.regionDieselPrice;
     default:
-      return regionProfile.gasoline;
+      return regionProfile.regionGasolinePrice;
   }
 }
 
 function defaultChargingProfile(regionProfile = selectedRegionProfile()) {
+  if (!regionProfile) {
+    return null;
+  }
+
   return {
-    homeSharePercent: 82,
-    chargingLossPercent: 10,
-    homeMean: regionProfile.homeElectricity.mean,
-    homeStdDev: regionProfile.homeElectricity.stdDev,
-    publicMean: regionProfile.publicCharging.mean,
-    publicStdDev: regionProfile.publicCharging.stdDev,
+    homeSharePercent: regionProfile.regionHomeChargingShare * 100,
+    chargingLossPercent: regionProfile.regionChargingLossRate * 100,
+    homeMean: regionProfile.regionHomeChargingPrice.boundedNormalMean,
+    homeStdDev: regionProfile.regionHomeChargingPrice.boundedNormalStdDev,
+    publicMean: regionProfile.regionPublicChargingPrice.boundedNormalMean,
+    publicStdDev: regionProfile.regionPublicChargingPrice.boundedNormalStdDev,
   };
+}
+
+function regionManagedNamesForFuelType(fuelType) {
+  const names = ["salesTaxPercent", "annualRegistration", "fuelMean", "fuelStdDev"];
+
+  if (usesChargingFuelType(fuelType)) {
+    names.push("homeChargingSharePercent", "chargingLossPercent", "publicChargingMean", "publicChargingStdDev");
+  }
+
+  if (isPlugInHybridFuelType(fuelType)) {
+    names.push("homeChargingMean", "homeChargingStdDev");
+  }
+
+  return names;
+}
+
+function syncRegionManagedFieldState() {
+  const shouldLockRegionManagedFields = applyRegionDefaultsCheckbox.checked && !!selectedRegionProfile();
+  const activeManagedNames = new Set(regionManagedNamesForFuelType(fuelTypeSelect.value));
+
+  regionManagedFieldNames.forEach((fieldName) => {
+    const field = form.elements[fieldName];
+    if (!field) {
+      return;
+    }
+
+    field.disabled = shouldLockRegionManagedFields && activeManagedNames.has(fieldName);
+  });
 }
 
 function defaultPlugInHybridProfile() {
@@ -316,27 +338,40 @@ function applyFuelTypeLabels(fuelType = fuelTypeSelect.value) {
   if (isElectric) {
     energyPriceMeanLabel.textContent = "Home electricity price mean ($/kWh)";
     energyPriceStdDevLabel.textContent = "Home electricity price std dev";
+    syncRegionManagedFieldState();
     return;
   }
 
   if (isPlugInHybrid) {
     energyPriceMeanLabel.textContent = "Gasoline price mean ($/gal)";
     energyPriceStdDevLabel.textContent = "Gasoline price std dev";
+    syncRegionManagedFieldState();
     return;
   }
 
   energyPriceMeanLabel.textContent = "Fuel price mean ($/gal)";
   energyPriceStdDevLabel.textContent = "Fuel price std dev";
+  syncRegionManagedFieldState();
 }
 
 function applyEnergyDefaultsForFuelType(fuelType) {
   const regionProfile = selectedRegionProfile();
   const defaults = defaultEnergyPriceProfile(fuelType, regionProfile);
-  setNumericField("fuelMean", defaults.mean.toFixed(2));
-  setNumericField("fuelStdDev", defaults.stdDev.toFixed(2));
+  if (!defaults) {
+    syncRegionManagedFieldState();
+    return;
+  }
+
+  setNumericField("fuelMean", defaults.boundedNormalMean.toFixed(2));
+  setNumericField("fuelStdDev", defaults.boundedNormalStdDev.toFixed(2));
 
   if (usesChargingFuelType(fuelType)) {
     const chargingDefaults = defaultChargingProfile(regionProfile);
+    if (!chargingDefaults) {
+      syncRegionManagedFieldState();
+      return;
+    }
+
     setNumericField("homeChargingSharePercent", chargingDefaults.homeSharePercent);
     setNumericField("chargingLossPercent", chargingDefaults.chargingLossPercent);
     if (isPlugInHybridFuelType(fuelType)) {
@@ -353,14 +388,44 @@ function applyEnergyDefaultsForFuelType(fuelType) {
     setNumericField("plugInCityMilesPerGallonEquivalent", plugInDefaults.cityMpge.toFixed(1));
     setNumericField("plugInHighwayMilesPerGallonEquivalent", plugInDefaults.highwayMpge.toFixed(1));
   }
+
+  syncRegionManagedFieldState();
 }
 
-function applyLocationProfileDefaults() {
+function applyLocationProfileDefaults(announce = true) {
   const regionProfile = selectedRegionProfile();
-  setNumericField("salesTaxPercent", regionProfile.salesTaxPercent.toFixed(1));
-  setNumericField("annualRegistration", Math.round(regionProfile.annualRegistration));
+  if (!regionProfile) {
+    syncRegionManagedFieldState();
+    if (announce) {
+      statusLine.textContent =
+        "Backend region profiles could not be loaded, so tax, registration, and energy assumptions are staying manual.";
+    }
+    return;
+  }
+
+  setNumericField("salesTaxPercent", (regionProfile.regionSalesTaxRate * 100).toFixed(1));
+  setNumericField("annualRegistration", Math.round(regionProfile.regionAnnualRegistration));
   applyEnergyDefaultsForFuelType(fuelTypeSelect.value);
-  statusLine.textContent = `${regionProfile.label} defaults applied. You can still edit every assumption manually.`;
+  syncRegionManagedFieldState();
+
+  if (announce) {
+    statusLine.textContent = applyRegionDefaultsCheckbox.checked
+      ? `${regionOptionLabel(regionProfile)} backend defaults are active for tax, registration, and energy assumptions. Turn the region toggle off to edit those values manually.`
+      : `${regionOptionLabel(regionProfile)} starter defaults applied. You can still edit every assumption manually.`;
+  }
+}
+
+function applyRegionCalibrationState(announce = true) {
+  if (applyRegionDefaultsCheckbox.checked) {
+    applyLocationProfileDefaults(announce);
+    return;
+  }
+
+  syncRegionManagedFieldState();
+  if (announce) {
+    statusLine.textContent =
+      "Backend region defaults are off. Manual tax, registration, and energy assumptions will be used.";
+  }
 }
 
 function showToolFeedback(message, isError = false) {
@@ -707,6 +772,7 @@ function collectFormValues() {
     cityDrivingSharePercent: numericValue("cityDrivingSharePercent"),
     fuelType: normalizedFuelType(fieldValue("fuelType")),
     locationProfile: fieldValue("locationProfile") || "national",
+    applyRegionDefaults: checkboxValue("applyRegionDefaults"),
     homeChargingSharePercent: numericValue("homeChargingSharePercent"),
     chargingLossPercent: numericValue("chargingLossPercent"),
     plugInElectricDrivingSharePercent: numericValue("plugInElectricDrivingSharePercent"),
@@ -876,6 +942,10 @@ function applyVehicleCatalogSelectionById(vehicleId) {
   setVehicleLookupFromEntry(catalogEntry);
   vehiclePresetSelect.value = vehicleId;
   applyVehiclePreset(preset);
+  if (applyRegionDefaultsCheckbox.checked) {
+    applyRegionCalibrationState(false);
+    statusLine.textContent = `${catalogEntry.catalogName} loaded. ${regionOptionLabel(selectedRegionProfile())} backend defaults remain active for tax, registration, and energy assumptions.`;
+  }
   setVehicleLookupStatus(
     `${catalogEntry.catalogName} selected. Known car-specific assumptions were autofilled, and you can still edit any value manually.`
   );
@@ -928,11 +998,41 @@ async function loadVehiclePresets() {
   }
 }
 
+async function loadRegionProfiles() {
+  try {
+    const response = await fetch("/api/regions");
+    const payload = await response.json();
+
+    if (!response.ok || !Array.isArray(payload)) {
+      throw new Error("Region profiles could not be loaded.");
+    }
+
+    regionProfiles = payload;
+    regionProfilesById = Object.fromEntries(payload.map((regionProfile) => [regionProfile.regionId, regionProfile]));
+    populateRegionProfileOptions(locationProfileSelect.value || "national");
+    applyRegionDefaultsCheckbox.disabled = false;
+    applyRegionCalibrationState(false);
+  } catch (error) {
+    regionProfiles = [];
+    regionProfilesById = Object.create(null);
+    applyRegionDefaultsCheckbox.checked = false;
+    applyRegionDefaultsCheckbox.disabled = true;
+    syncRegionManagedFieldState();
+    statusLine.textContent =
+      error.message || "Region profiles could not be loaded, so tax, registration, and energy assumptions are staying manual.";
+  }
+}
+
 function buildScenarioSearchParams() {
   const params = new URLSearchParams();
 
   shareFieldNames.forEach((name) => {
-    const rawValue = fieldValue(name);
+    const field = form.elements[name];
+    if (!field) {
+      return;
+    }
+
+    const rawValue = field.type === "checkbox" ? (field.checked ? "true" : "") : field.value.trim();
     if (rawValue !== "") {
       params.set(name, rawValue);
     }
@@ -967,7 +1067,11 @@ function applyScenarioFromQuery() {
       return;
     }
 
-    field.value = params.get(name);
+    if (field.type === "checkbox") {
+      field.checked = params.get(name) === "true";
+    } else {
+      field.value = params.get(name);
+    }
     hasFieldOverrides = true;
   });
 
@@ -1053,6 +1157,8 @@ function buildRequestPayload(values) {
       simulationAnnualMileageChangeRate: values.annualMileageChangePercent / 100,
       simulationCityDrivingShare: cityDrivingShare,
       simulationFuelType: fuelType,
+      simulationRegionProfile: values.locationProfile || null,
+      simulationApplyRegionDefaults: values.applyRegionDefaults,
       simulationHomeChargingShare: values.homeChargingSharePercent / 100,
       simulationChargingLossRate: values.chargingLossPercent / 100,
       simulationPlugInElectricDrivingShare: values.plugInElectricDrivingSharePercent / 100,
@@ -1495,6 +1601,7 @@ function resetScenarioForm() {
   vehicleSearchInput.value = "";
   vehiclePresetSelect.value = "";
   refreshVehicleLookupOptions();
+  applyRegionCalibrationState(false);
   setVehicleLookupStatus(defaultVehicleLookupStatus);
   presetDescription.textContent = defaultPresetDescription;
   clearFieldErrors();
@@ -1604,6 +1711,14 @@ function validateFormValues(values) {
       errors,
       "fuelType",
       "Fuel type must be gasoline, hybrid gasoline, plug-in hybrid, diesel, or electric."
+    );
+  }
+
+  if (values.applyRegionDefaults && !selectedRegionProfile()) {
+    pushValidationError(
+      errors,
+      "locationProfile",
+      "Backend region defaults are enabled, but the selected region profile is unavailable."
     );
   }
 
@@ -2750,11 +2865,20 @@ vehicleTrimSelect.addEventListener("change", () => {
 
 fuelTypeSelect.addEventListener("change", () => {
   applyFuelTypeLabels(fuelTypeSelect.value);
+  if (applyRegionDefaultsCheckbox.checked) {
+    applyLocationProfileDefaults();
+    return;
+  }
+
   applyEnergyDefaultsForFuelType(fuelTypeSelect.value);
 });
 
 locationProfileSelect.addEventListener("change", () => {
   applyLocationProfileDefaults();
+});
+
+applyRegionDefaultsCheckbox.addEventListener("change", () => {
+  applyRegionCalibrationState();
 });
 
 vehicleSearchInput.addEventListener("input", () => {
@@ -2780,8 +2904,9 @@ async function initializeApp() {
   renderInitialResultsState();
   applyScenarioFromQuery();
   applyFuelTypeLabels(fuelTypeSelect.value);
-  await Promise.all([loadVehicleCatalog(), loadVehiclePresets()]);
+  await Promise.all([loadVehicleCatalog(), loadVehiclePresets(), loadRegionProfiles()]);
   syncPresetSelectionFromQuery();
+  applyRegionCalibrationState(false);
   runSimulation();
 }
 

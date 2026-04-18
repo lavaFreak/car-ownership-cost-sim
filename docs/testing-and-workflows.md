@@ -38,11 +38,13 @@ The Haskell test suite in [test/Spec.hs](/Users/garion/Work/projects/car-ownersh
 covers three categories:
 
 - simulation model tests
-  - financing, taxes, inflation, mileage growth, tire wear, and validation
+  - financing, taxes, inflation, mileage growth, tire wear, validation, and
+    backend region calibration
 - importer tests
   - fixture decoding and source-seed normalization
 - route tests
-  - API responses and basic static asset boot behavior
+  - API responses, region-profile payloads, and basic static asset boot
+    behavior
 
 ## CI workflow
 

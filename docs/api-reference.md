@@ -17,6 +17,8 @@ The app currently serves a very small API:
   - returns a fully populated example `SimulationRequest`
 - `GET /api/catalog`
   - returns the local vehicle catalog entries loaded at startup
+- `GET /api/regions`
+  - returns the backend-owned region calibration profiles
 - `GET /api/presets`
   - returns browser-facing presets derived from the local catalog
 - `POST /api/simulate`
@@ -43,6 +45,8 @@ The request body is JSON with this top-level shape:
     "simulationAnnualMileageChangeRate": 0.02,
     "simulationCityDrivingShare": 0.58,
     "simulationFuelType": "gasoline",
+    "simulationRegionProfile": "national",
+    "simulationApplyRegionDefaults": true,
     "simulationHomeChargingShare": 0.82,
     "simulationChargingLossRate": 0.1,
     "simulationPlugInElectricDrivingShare": 0.65,
@@ -116,6 +120,15 @@ The request body is JSON with this top-level shape:
   - gasoline and diesel scenarios only use liquid-fuel pricing
   - EV scenarios only use charging pricing
   - plug-in hybrids can use both gasoline and charging pricing in the same run
+- `simulationRegionProfile` identifies the backend region profile to use when
+  location-aware calibration is enabled
+- `simulationApplyRegionDefaults` controls whether the backend will override
+  location-sensitive fields with the selected region profile before validation
+  and simulation
+  - when `true`, the backend can replace sales tax, annual registration,
+    liquid-fuel pricing, charging pricing, home-charging share, and
+    charging-loss assumptions from the selected region
+  - when `false`, the request uses the manual values exactly as sent
 - `simulationHomeChargingShare` and `simulationChargingLossRate` only affect
   plug-in scenarios
   - they model how much charging happens at home and how much purchased
@@ -207,6 +220,10 @@ Two main cases exist:
 
 `GET /api/catalog` returns the full normalized local catalog rows. These are
 more detailed and are intended for app logic or future features.
+
+`GET /api/regions` returns the backend-owned location profiles used for region
+calibration. The browser uses these to populate the region selector and to keep
+frontend defaults aligned with the simulation engine.
 
 `GET /api/presets` returns the subset of fields the current frontend uses to
 prefill scenario inputs. Presets are derived from the catalog at runtime, so

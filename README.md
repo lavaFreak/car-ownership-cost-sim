@@ -73,6 +73,9 @@ the core simulation code.
 
 - `src/CarOwnershipCostSim/Types.hs`
   Defines simulation inputs, outputs, and JSON-facing types.
+- `src/CarOwnershipCostSim/RegionProfiles.hs`
+  Defines the shared region calibration profiles used by both the API and the
+  simulation engine.
 - `src/CarOwnershipCostSim/Simulation.hs`
   Contains the Monte Carlo engine and ownership cost calculations.
 - `src/CarOwnershipCostSim/Statistics.hs`
@@ -173,6 +176,7 @@ The yearly model now also applies:
 - EV charging cost modeling that uses electricity price per kWh instead of gasoline price, including home/public charging mix and charging-loss overhead
 - plug-in hybrid cost modeling that splits miles between electricity and gasoline using EV-mode MPGe plus a configurable electric-driving share
 - separate pricing for plug-in-hybrid gasoline, home charging, and public charging instead of forcing all energy through one price assumption
+- optional backend region calibration that can override sales tax, registration, fuel price, charging price, home-charging share, and charging-loss assumptions from the selected location profile
 - loan amortization with interest tracked separately from principal in the yearly breakdown
 - a first-year resale hit on top of the sampled annual depreciation rate
 - a residual value floor so resale cannot fall below a configured minimum
@@ -181,9 +185,11 @@ The yearly model now also applies:
 
 This is still intentionally compact, but it now captures more of the front
 loaded and tail-risk behavior that matters in real ownership decisions.
-The browser also now offers region profiles that prefill sales tax,
-registration, gasoline, diesel, and electricity assumptions while still
-leaving every field editable.
+Region profiles are now also part of the backend contract instead of only a
+browser helper. The UI can still run in fully manual mode, but when backend
+region defaults are enabled the simulator resolves sales tax, registration,
+fuel or electricity pricing, and charging assumptions from the selected region
+before validation and sampling.
 The yearly response now also returns explicit electric miles, liquid-fuel
 miles, purchased charging energy, home/public charging splits, and charging
 loss overhead so the frontend does not have to infer those values from the
@@ -199,6 +205,9 @@ The backend currently exposes:
   Returns a sample request payload.
 - `GET /api/catalog`
   Returns the normalized local vehicle catalog entries used by the app.
+- `GET /api/regions`
+  Returns the backend-owned region calibration profiles used by the UI and
+  simulation engine.
 - `GET /api/presets`
   Returns vehicle presets derived from the local vehicle catalog.
 - `POST /api/simulate`

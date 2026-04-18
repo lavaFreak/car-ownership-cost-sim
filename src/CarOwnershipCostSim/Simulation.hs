@@ -22,6 +22,7 @@ module CarOwnershipCostSim.Simulation
   )
 where
 
+import CarOwnershipCostSim.RegionProfiles (lookupRegionProfile, resolveRegionAdjustedInput)
 import CarOwnershipCostSim.Statistics (mean, percentile)
 import CarOwnershipCostSim.Types
   ( BoundedNormal (..),
@@ -56,8 +57,8 @@ simulateMany requestedIterations simulationInput seed =
 simulateRequestWithSeed :: Int -> SimulationRequest -> SimulationResponse
 simulateRequestWithSeed seed request =
   let iterations = max 1 (requestIterations request)
-      simulationInput = requestInput request
-      samples = simulateMany iterations (requestInput request) seed
+      simulationInput = resolveRegionAdjustedInput (requestInput request)
+      samples = simulateMany iterations simulationInput seed
       totals = map costTotal samples
       (exampleBreakdown, exampleYearlyBreakdown, _) =
         simulateDetailedCostBreakdown simulationInput (mkStdGen seed)
@@ -775,6 +776,26 @@ totalMilesDrivenForInput simulationInput =
 -- | Validate the simulation input fields independently of the transport layer.
 validateSimulationInput :: SimulationInput -> [String]
 validateSimulationInput simulationInput =
+  let resolvedSimulationInput = resolveRegionAdjustedInput simulationInput
+   in concat
+        [ validateRegionSelection simulationInput,
+          validateResolvedSimulationInput resolvedSimulationInput
+        ]
+
+validateRegionSelection :: SimulationInput -> [String]
+validateRegionSelection simulationInput =
+  case simulationRegionProfile simulationInput of
+    Nothing ->
+      require
+        (not (simulationApplyRegionDefaults simulationInput))
+        "Region profile is required when backend region defaults are enabled."
+    Just regionProfileId ->
+      require
+        (lookupRegionProfile regionProfileId /= Nothing)
+        "Region profile must be one of the supported backend region ids."
+
+validateResolvedSimulationInput :: SimulationInput -> [String]
+validateResolvedSimulationInput simulationInput =
   concat
     [ require (simulationPurchasePrice simulationInput > 0) "Purchase price must be greater than 0.",
       require (simulationDownPayment simulationInput >= 0) "Down payment cannot be negative.",

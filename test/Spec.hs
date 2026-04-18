@@ -14,6 +14,11 @@ core ownership model, the data-refresh path, and the web API still agree.
 -}
 module Main (main) where
 
+import CarOwnershipCostSim.RegionProfiles
+  ( RegionProfile (..),
+    applyRegionProfileDefaults,
+    lookupRegionProfile,
+  )
 import CarOwnershipCostSim.Simulation (simulateRequestWithSeed, validateSimulationRequest)
 import CarOwnershipCostSim.Types
 import CarOwnershipCostSim.VehicleCatalog
@@ -98,12 +103,14 @@ tests =
       TestLabel "missing source assumptions fall back to generated defaults" generatedSourceDefaultsTest,
       TestLabel "source seed validation rejects wrong vPIC model matches" sourceSeedValidationFailureTest,
       TestLabel "API example route returns a valid simulation request" apiExampleRouteTest,
+      TestLabel "API region route returns backend calibration profiles" apiRegionsRouteTest,
       TestLabel "web asset routes boot successfully" webAssetRoutesSmokeTest,
       TestLabel "HEAD requests resolve for the homepage" homepageHeadRouteTest,
       TestLabel "API catalog and preset routes stay aligned" apiCatalogAndPresetsRouteTest,
       TestLabel "API simulate route returns a valid simulation response" apiSimulateRouteTest,
       TestLabel "API simulate rejects malformed and invalid input" apiSimulateErrorRoutesTest,
       TestLabel "simulation is deterministic for a fixed seed" simulationDeterminismTest,
+      TestLabel "region defaults override manual tax and energy assumptions" regionCalibrationOverrideTest,
       TestLabel "simulation invariants hold across many seeds" simulationInvariantsAcrossSeedsTest,
       TestLabel "summary statistics stay ordered" summaryOrderingTest,
       TestLabel "invalid input is rejected" invalidInputValidationTest,
@@ -129,6 +136,8 @@ deterministicCashPurchaseTest =
                     simulationAnnualMileageChangeRate = 0,
                     simulationCityDrivingShare = 0.5,
                     simulationFuelType = "gasoline",
+                    simulationRegionProfile = Nothing,
+                    simulationApplyRegionDefaults = False,
                     simulationHomeChargingShare = 0,
                     simulationChargingLossRate = 0,
                     simulationPlugInElectricDrivingShare = 0,
@@ -224,6 +233,8 @@ purchaseTaxAndFeesTest =
                     simulationAnnualMileageChangeRate = 0,
                     simulationCityDrivingShare = 0.5,
                     simulationFuelType = "gasoline",
+                    simulationRegionProfile = Nothing,
+                    simulationApplyRegionDefaults = False,
                     simulationHomeChargingShare = 0,
                     simulationChargingLossRate = 0,
                     simulationPlugInElectricDrivingShare = 0,
@@ -310,6 +321,8 @@ inflationTest =
                     simulationAnnualMileageChangeRate = 0,
                     simulationCityDrivingShare = 0.5,
                     simulationFuelType = "gasoline",
+                    simulationRegionProfile = Nothing,
+                    simulationApplyRegionDefaults = False,
                     simulationHomeChargingShare = 0,
                     simulationChargingLossRate = 0,
                     simulationPlugInElectricDrivingShare = 0,
@@ -401,6 +414,8 @@ repairShockTest =
                     simulationAnnualMileageChangeRate = 0,
                     simulationCityDrivingShare = 0.5,
                     simulationFuelType = "gasoline",
+                    simulationRegionProfile = Nothing,
+                    simulationApplyRegionDefaults = False,
                     simulationHomeChargingShare = 0,
                     simulationChargingLossRate = 0,
                     simulationPlugInElectricDrivingShare = 0,
@@ -1226,6 +1241,21 @@ apiExampleRouteTest =
         (eitherDecode (simpleBody response))
     assertEqual "example route stays in sync with the example request" exampleSimulationRequest decodedRequest
 
+apiRegionsRouteTest :: Test
+apiRegionsRouteTest =
+  TestCase $ do
+    testApplication <- buildTestApplication
+    response <- runRequest testApplication methodGet "/api/regions" BL.empty []
+    assertEqual "region route returns 200" status200 (simpleStatus response)
+    decodedRegions <-
+      either
+        (\decodeError -> assertFailure ("Region route did not return valid JSON: " <> decodeError) >> pure ([] :: [RegionProfile]))
+        pure
+        (eitherDecode (simpleBody response))
+    assertBool "backend exposes several region profiles" (length decodedRegions >= 6)
+    assertBool "national profile is present" (find (\regionProfile -> regionId regionProfile == "national") decodedRegions /= Nothing)
+    assertBool "west coast profile is present" (find (\regionProfile -> regionId regionProfile == "west-coast") decodedRegions /= Nothing)
+
 apiCatalogAndPresetsRouteTest :: Test
 apiCatalogAndPresetsRouteTest =
   TestCase $ do
@@ -1320,6 +1350,32 @@ simulationDeterminismTest =
     assertEqual "running the same seed twice gives the same response" firstResponse secondResponse
     assertBool "changing the seed changes the sample totals for the uncertain model" (responseSampleTotals firstResponse /= responseSampleTotals changedSeedResponse)
 
+regionCalibrationOverrideTest :: Test
+regionCalibrationOverrideTest =
+  TestCase $ do
+    westCoastProfile <-
+      maybe
+        (assertFailure "West Coast region profile was missing." >> pure fallbackRegionProfile)
+        pure
+        (lookupRegionProfile "west-coast")
+    let manuallyMismatchedInput =
+          baselineSimulationInput
+            { simulationFuelType = "gasoline",
+              simulationRegionProfile = Just "west-coast",
+              simulationApplyRegionDefaults = True,
+              simulationSalesTaxRate = 0,
+              simulationAnnualRegistration = 0,
+              simulationAnnualMiles = 12000,
+              simulationFuelPrice = deterministicBoundedNormal 0.25
+            }
+        expectedResolvedInput =
+          (applyRegionProfileDefaults westCoastProfile manuallyMismatchedInput)
+            { simulationApplyRegionDefaults = False
+            }
+        calibratedResponse = simulateRequestWithSeed 20260418 (deterministicRequest 20260418 manuallyMismatchedInput)
+        manuallyResolvedResponse = simulateRequestWithSeed 20260418 (deterministicRequest 20260418 expectedResolvedInput)
+    assertEqual "backend region calibration resolves to the same simulation as the explicit equivalent input" manuallyResolvedResponse calibratedResponse
+
 simulationInvariantsAcrossSeedsTest :: Test
 simulationInvariantsAcrossSeedsTest =
   TestCase $
@@ -1366,6 +1422,8 @@ invalidInputValidationTest =
                     simulationAnnualMileageChangeRate = 1.2,
                     simulationCityDrivingShare = 1.2,
                     simulationFuelType = "gasoline",
+                    simulationRegionProfile = Just "not-a-region",
+                    simulationApplyRegionDefaults = True,
                     simulationHomeChargingShare = 1.2,
                     simulationChargingLossRate = 1.1,
                     simulationPlugInElectricDrivingShare = 1.2,
@@ -1434,6 +1492,7 @@ invalidInputValidationTest =
             }
         validationErrors = validateSimulationRequest invalidRequest
     assertBool "iterations are validated" ("Iterations must be at least 1." `elem` validationErrors)
+    assertBool "region profile ids are validated" ("Region profile must be one of the supported backend region ids." `elem` validationErrors)
     assertBool "down payment is validated" ("Down payment cannot exceed purchase price." `elem` validationErrors)
     assertBool "sales tax is validated" ("Sales tax rate should be expressed as a decimal between 0 and 1." `elem` validationErrors)
     assertBool "upfront fees are validated" ("Upfront fees cannot be negative." `elem` validationErrors)
@@ -1746,6 +1805,8 @@ invalidSimulationRequest =
             simulationAnnualMileageChangeRate = 1.2,
             simulationCityDrivingShare = 1.2,
             simulationFuelType = "gasoline",
+            simulationRegionProfile = Just "not-a-region",
+            simulationApplyRegionDefaults = True,
             simulationHomeChargingShare = 1.2,
             simulationChargingLossRate = 1.1,
             simulationPlugInElectricDrivingShare = 1.2,
@@ -1822,6 +1883,21 @@ fallbackBoundedNormal =
       boundedNormalUpperBound = Just 0
     }
 
+fallbackRegionProfile :: RegionProfile
+fallbackRegionProfile =
+  RegionProfile
+    { regionId = "fallback",
+      regionLabel = "Fallback",
+      regionSalesTaxRate = 0,
+      regionAnnualRegistration = 0,
+      regionHomeChargingShare = 0.82,
+      regionChargingLossRate = 0.1,
+      regionGasolinePrice = fallbackBoundedNormal,
+      regionDieselPrice = fallbackBoundedNormal,
+      regionHomeChargingPrice = fallbackBoundedNormal,
+      regionPublicChargingPrice = fallbackBoundedNormal
+    }
+
 deterministicBoundedNormal :: Double -> BoundedNormal
 deterministicBoundedNormal value =
   BoundedNormal
@@ -1844,6 +1920,8 @@ baselineSimulationInput =
       simulationAnnualMileageChangeRate = 0,
       simulationCityDrivingShare = 0.5,
       simulationFuelType = "gasoline",
+      simulationRegionProfile = Nothing,
+      simulationApplyRegionDefaults = False,
       simulationHomeChargingShare = 0,
       simulationChargingLossRate = 0,
       simulationPlugInElectricDrivingShare = 0,

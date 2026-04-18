@@ -57,6 +57,7 @@ library
     import:           shared-properties
     hs-source-dirs:   src
     exposed-modules:
+        CarOwnershipCostSim.RegionProfiles
         CarOwnershipCostSim.Simulation
         CarOwnershipCostSim.Statistics
         CarOwnershipCostSim.Types
