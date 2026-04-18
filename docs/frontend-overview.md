@@ -49,7 +49,8 @@ The browser now supports two catalog-backed lookup paths:
 
 Those lookup controls intentionally:
 
-- autofill car-specific defaults such as city/highway MPG and maintenance
+- autofill car-specific defaults such as city/highway efficiency, fuel type,
+  and maintenance
   assumptions
 - keep the exact-match dropdown in sync with the current filters and search
   text
@@ -61,7 +62,8 @@ The preset dropdown is populated from `GET /api/presets`.
 
 Presets intentionally:
 
-- prefill vehicle-specific defaults such as city/highway MPG and maintenance
+- prefill vehicle-specific defaults such as city/highway efficiency, fuel type,
+  energy-price assumptions, and maintenance
   assumptions
 - leave scenario-specific choices like mileage and financing under user control
 - come from the local catalog so they stay reproducible

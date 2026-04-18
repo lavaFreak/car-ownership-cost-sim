@@ -134,12 +134,23 @@
               </label>
 
               <label>
-                City MPG
+                Fuel / powertrain
+                <select id="fuel-type" name="fuelType">
+                  <option value="gasoline" selected>Gasoline</option>
+                  <option value="hybrid-gasoline">Hybrid gasoline</option>
+                  <option value="plug-in-hybrid">Plug-in hybrid</option>
+                  <option value="diesel">Diesel</option>
+                  <option value="electric">Electric</option>
+                </select>
+              </label>
+
+              <label>
+                <span id="city-efficiency-label">City MPG</span>
                 <input name="cityMilesPerGallon" type="number" min="1" step="0.1" value="28" required />
               </label>
 
               <label>
-                Highway MPG
+                <span id="highway-efficiency-label">Highway MPG</span>
                 <input name="highwayMilesPerGallon" type="number" min="1" step="0.1" value="38" required />
               </label>
             </fieldset>
@@ -210,12 +221,12 @@
               <legend>Uncertainty assumptions</legend>
 
               <label>
-                Fuel price mean ($/gal)
+                <span id="energy-price-mean-label">Fuel price mean ($/gal)</span>
                 <input name="fuelMean" type="number" min="0" step="0.05" value="3.75" required />
               </label>
 
               <label>
-                Fuel price std dev
+                <span id="energy-price-stddev-label">Fuel price std dev</span>
                 <input name="fuelStdDev" type="number" min="0" step="0.05" value="0.55" required />
               </label>
 

@@ -32,6 +32,7 @@ import CarOwnershipCostSim.Types
     SimulationSummary (..),
     YearlyCostBreakdown (..),
   )
+import Data.Char (toLower)
 import System.Random (StdGen, mkStdGen, randomR)
 
 -- | Run the simulation repeatedly for a fixed input scenario and random seed.
@@ -133,6 +134,7 @@ simulateDetailedCostBreakdown simulationInput initialGen =
       annualMileageChangeRate = max (-1) (simulationAnnualMileageChangeRate simulationInput)
       baseAnnualMiles = max 0 (simulationAnnualMiles simulationInput)
       cityDrivingShare = clampUnitInterval (simulationCityDrivingShare simulationInput)
+      fuelType = normalizeFuelType (simulationFuelType simulationInput)
       combinedMilesPerGallon = max 0 (simulationMilesPerGallon simulationInput)
       cityMilesPerGallon = positiveOrFallback (simulationCityMilesPerGallon simulationInput) combinedMilesPerGallon
       highwayMilesPerGallon = positiveOrFallback (simulationHighwayMilesPerGallon simulationInput) combinedMilesPerGallon
@@ -155,6 +157,7 @@ simulateDetailedCostBreakdown simulationInput initialGen =
           baseAnnualMiles
           annualMileageChangeRate
           cityDrivingShare
+          fuelType
           cityMilesPerGallon
           highwayMilesPerGallon
           (simulationFuelPrice simulationInput)
@@ -238,6 +241,9 @@ data SampledYear = SampledYear
   { sampledYearMilesDriven :: Double,
     sampledYearCityMilesDriven :: Double,
     sampledYearHighwayMilesDriven :: Double,
+    sampledYearEnergyUnitsConsumed :: Double,
+    sampledYearCityEnergyUnitsConsumed :: Double,
+    sampledYearHighwayEnergyUnitsConsumed :: Double,
     sampledYearFuelGallons :: Double,
     sampledYearCityFuelGallons :: Double,
     sampledYearHighwayFuelGallons :: Double,
@@ -259,6 +265,7 @@ simulateYears ::
   Double ->
   Double ->
   Double ->
+  String ->
   Double ->
   Double ->
   BoundedNormal ->
@@ -274,7 +281,7 @@ simulateYears ::
   Double ->
   StdGen ->
   ([SampledYear], StdGen)
-simulateYears yearsRemaining carValue baseAnnualMiles annualMileageChangeRate cityDrivingShare cityMilesPerGallon highwayMilesPerGallon fuelModel maintenanceModel repairShockProbability repairShockModel depreciationModel tireReplacementCost tireLifeMiles firstYearDepreciationBonus residualValueFloorPercent expectedAnnualMilesForResale extraMileageDepreciationPerMile initialGen =
+simulateYears yearsRemaining carValue baseAnnualMiles annualMileageChangeRate cityDrivingShare fuelType cityMilesPerGallon highwayMilesPerGallon fuelModel maintenanceModel repairShockProbability repairShockModel depreciationModel tireReplacementCost tireLifeMiles firstYearDepreciationBonus residualValueFloorPercent expectedAnnualMilesForResale extraMileageDepreciationPerMile initialGen =
   go yearsRemaining 1 carValue 0 [] initialGen
   where
     go 0 _ _ _ acc gen = (reverse acc, gen)
@@ -282,8 +289,11 @@ simulateYears yearsRemaining carValue baseAnnualMiles annualMileageChangeRate ci
       let yearlyMiles = annualMilesForYear baseAnnualMiles annualMileageChangeRate yearIndex
           cityMiles = yearlyMiles * cityDrivingShare
           highwayMiles = max 0 (yearlyMiles - cityMiles)
-          cityGallons = gallonsDrivenForYear cityMiles cityMilesPerGallon
-          highwayGallons = gallonsDrivenForYear highwayMiles highwayMilesPerGallon
+          cityEnergyUnits = energyUnitsDrivenForYear fuelType cityMiles cityMilesPerGallon
+          highwayEnergyUnits = energyUnitsDrivenForYear fuelType highwayMiles highwayMilesPerGallon
+          annualEnergyUnits = cityEnergyUnits + highwayEnergyUnits
+          cityGallons = liquidFuelGallonsForYear fuelType cityMiles cityMilesPerGallon
+          highwayGallons = liquidFuelGallonsForYear fuelType highwayMiles highwayMilesPerGallon
           annualGallons = cityGallons + highwayGallons
           tireCost =
             tireReplacementCost
@@ -315,10 +325,13 @@ simulateYears yearsRemaining carValue baseAnnualMiles annualMileageChangeRate ci
               { sampledYearMilesDriven = yearlyMiles,
                 sampledYearCityMilesDriven = cityMiles,
                 sampledYearHighwayMilesDriven = highwayMiles,
+                sampledYearEnergyUnitsConsumed = annualEnergyUnits,
+                sampledYearCityEnergyUnitsConsumed = cityEnergyUnits,
+                sampledYearHighwayEnergyUnitsConsumed = highwayEnergyUnits,
                 sampledYearFuelGallons = annualGallons,
                 sampledYearCityFuelGallons = cityGallons,
                 sampledYearHighwayFuelGallons = highwayGallons,
-                sampledYearFuelCost = annualGallons * fuelPrice,
+                sampledYearFuelCost = annualEnergyUnits * fuelPrice,
                 sampledYearMaintenanceCost = maintenanceCost,
                 sampledYearRepairShockCost = repairShockCost,
                 sampledYearTireCost = tireCost,
@@ -437,6 +450,9 @@ buildYearlyCostBreakdown financing purchaseTax upfrontFees annualInflationRate a
           yearlyMilesDriven = sampledYearMilesDriven sampledYear,
           yearlyCityMilesDriven = sampledYearCityMilesDriven sampledYear,
           yearlyHighwayMilesDriven = sampledYearHighwayMilesDriven sampledYear,
+          yearlyEnergyUnitsConsumed = sampledYearEnergyUnitsConsumed sampledYear,
+          yearlyCityEnergyUnitsConsumed = sampledYearCityEnergyUnitsConsumed sampledYear,
+          yearlyHighwayEnergyUnitsConsumed = sampledYearHighwayEnergyUnitsConsumed sampledYear,
           yearlyFuelGallons = sampledYearFuelGallons sampledYear,
           yearlyCityFuelGallons = sampledYearCityFuelGallons sampledYear,
           yearlyHighwayFuelGallons = sampledYearHighwayFuelGallons sampledYear,
@@ -564,6 +580,35 @@ gallonsDrivenForYear yearlyMiles milesPerGallon
   | milesPerGallon <= 0 = 0
   | otherwise = yearlyMiles / milesPerGallon
 
+energyUnitsDrivenForYear :: String -> Double -> Double -> Double
+energyUnitsDrivenForYear fuelType yearlyMiles efficiency
+  | isElectricFuelType fuelType = electricKilowattHoursForYear yearlyMiles efficiency
+  | otherwise = gallonsDrivenForYear yearlyMiles efficiency
+
+liquidFuelGallonsForYear :: String -> Double -> Double -> Double
+liquidFuelGallonsForYear fuelType yearlyMiles efficiency
+  | isElectricFuelType fuelType = 0
+  | otherwise = gallonsDrivenForYear yearlyMiles efficiency
+
+electricKilowattHoursForYear :: Double -> Double -> Double
+electricKilowattHoursForYear yearlyMiles milesPerGallonEquivalent
+  | milesPerGallonEquivalent <= 0 = 0
+  | otherwise = yearlyMiles * kilowattHoursPerGallonEquivalent / milesPerGallonEquivalent
+
+kilowattHoursPerGallonEquivalent :: Double
+kilowattHoursPerGallonEquivalent = 33.7
+
+normalizeFuelType :: String -> String
+normalizeFuelType rawFuelType
+  | normalized == "hybrid" = "hybrid-gasoline"
+  | otherwise = normalized
+  where
+    normalized = map toLower rawFuelType
+
+isElectricFuelType :: String -> Bool
+isElectricFuelType fuelType =
+  normalizeFuelType fuelType == "electric"
+
 expectedCumulativeMilesForYear :: Double -> Int -> Double
 expectedCumulativeMilesForYear expectedAnnualMiles yearIndex =
   max 0 expectedAnnualMiles * fromIntegral (max 0 yearIndex)
@@ -628,9 +673,10 @@ validateSimulationInput simulationInput =
       require (simulationAnnualMileageChangeRate simulationInput <= 1) "Annual mileage change rate should be less than or equal to 1.",
       require (simulationCityDrivingShare simulationInput >= 0) "City driving share cannot be negative.",
       require (simulationCityDrivingShare simulationInput <= 1) "City driving share should be expressed as a decimal between 0 and 1.",
-      require (simulationMilesPerGallon simulationInput > 0) "Fuel efficiency must be greater than 0 MPG.",
-      require (simulationCityMilesPerGallon simulationInput > 0) "City fuel efficiency must be greater than 0 MPG.",
-      require (simulationHighwayMilesPerGallon simulationInput > 0) "Highway fuel efficiency must be greater than 0 MPG.",
+      require (normalizeFuelType (simulationFuelType simulationInput) `elem` ["gasoline", "hybrid-gasoline", "plug-in-hybrid", "diesel", "electric"]) "Fuel type must be gasoline, hybrid-gasoline, plug-in-hybrid, diesel, or electric.",
+      require (simulationMilesPerGallon simulationInput > 0) "Combined efficiency must be greater than 0.",
+      require (simulationCityMilesPerGallon simulationInput > 0) "City efficiency must be greater than 0.",
+      require (simulationHighwayMilesPerGallon simulationInput > 0) "Highway efficiency must be greater than 0.",
       require (simulationAnnualInsurance simulationInput >= 0) "Insurance cost cannot be negative.",
       require (simulationAnnualRegistration simulationInput >= 0) "Registration cost cannot be negative.",
       require (simulationAnnualParking simulationInput >= 0) "Parking cost cannot be negative.",
@@ -650,7 +696,7 @@ validateSimulationInput simulationInput =
       require (simulationRepairShockProbability simulationInput >= 0) "Repair shock probability cannot be negative.",
       require (simulationRepairShockProbability simulationInput <= 1) "Repair shock probability should be expressed as a decimal between 0 and 1.",
       validateBoundedNormal "Repair shock cost" False (simulationRepairShockCost simulationInput),
-      validateBoundedNormal "Fuel price" False (simulationFuelPrice simulationInput),
+      validateBoundedNormal "Energy price" False (simulationFuelPrice simulationInput),
       validateBoundedNormal "Annual maintenance" False (simulationAnnualMaintenance simulationInput),
       validateBoundedNormal "Annual depreciation rate" True (simulationAnnualDepreciationRate simulationInput)
     ]

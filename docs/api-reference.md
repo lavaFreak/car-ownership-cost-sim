@@ -42,6 +42,7 @@ The request body is JSON with this top-level shape:
     "simulationAnnualMiles": 12000,
     "simulationAnnualMileageChangeRate": 0.02,
     "simulationCityDrivingShare": 0.58,
+    "simulationFuelType": "gasoline",
     "simulationMilesPerGallon": 32,
     "simulationCityMilesPerGallon": 28,
     "simulationHighwayMilesPerGallon": 38,
@@ -93,8 +94,12 @@ The request body is JSON with this top-level shape:
   - when absent, the server picks a random seed
 - `requestIterations` controls Monte Carlo sample count
 - bounded-normal inputs are used for uncertain variables
-- `simulationMilesPerGallon` is the derived blended MPG for the chosen
+- `simulationFuelType` controls whether the energy-price distribution is
+  interpreted as dollars per gallon or dollars per kWh
+- `simulationMilesPerGallon` is the derived blended efficiency for the chosen
   city/highway split
+  - for gasoline-like vehicles it is MPG
+  - for EVs it is MPGe
 
 ### Response shape
 

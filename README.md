@@ -21,10 +21,10 @@ The app asks for values such as:
 - down payment and loan details
 - miles driven per year
 - annual mileage change over time
-- city-driving share plus city and highway MPG
+- city-driving share plus city and highway efficiency
 - yearly insurance, registration, parking, tolls, and inspection
 - tire replacement assumptions
-- assumptions about fuel price, maintenance, and depreciation
+- assumptions about energy price, maintenance, and depreciation
 
 It then runs many simulations and summarizes the results with statistics such
 as:
@@ -125,7 +125,7 @@ for deeper context:
 
 The current MVP models uncertainty with bounded normal distributions for:
 
-- fuel price
+- energy price
 - annual maintenance
 - annual depreciation rate
 - annual repair shock cost when a repair shock occurs
@@ -163,7 +163,8 @@ The yearly model now also applies:
 - purchase tax and upfront one-time fees
 - annual inflation to recurring costs such as fuel, maintenance, insurance, registration, parking, tolls, inspection, tires, and repair shocks
 - annual mileage change so fuel use and tire wear can grow or shrink over time
-- city/highway fuel burn using a configurable city-driving share instead of one flat MPG assumption
+- city/highway energy use using a configurable city-driving share instead of one flat efficiency assumption
+- EV charging cost modeling that uses electricity price per kWh instead of gasoline price
 - loan amortization with interest tracked separately from principal in the yearly breakdown
 - a first-year resale hit on top of the sampled annual depreciation rate
 - a residual value floor so resale cannot fall below a configured minimum
@@ -295,9 +296,11 @@ depreciation, mileage penalties, and floor-limited residual value while keeping
 the web layer lightweight. The frontend now also supports side-by-side
 comparison by letting users pin a baseline run, compare later scenarios against
 it with delta cards, and overlay the baseline on the distribution and yearly
-charts. The fuel model now also distinguishes city and highway MPG, using the
-catalog's official FuelEconomy.gov values when presets are applied, so vehicle
-comparisons are no longer forced through one blended MPG input. It also now
+charts. The energy model now also distinguishes city and highway efficiency,
+using the catalog's official FuelEconomy.gov values when presets are applied,
+so vehicle comparisons are no longer forced through one blended MPG input. EV
+scenarios now switch to charging-cost math and electricity-price assumptions
+instead of being treated like gasoline vehicles. It also now
 includes a first importer layer that uses curated source seeds plus official
 `vPIC` and `FuelEconomy.gov` payloads to refresh the local vehicle catalog, and
 that catalog now carries resale defaults and city/highway fuel-economy data all

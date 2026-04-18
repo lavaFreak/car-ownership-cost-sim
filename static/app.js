@@ -17,6 +17,11 @@ const vehiclePresetSelect = document.getElementById("vehicle-preset");
 const vehicleLookupStatus = document.getElementById("vehicle-lookup-status");
 const vehicleMatchCount = document.getElementById("vehicle-match-count");
 const presetDescription = document.getElementById("preset-description");
+const fuelTypeSelect = document.getElementById("fuel-type");
+const cityEfficiencyLabel = document.getElementById("city-efficiency-label");
+const highwayEfficiencyLabel = document.getElementById("highway-efficiency-label");
+const energyPriceMeanLabel = document.getElementById("energy-price-mean-label");
+const energyPriceStdDevLabel = document.getElementById("energy-price-stddev-label");
 const submitButton = form.querySelector('button[type="submit"]');
 const saveComparisonButton = document.getElementById("save-comparison-button");
 const clearComparisonButton = document.getElementById("clear-comparison-button");
@@ -55,7 +60,7 @@ const preciseCurrency = new Intl.NumberFormat("en-US", {
 let hasSuccessfulRun = false;
 let vehicleCatalog = [];
 let vehiclePresets = [];
-let pendingPresetSelection = { presetId: "", hasFieldOverrides: false };
+let pendingPresetSelection = { presetId: "", hasFieldOverrides: false, hasFuelTypeOverride: false };
 let latestRun = null;
 let comparisonBaseline = null;
 
@@ -76,6 +81,7 @@ const shareFieldNames = [
   "annualMiles",
   "annualMileageChangePercent",
   "cityDrivingSharePercent",
+  "fuelType",
   "cityMilesPerGallon",
   "highwayMilesPerGallon",
   "annualInsurance",
@@ -105,6 +111,8 @@ const shareFieldNames = [
   "seed",
 ];
 
+const knownFuelTypes = ["gasoline", "hybrid-gasoline", "plug-in-hybrid", "diesel", "electric"];
+
 function fieldValue(name) {
   return form.elements[name].value.trim();
 }
@@ -130,6 +138,69 @@ function setNumericField(name, value) {
   }
 
   field.value = String(value);
+}
+
+function normalizedFuelType(value) {
+  if (!value) {
+    return "gasoline";
+  }
+
+  const normalized = value.trim().toLowerCase();
+  if (normalized === "hybrid") {
+    return "hybrid-gasoline";
+  }
+
+  return knownFuelTypes.includes(normalized) ? normalized : "gasoline";
+}
+
+function isElectricFuelType(value) {
+  return normalizedFuelType(value) === "electric";
+}
+
+function defaultEnergyPriceProfile(fuelType) {
+  switch (normalizedFuelType(fuelType)) {
+    case "electric":
+      return { mean: 0.17, stdDev: 0.05 };
+    case "diesel":
+      return { mean: 4.15, stdDev: 0.6 };
+    default:
+      return { mean: 3.75, stdDev: 0.55 };
+  }
+}
+
+function energyCostLabel(fuelType) {
+  return isElectricFuelType(fuelType) ? "Charging" : "Fuel";
+}
+
+function energyUnitLabel(fuelType) {
+  return isElectricFuelType(fuelType) ? "kWh" : "gal";
+}
+
+function efficiencyLabelPrefix(fuelType) {
+  return isElectricFuelType(fuelType) ? "MPGe" : "MPG";
+}
+
+function applyFuelTypeLabels(fuelType = fuelTypeSelect.value) {
+  const normalized = normalizedFuelType(fuelType);
+  const efficiencyLabel = efficiencyLabelPrefix(normalized);
+
+  cityEfficiencyLabel.textContent = `City ${efficiencyLabel}`;
+  highwayEfficiencyLabel.textContent = `Highway ${efficiencyLabel}`;
+
+  if (isElectricFuelType(normalized)) {
+    energyPriceMeanLabel.textContent = "Electricity price mean ($/kWh)";
+    energyPriceStdDevLabel.textContent = "Electricity price std dev";
+    return;
+  }
+
+  energyPriceMeanLabel.textContent = "Fuel price mean ($/gal)";
+  energyPriceStdDevLabel.textContent = "Fuel price std dev";
+}
+
+function applyEnergyDefaultsForFuelType(fuelType) {
+  const defaults = defaultEnergyPriceProfile(fuelType);
+  setNumericField("fuelMean", defaults.mean.toFixed(2));
+  setNumericField("fuelStdDev", defaults.stdDev.toFixed(2));
 }
 
 function showToolFeedback(message, isError = false) {
@@ -448,6 +519,7 @@ function loadPersistedComparisonBaseline() {
       return;
     }
 
+    parsed.fuelType = normalizedFuelType(parsed.fuelType);
     comparisonBaseline = parsed;
   } catch (_error) {
     try {
@@ -473,6 +545,7 @@ function collectFormValues() {
     annualMiles: numericValue("annualMiles"),
     annualMileageChangePercent: numericValue("annualMileageChangePercent"),
     cityDrivingSharePercent: numericValue("cityDrivingSharePercent"),
+    fuelType: normalizedFuelType(fieldValue("fuelType")),
     cityMilesPerGallon: numericValue("cityMilesPerGallon"),
     highwayMilesPerGallon: numericValue("highwayMilesPerGallon"),
     annualInsurance: numericValue("annualInsurance"),
@@ -532,6 +605,7 @@ function presetLikeFromCatalogEntry(catalogEntry) {
     presetId: catalogEntry.catalogId,
     presetName: catalogEntry.catalogName,
     presetDescription: catalogEntry.catalogDescription,
+    presetFuelType: normalizedFuelType(catalogEntry.catalogFuelType),
     presetPurchasePrice: catalogEntry.catalogPurchasePrice,
     presetCityMilesPerGallon: catalogEntry.catalogCityMpg ?? catalogEntry.catalogCombinedMpg,
     presetHighwayMilesPerGallon: catalogEntry.catalogHighwayMpg ?? catalogEntry.catalogCombinedMpg,
@@ -550,6 +624,8 @@ function presetLikeFromCatalogEntry(catalogEntry) {
 }
 
 function applyVehiclePreset(preset) {
+  fuelTypeSelect.value = normalizedFuelType(preset.presetFuelType || fuelTypeSelect.value);
+  applyFuelTypeLabels(fuelTypeSelect.value);
   setNumericField("purchasePrice", Math.round(preset.presetPurchasePrice));
   setNumericField("cityMilesPerGallon", preset.presetCityMilesPerGallon.toFixed(1));
   setNumericField("highwayMilesPerGallon", preset.presetHighwayMilesPerGallon.toFixed(1));
@@ -600,6 +676,9 @@ function applyVehicleCatalogSelectionById(vehicleId) {
     vehicleSearchInput.value = "";
   }
 
+  fuelTypeSelect.value = normalizedFuelType(catalogEntry.catalogFuelType);
+  applyFuelTypeLabels(fuelTypeSelect.value);
+  applyEnergyDefaultsForFuelType(fuelTypeSelect.value);
   setVehicleLookupFromEntry(catalogEntry);
   vehiclePresetSelect.value = vehicleId;
   applyVehiclePreset(preset);
@@ -682,6 +761,7 @@ function replaceUrlWithCurrentScenario() {
 function applyScenarioFromQuery() {
   const params = new URLSearchParams(window.location.search);
   let hasFieldOverrides = false;
+  const hasFuelTypeOverride = params.has("fuelType");
 
   shareFieldNames.forEach((name) => {
     if (!params.has(name)) {
@@ -700,6 +780,7 @@ function applyScenarioFromQuery() {
   pendingPresetSelection = {
     presetId: params.get("preset") || "",
     hasFieldOverrides,
+    hasFuelTypeOverride,
   };
 
   if (hasFieldOverrides) {
@@ -726,6 +807,10 @@ function syncPresetSelectionFromQuery() {
 
   if (catalogEntry) {
     setVehicleLookupFromEntry(catalogEntry);
+    if (!pendingPresetSelection.hasFuelTypeOverride) {
+      fuelTypeSelect.value = normalizedFuelType(catalogEntry.catalogFuelType);
+      applyFuelTypeLabels(fuelTypeSelect.value);
+    }
   }
 
   if (!pendingPresetSelection.hasFieldOverrides) {
@@ -762,6 +847,7 @@ function buildRequestPayload(values) {
       simulationAnnualMiles: values.annualMiles,
       simulationAnnualMileageChangeRate: values.annualMileageChangePercent / 100,
       simulationCityDrivingShare: cityDrivingShare,
+      simulationFuelType: values.fuelType,
       simulationMilesPerGallon: combinedMilesPerGallon,
       simulationCityMilesPerGallon: values.cityMilesPerGallon,
       simulationHighwayMilesPerGallon: values.highwayMilesPerGallon,
@@ -789,7 +875,7 @@ function buildRequestPayload(values) {
       simulationFuelPrice: buildBoundedNormal(
         values.fuelMean,
         values.fuelStdDev,
-        Math.max(0.5, values.fuelMean - values.fuelStdDev * 3),
+        Math.max(0, values.fuelMean - values.fuelStdDev * 3),
         values.fuelMean + values.fuelStdDev * 3
       ),
       simulationAnnualMaintenance: buildBoundedNormal(
@@ -1012,6 +1098,7 @@ function saveLatestRunAsBaseline() {
   comparisonBaseline = {
     label: latestRun.label,
     response: cloneData(latestRun.response),
+    fuelType: latestRun.fuelType,
   };
   persistComparisonBaseline();
   renderComparisonSection();
@@ -1057,7 +1144,7 @@ function renderBreakdownPlaceholder() {
     { label: "Loan payments", value: "After a run" },
     { label: "Loan interest", value: "After a run" },
     { label: "Loan balance at sale", value: "After a run" },
-    { label: "Fuel", value: "After a run" },
+    { label: "Fuel / charging", value: "After a run" },
     { label: "Maintenance", value: "After a run" },
     { label: "Repair shocks", value: "After a run" },
     { label: "Insurance", value: "After a run" },
@@ -1078,7 +1165,7 @@ function renderInsightPlaceholder() {
     { label: "Typical yearly cost", value: "After a run" },
     { label: "10-90 spread", value: "After a run" },
     { label: "Modeled miles", value: "After a run" },
-    { label: "Blended sample MPG", value: "After a run" },
+    { label: "Blended sample efficiency", value: "After a run" },
     { label: "Sampled end equity", value: "After a run" },
     { label: "Ending resale value", value: "After a run" },
     { label: "Repair-shock share", value: "After a run" },
@@ -1092,8 +1179,8 @@ function renderYearlyBreakdownPlaceholder() {
           <dl>
             <div><dt>Miles driven</dt><dd>After a run</dd></div>
             <div><dt>City + highway miles</dt><dd>After a run</dd></div>
-            <div><dt>Fuel burned</dt><dd>After a run</dd></div>
-            <div><dt>City + highway gallons</dt><dd>After a run</dd></div>
+            <div><dt>Energy used</dt><dd>After a run</dd></div>
+            <div><dt>City + highway energy</dt><dd>After a run</dd></div>
             <div><dt>Annual totals</dt><dd>After a run</dd></div>
             <div><dt>Year 1 purchase costs</dt><dd>After a run</dd></div>
             <div><dt>Insurance + registration</dt><dd>After a run</dd></div>
@@ -1182,6 +1269,7 @@ function renderInitialResultsState() {
 
 function resetScenarioForm() {
   form.reset();
+  applyFuelTypeLabels(fuelTypeSelect.value);
   vehicleSearchInput.value = "";
   vehiclePresetSelect.value = "";
   refreshVehicleLookupOptions();
@@ -1190,7 +1278,7 @@ function resetScenarioForm() {
   clearFieldErrors();
   hideFeedback(formFeedback);
   hideToolFeedback();
-  pendingPresetSelection = { presetId: "", hasFieldOverrides: false };
+  pendingPresetSelection = { presetId: "", hasFieldOverrides: false, hasFuelTypeOverride: false };
   window.history.replaceState({}, "", window.location.pathname);
   statusLine.textContent = hasSuccessfulRun
     ? "Starter inputs restored. Run the simulation again to compare with the last result."
@@ -1288,18 +1376,26 @@ function validateFormValues(values) {
     pushValidationError(errors, "cityDrivingSharePercent", "City driving share must be between 0% and 100%.");
   }
 
-  if (
-    validateRequiredNumber(errors, values, "cityMilesPerGallon", "City MPG") &&
-    values.cityMilesPerGallon <= 0
-  ) {
-    pushValidationError(errors, "cityMilesPerGallon", "City MPG must be greater than 0.");
+  if (!knownFuelTypes.includes(normalizedFuelType(values.fuelType))) {
+    pushValidationError(
+      errors,
+      "fuelType",
+      "Fuel type must be gasoline, hybrid gasoline, plug-in hybrid, diesel, or electric."
+    );
   }
 
   if (
-    validateRequiredNumber(errors, values, "highwayMilesPerGallon", "Highway MPG") &&
+    validateRequiredNumber(errors, values, "cityMilesPerGallon", "City efficiency") &&
+    values.cityMilesPerGallon <= 0
+  ) {
+    pushValidationError(errors, "cityMilesPerGallon", "City efficiency must be greater than 0.");
+  }
+
+  if (
+    validateRequiredNumber(errors, values, "highwayMilesPerGallon", "Highway efficiency") &&
     values.highwayMilesPerGallon <= 0
   ) {
-    pushValidationError(errors, "highwayMilesPerGallon", "Highway MPG must be greater than 0.");
+    pushValidationError(errors, "highwayMilesPerGallon", "Highway efficiency must be greater than 0.");
   }
 
   if (validateRequiredNumber(errors, values, "annualInsurance", "Insurance") && values.annualInsurance < 0) {
@@ -1366,12 +1462,12 @@ function validateFormValues(values) {
     pushValidationError(errors, "tireLifeMiles", "Tire life must be greater than 0 miles.");
   }
 
-  if (validateRequiredNumber(errors, values, "fuelMean", "Fuel price mean") && values.fuelMean < 0) {
-    pushValidationError(errors, "fuelMean", "Fuel price mean cannot be negative.");
+  if (validateRequiredNumber(errors, values, "fuelMean", "Energy price mean") && values.fuelMean < 0) {
+    pushValidationError(errors, "fuelMean", "Energy price mean cannot be negative.");
   }
 
-  if (validateRequiredNumber(errors, values, "fuelStdDev", "Fuel price standard deviation") && values.fuelStdDev < 0) {
-    pushValidationError(errors, "fuelStdDev", "Fuel price standard deviation cannot be negative.");
+  if (validateRequiredNumber(errors, values, "fuelStdDev", "Energy price standard deviation") && values.fuelStdDev < 0) {
+    pushValidationError(errors, "fuelStdDev", "Energy price standard deviation cannot be negative.");
   }
 
   if (
@@ -1599,6 +1695,11 @@ function formatGallons(value) {
   return `${Math.round(value).toLocaleString()} gal`;
 }
 
+function formatEnergyUnits(value, fuelType) {
+  const unitLabel = energyUnitLabel(fuelType);
+  return `${Math.round(value).toLocaleString()} ${unitLabel}`;
+}
+
 function renderSummary(response) {
   const summary = response.responseSummary;
   renderCards(summaryGrid, [
@@ -1615,6 +1716,7 @@ function renderSummary(response) {
 
 function renderBreakdown(response) {
   const sample = response.responseExampleBreakdown;
+  const fuelType = latestRun?.fuelType || normalizedFuelType(fuelTypeSelect.value);
   renderCards(breakdownGrid, [
     { label: "Upfront payment", value: currency.format(sample.costUpfrontPayment) },
     { label: "Purchase tax", value: currency.format(sample.costPurchaseTax) },
@@ -1622,7 +1724,7 @@ function renderBreakdown(response) {
     { label: "Loan payments", value: currency.format(sample.costLoanPaymentsMade) },
     { label: "Loan interest", value: currency.format(sample.costLoanInterest) },
     { label: "Loan balance at sale", value: currency.format(sample.costRemainingLoanBalance) },
-    { label: "Fuel", value: currency.format(sample.costFuel) },
+    { label: energyCostLabel(fuelType), value: currency.format(sample.costFuel) },
     { label: "Maintenance", value: currency.format(sample.costMaintenance) },
     { label: "Repair shocks", value: currency.format(sample.costRepairShocks) },
     { label: "Insurance", value: currency.format(sample.costInsurance) },
@@ -1641,14 +1743,15 @@ function renderBreakdown(response) {
 function renderInsights(response) {
   const summary = response.responseSummary;
   const yearlyBreakdown = response.responseExampleYearlyBreakdown || [];
+  const fuelType = latestRun?.fuelType || normalizedFuelType(fuelTypeSelect.value);
   const yearsOwned = Math.max(1, yearlyBreakdown.length || 1);
   const spread = summary.summaryP90TotalCost - summary.summaryP10TotalCost;
   const endingEquity = yearlyBreakdown.length
     ? yearlyBreakdown[yearlyBreakdown.length - 1].yearlyEstimatedEquity
     : 0;
-  const totalFuelGallons = yearlyBreakdown.reduce((sum, year) => sum + year.yearlyFuelGallons, 0);
-  const blendedMpg =
-    totalFuelGallons > 0 ? summary.summaryTotalMilesDriven / totalFuelGallons : null;
+  const totalEnergyUnits = yearlyBreakdown.reduce((sum, year) => sum + year.yearlyEnergyUnitsConsumed, 0);
+  const blendedEfficiency =
+    totalEnergyUnits > 0 ? summary.summaryTotalMilesDriven / totalEnergyUnits : null;
   const repairShockShare =
     response.responseExampleBreakdown.costTotal <= 0
       ? null
@@ -1668,8 +1771,8 @@ function renderInsights(response) {
       value: formatMiles(summary.summaryTotalMilesDriven),
     },
     {
-      label: "Blended sample MPG",
-      value: blendedMpg === null ? "N/A" : blendedMpg.toFixed(1),
+      label: isElectricFuelType(fuelType) ? "Blended sample mi/kWh" : "Blended sample MPG",
+      value: blendedEfficiency === null ? "N/A" : blendedEfficiency.toFixed(1),
     },
     {
       label: "Sampled end equity",
@@ -1688,6 +1791,7 @@ function renderInsights(response) {
 
 function renderYearlyBreakdown(response) {
   const yearlyBreakdown = response.responseExampleYearlyBreakdown || [];
+  const fuelType = latestRun?.fuelType || normalizedFuelType(fuelTypeSelect.value);
 
   if (!yearlyBreakdown.length) {
     renderYearlyBreakdownPlaceholder();
@@ -1704,9 +1808,16 @@ function renderYearlyBreakdown(response) {
             <div><dt>City + highway miles</dt><dd>${formatMiles(year.yearlyCityMilesDriven)} / ${formatMiles(
               year.yearlyHighwayMilesDriven
             )}</dd></div>
-            <div><dt>Fuel burned</dt><dd>${formatGallons(year.yearlyFuelGallons)}</dd></div>
-            <div><dt>City + highway gallons</dt><dd>${formatGallons(year.yearlyCityFuelGallons)} / ${formatGallons(
-              year.yearlyHighwayFuelGallons
+            <div><dt>${isElectricFuelType(fuelType) ? "Charging used" : "Fuel burned"}</dt><dd>${formatEnergyUnits(
+              year.yearlyEnergyUnitsConsumed,
+              fuelType
+            )}</dd></div>
+            <div><dt>City + highway ${energyUnitLabel(fuelType)}</dt><dd>${formatEnergyUnits(
+              year.yearlyCityEnergyUnitsConsumed,
+              fuelType
+            )} / ${formatEnergyUnits(
+              year.yearlyHighwayEnergyUnitsConsumed,
+              fuelType
             )}</dd></div>
             <div><dt>Total for year</dt><dd>${currency.format(year.yearlyTotalCost)}</dd></div>
             <div><dt>Year 1 purchase costs</dt><dd>${currency.format(year.yearlyPurchaseTax + year.yearlyUpfrontFees)}</dd></div>
@@ -2013,6 +2124,7 @@ async function runSimulation() {
     hasSuccessfulRun = true;
     latestRun = {
       label: buildScenarioLabel(values),
+      fuelType: normalizedFuelType(values.fuelType),
       response: cloneData(payload),
     };
     replaceUrlWithCurrentScenario();
@@ -2174,6 +2286,11 @@ vehicleTrimSelect.addEventListener("change", () => {
   maybeApplyVehicleLookupSelection();
 });
 
+fuelTypeSelect.addEventListener("change", () => {
+  applyFuelTypeLabels(fuelTypeSelect.value);
+  applyEnergyDefaultsForFuelType(fuelTypeSelect.value);
+});
+
 vehicleSearchInput.addEventListener("input", () => {
   populateVehiclePresets();
 });
@@ -2185,7 +2302,7 @@ vehiclePresetSelect.addEventListener("change", (event) => {
     refreshVehicleLookupOptions({ year: "", make: "", model: "", trim: "" });
     setVehicleLookupStatus(defaultVehicleLookupStatus);
     presetDescription.textContent = defaultPresetDescription;
-    pendingPresetSelection = { presetId: "", hasFieldOverrides: false };
+    pendingPresetSelection = { presetId: "", hasFieldOverrides: false, hasFuelTypeOverride: false };
     return;
   }
 
@@ -2196,6 +2313,7 @@ async function initializeApp() {
   loadPersistedComparisonBaseline();
   renderInitialResultsState();
   applyScenarioFromQuery();
+  applyFuelTypeLabels(fuelTypeSelect.value);
   await Promise.all([loadVehicleCatalog(), loadVehiclePresets()]);
   syncPresetSelectionFromQuery();
   runSimulation();

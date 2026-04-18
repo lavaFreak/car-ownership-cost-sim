@@ -32,8 +32,9 @@ The following pieces are deterministic once a scenario input is fixed:
 - annual miles at year 1
 - annual mileage change rate
 - city-driving share
-- city MPG
-- highway MPG
+- city efficiency
+- highway efficiency
+- fuel or powertrain type
 - annual insurance
 - annual registration
 - annual parking
@@ -86,8 +87,8 @@ For each modeled year, the simulator currently computes:
 
 - miles driven for the year
 - city and highway miles for the year
-- city and highway gallons consumed for the year
-- sampled fuel cost
+- city and highway energy consumed for the year
+- sampled fuel or charging cost
 - sampled maintenance cost
 - sampled repair shock cost, if triggered
 - tire replacement cost if cumulative miles cross a tire-life threshold
@@ -112,7 +113,7 @@ upfront payment
 + upfront fees
 + loan payments made during ownership
 + remaining loan balance at sale
-+ fuel
++ fuel or charging
 + maintenance
 + repair shocks
 + insurance
@@ -157,8 +158,9 @@ important simplifications:
 - depreciation and resale are still heuristic rather than market-comparable,
   even though the model now includes first-year loss, mileage penalties, and a
   floor on residual value
-- fuel use now distinguishes city and highway MPG, but it still assumes one
-  fixed city-driving share across the full ownership horizon
+- energy use now distinguishes city and highway efficiency, and EVs now switch
+  to charging-cost math, but the model still assumes one fixed city-driving
+  share across the full ownership horizon
 - maintenance and repair shocks are independent draws rather than age- or
   mileage-conditioned processes
 - financing assumes a standard amortizing loan and does not model refinancing,

@@ -79,6 +79,7 @@ tests =
       TestLabel "extra mileage lowers resale value year by year" mileageResalePenaltyTest,
       TestLabel "mileage growth and tire wear affect deterministic totals" mileageGrowthAndTireWearTest,
       TestLabel "city and highway MPG split shapes fuel costs" cityHighwayFuelSplitTest,
+      TestLabel "electric vehicles use charging costs instead of gas prices" electricChargingCostTest,
       TestLabel "local recurring costs inflate over time" localRecurringCostsInflationTest,
       TestLabel "vehicle catalog loads and drives presets" vehicleCatalogTest,
       TestLabel "catalog import seeds build normalized entries" catalogImportSeedTest,
@@ -124,6 +125,7 @@ deterministicCashPurchaseTest =
                     simulationAnnualMiles = 12000,
                     simulationAnnualMileageChangeRate = 0,
                     simulationCityDrivingShare = 0.5,
+                    simulationFuelType = "gasoline",
                     simulationMilesPerGallon = 30,
                     simulationCityMilesPerGallon = 30,
                     simulationHighwayMilesPerGallon = 30,
@@ -211,6 +213,7 @@ purchaseTaxAndFeesTest =
                     simulationAnnualMiles = 0,
                     simulationAnnualMileageChangeRate = 0,
                     simulationCityDrivingShare = 0.5,
+                    simulationFuelType = "gasoline",
                     simulationMilesPerGallon = 30,
                     simulationCityMilesPerGallon = 30,
                     simulationHighwayMilesPerGallon = 30,
@@ -289,6 +292,7 @@ inflationTest =
                     simulationAnnualMiles = 12000,
                     simulationAnnualMileageChangeRate = 0,
                     simulationCityDrivingShare = 0.5,
+                    simulationFuelType = "gasoline",
                     simulationMilesPerGallon = 30,
                     simulationCityMilesPerGallon = 30,
                     simulationHighwayMilesPerGallon = 30,
@@ -372,6 +376,7 @@ repairShockTest =
                     simulationAnnualMiles = 0,
                     simulationAnnualMileageChangeRate = 0,
                     simulationCityDrivingShare = 0.5,
+                    simulationFuelType = "gasoline",
                     simulationMilesPerGallon = 30,
                     simulationCityMilesPerGallon = 30,
                     simulationHighwayMilesPerGallon = 30,
@@ -636,6 +641,37 @@ cityHighwayFuelSplitTest =
         assertClose "year one city gallons are tracked" 300 (yearlyCityFuelGallons yearOne)
         assertClose "year one highway gallons are tracked" 150 (yearlyHighwayFuelGallons yearOne)
         assertClose "year one total gallons stay aligned" 450 (yearlyFuelGallons yearOne)
+      _ -> assertFailure "Expected exactly one yearly breakdown row."
+
+electricChargingCostTest :: Test
+electricChargingCostTest =
+  TestCase $ do
+    let request =
+          deterministicRequest
+            46
+            baselineSimulationInput
+              { simulationPurchasePrice = 10000,
+                simulationYearsOwned = 1,
+                simulationAnnualMiles = 10000,
+                simulationCityDrivingShare = 0.5,
+                simulationFuelType = "electric",
+                simulationMilesPerGallon = 100,
+                simulationCityMilesPerGallon = 100,
+                simulationHighwayMilesPerGallon = 100,
+                simulationFuelPrice = deterministicBoundedNormal 0.15
+              }
+        response = simulateRequestWithSeed 46 request
+        breakdown = responseExampleBreakdown response
+        yearlyBreakdown = responseExampleYearlyBreakdown response
+        expectedKilowattHours = 10000 * 33.7 / 100
+        expectedChargingCost = expectedKilowattHours * 0.15
+    assertClose "electric charging cost uses kWh pricing" expectedChargingCost (costFuel breakdown)
+    case yearlyBreakdown of
+      [yearOne] -> do
+        assertClose "year one charging tracks total kWh" expectedKilowattHours (yearlyEnergyUnitsConsumed yearOne)
+        assertClose "electric runs do not report gasoline gallons" 0 (yearlyFuelGallons yearOne)
+        assertClose "city energy is tracked separately" (expectedKilowattHours / 2) (yearlyCityEnergyUnitsConsumed yearOne)
+        assertClose "highway energy is tracked separately" (expectedKilowattHours / 2) (yearlyHighwayEnergyUnitsConsumed yearOne)
       _ -> assertFailure "Expected exactly one yearly breakdown row."
 
 localRecurringCostsInflationTest :: Test
@@ -1161,6 +1197,7 @@ invalidInputValidationTest =
                     simulationAnnualMiles = 12000,
                     simulationAnnualMileageChangeRate = 1.2,
                     simulationCityDrivingShare = 1.2,
+                    simulationFuelType = "gasoline",
                     simulationMilesPerGallon = 0,
                     simulationCityMilesPerGallon = 0,
                     simulationHighwayMilesPerGallon = 0,
@@ -1219,9 +1256,9 @@ invalidInputValidationTest =
     assertBool "repair shock bounds are validated" ("Repair shock cost standard deviation cannot be negative." `elem` validationErrors)
     assertBool "years owned is validated" ("Years owned must be at least 1." `elem` validationErrors)
     assertBool "city share is validated" ("City driving share should be expressed as a decimal between 0 and 1." `elem` validationErrors)
-    assertBool "fuel efficiency is validated" ("Fuel efficiency must be greater than 0 MPG." `elem` validationErrors)
-    assertBool "city MPG is validated" ("City fuel efficiency must be greater than 0 MPG." `elem` validationErrors)
-    assertBool "highway MPG is validated" ("Highway fuel efficiency must be greater than 0 MPG." `elem` validationErrors)
+    assertBool "fuel efficiency is validated" ("Combined efficiency must be greater than 0." `elem` validationErrors)
+    assertBool "city MPG is validated" ("City efficiency must be greater than 0." `elem` validationErrors)
+    assertBool "highway MPG is validated" ("Highway efficiency must be greater than 0." `elem` validationErrors)
     assertBool "parking is validated" ("Parking cost cannot be negative." `elem` validationErrors)
     assertBool "tolls are validated" ("Tolls and road fees cannot be negative." `elem` validationErrors)
     assertBool "inspection is validated" ("Inspection and emissions costs cannot be negative." `elem` validationErrors)
@@ -1273,7 +1310,7 @@ boundedNormalValidationTest =
               }
         validationErrors = validateSimulationRequest invalidRequest
     assertBool "negative lower bounds are rejected" ("Repair shock cost lower bound cannot be negative." `elem` validationErrors)
-    assertBool "means below the lower bound are rejected" ("Fuel price mean must be greater than or equal to its lower bound." `elem` validationErrors)
+    assertBool "means below the lower bound are rejected" ("Energy price mean must be greater than or equal to its lower bound." `elem` validationErrors)
     assertBool "means above the upper bound are rejected" ("Annual maintenance mean must be less than or equal to its upper bound." `elem` validationErrors)
     assertBool "upper bounds below the lower bound are rejected" ("Annual depreciation rate upper bound must be greater than or equal to its lower bound." `elem` validationErrors)
 
@@ -1519,6 +1556,7 @@ invalidSimulationRequest =
             simulationAnnualMiles = 12000,
             simulationAnnualMileageChangeRate = 1.2,
             simulationCityDrivingShare = 1.2,
+            simulationFuelType = "gasoline",
             simulationMilesPerGallon = 0,
             simulationCityMilesPerGallon = 0,
             simulationHighwayMilesPerGallon = 0,
@@ -1597,6 +1635,7 @@ baselineSimulationInput =
       simulationAnnualMiles = 0,
       simulationAnnualMileageChangeRate = 0,
       simulationCityDrivingShare = 0.5,
+      simulationFuelType = "gasoline",
       simulationMilesPerGallon = 30,
       simulationCityMilesPerGallon = 30,
       simulationHighwayMilesPerGallon = 30,
