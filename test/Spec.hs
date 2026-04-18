@@ -78,6 +78,7 @@ tests =
       TestLabel "vPIC fixtures decode model listings" vpicFixtureDecodingTest,
       TestLabel "FuelEconomy fixtures decode vehicle details" fuelEconomyFixtureDecodingTest,
       TestLabel "source seeds build catalog entries from official fixtures" sourceSeedCatalogBuildTest,
+      TestLabel "missing source assumptions fall back to generated defaults" generatedSourceDefaultsTest,
       TestLabel "source seed validation rejects wrong vPIC model matches" sourceSeedValidationFailureTest,
       TestLabel "API example route returns a valid simulation request" apiExampleRouteTest,
       TestLabel "web asset routes boot successfully" webAssetRoutesSmokeTest,
@@ -773,6 +774,8 @@ fuelEconomyFixtureDecodingTest =
     assertClose "Corolla combined MPG comes from official data" 50 (fuelEconomyVehicleCombinedMpg corollaVehicle)
     assertEqual "Civic make is preserved" "Honda" (fuelEconomyVehicleMake civicVehicle)
     assertClose "Civic city MPG comes from official data" 31 (maybe 0 id (fuelEconomyVehicleCityMpg civicVehicle))
+    assertEqual "Corolla drive type is preserved" (Just "Front-Wheel Drive") (fuelEconomyVehicleDrive corollaVehicle)
+    assertEqual "Corolla vehicle class is preserved" (Just "Compact Cars") (fuelEconomyVehicleClass corollaVehicle)
 
 sourceSeedCatalogBuildTest :: Test
 sourceSeedCatalogBuildTest =
@@ -813,6 +816,48 @@ sourceSeedCatalogBuildTest =
     assertBool "Corolla entry carries an extra-mile resale penalty" (catalogExtraMileageDepreciationPerMile corollaCatalogEntry > 0)
     assertBool "Civic import keeps curated first-year depreciation bonus" (importFirstYearDepreciationBonus civicCatalogImportSeed > 0)
     assertClose "Civic import keeps expected annual resale miles" 12000 (importExpectedAnnualMilesForResale civicCatalogImportSeed)
+
+generatedSourceDefaultsTest :: Test
+generatedSourceDefaultsTest =
+  TestCase $ do
+    sourceSeeds <- loadDefaultVehicleSourceSeeds
+    corollaSourceSeed <-
+      maybe
+        (assertFailure "Corolla source seed was missing." >> pure fallbackVehicleSourceSeed)
+        pure
+        (lookupVehicleSourceSeed "corolla-hybrid-2024" sourceSeeds)
+    toyotaVpicModels <- decodeVpicFixture "test/fixtures/vpic/toyota-2024-models.json"
+    corollaFuelEconomyVehicle <- decodeFuelEconomyFixture "test/fixtures/fueleconomy/vehicle-47339.xml"
+    let minimalSeed =
+          corollaSourceSeed
+            { sourcePurchasePrice = Nothing,
+              sourceAnnualInsurance = Nothing,
+              sourceAnnualRegistration = Nothing,
+              sourceAnnualMaintenance = Nothing,
+              sourceAnnualDepreciationRate = Nothing,
+              sourceFirstYearDepreciationBonus = Nothing,
+              sourceResidualValueFloorPercent = Nothing,
+              sourceExpectedAnnualMilesForResale = Nothing,
+              sourceExtraMileageDepreciationPerMile = Nothing,
+              sourceRepairShockProbability = Nothing,
+              sourceRepairShockCost = Nothing
+            }
+    generatedImportSeed <-
+      either
+        (\decodeError -> assertFailure ("Minimal source seed did not build from generated defaults: " <> decodeError) >> pure fallbackCatalogImportSeed)
+        pure
+        (buildCatalogImportSeedFromSourceSeed minimalSeed toyotaVpicModels corollaFuelEconomyVehicle)
+    assertBool "generated purchase price stays positive" (importPurchasePrice generatedImportSeed > 20000)
+    assertBool "generated insurance stays positive" (importAnnualInsurance generatedImportSeed > 1000)
+    assertBool "generated registration stays positive" (importAnnualRegistration generatedImportSeed > 150)
+    assertBool "generated maintenance mean stays plausible" (boundedNormalMean (importAnnualMaintenance generatedImportSeed) >= 400 && boundedNormalMean (importAnnualMaintenance generatedImportSeed) <= 800)
+    assertBool "generated depreciation mean stays plausible" (boundedNormalMean (importAnnualDepreciationRate generatedImportSeed) >= 0.1 && boundedNormalMean (importAnnualDepreciationRate generatedImportSeed) <= 0.16)
+    assertBool "generated first-year depreciation bonus stays in range" (importFirstYearDepreciationBonus generatedImportSeed >= 0.05 && importFirstYearDepreciationBonus generatedImportSeed <= 0.15)
+    assertBool "generated residual floor stays in range" (importResidualValueFloorPercent generatedImportSeed >= 0.25 && importResidualValueFloorPercent generatedImportSeed <= 0.45)
+    assertClose "generated expected annual resale miles default to 12000" 12000 (importExpectedAnnualMilesForResale generatedImportSeed)
+    assertBool "generated extra-mile resale penalty stays positive" (importExtraMileageDepreciationPerMile generatedImportSeed > 0)
+    assertBool "generated repair shock probability stays in range" (importRepairShockProbability generatedImportSeed >= 0.05 && importRepairShockProbability generatedImportSeed <= 0.15)
+    assertBool "generated repair shock mean stays positive" (boundedNormalMean (importRepairShockCost generatedImportSeed) > 0)
 
 sourceSeedValidationFailureTest :: Test
 sourceSeedValidationFailureTest =
@@ -1147,10 +1192,10 @@ assertVehicleSourceSeedLooksUsable sourceSeed = do
   assertBool "source seed has a display model" (not (null (sourceCatalogModel sourceSeed)))
   assertBool "source seed has a base model for matching" (not (null (sourceBaseModel sourceSeed)))
   assertBool "source seed uses a positive FuelEconomy.gov vehicle id" (sourceFuelEconomyVehicleId sourceSeed > 0)
-  assertBool "source seed first-year depreciation bonus is in range" (sourceFirstYearDepreciationBonus sourceSeed >= 0 && sourceFirstYearDepreciationBonus sourceSeed <= 1)
-  assertBool "source seed residual floor is in range" (sourceResidualValueFloorPercent sourceSeed >= 0 && sourceResidualValueFloorPercent sourceSeed <= 1)
-  assertBool "source seed expected annual resale miles are non-negative" (sourceExpectedAnnualMilesForResale sourceSeed >= 0)
-  assertBool "source seed extra-mile penalty is non-negative" (sourceExtraMileageDepreciationPerMile sourceSeed >= 0)
+  maybe (pure ()) (\value -> assertBool "source seed first-year depreciation bonus is in range" (value >= 0 && value <= 1)) (sourceFirstYearDepreciationBonus sourceSeed)
+  maybe (pure ()) (\value -> assertBool "source seed residual floor is in range" (value >= 0 && value <= 1)) (sourceResidualValueFloorPercent sourceSeed)
+  maybe (pure ()) (\value -> assertBool "source seed expected annual resale miles are non-negative" (value >= 0)) (sourceExpectedAnnualMilesForResale sourceSeed)
+  maybe (pure ()) (\value -> assertBool "source seed extra-mile penalty is non-negative" (value >= 0)) (sourceExtraMileageDepreciationPerMile sourceSeed)
 
 loadDefaultVehicleSourceSeeds :: IO [VehicleCatalogSourceSeed]
 loadDefaultVehicleSourceSeeds = do
@@ -1448,17 +1493,17 @@ fallbackVehicleSourceSeed =
       sourceTrim = "Base",
       sourceBaseModel = "Fallback",
       sourceFuelEconomyVehicleId = 1,
-      sourcePurchasePrice = 1,
-      sourceAnnualInsurance = 1,
-      sourceAnnualRegistration = 1,
-      sourceAnnualMaintenance = fallbackBoundedNormal,
-      sourceAnnualDepreciationRate = fallbackBoundedNormal,
-      sourceFirstYearDepreciationBonus = 0,
-      sourceResidualValueFloorPercent = 0,
-      sourceExpectedAnnualMilesForResale = 0,
-      sourceExtraMileageDepreciationPerMile = 0,
-      sourceRepairShockProbability = 0,
-      sourceRepairShockCost = fallbackBoundedNormal,
+      sourcePurchasePrice = Just 1,
+      sourceAnnualInsurance = Just 1,
+      sourceAnnualRegistration = Just 1,
+      sourceAnnualMaintenance = Just fallbackBoundedNormal,
+      sourceAnnualDepreciationRate = Just fallbackBoundedNormal,
+      sourceFirstYearDepreciationBonus = Just 0,
+      sourceResidualValueFloorPercent = Just 0,
+      sourceExpectedAnnualMilesForResale = Just 0,
+      sourceExtraMileageDepreciationPerMile = Just 0,
+      sourceRepairShockProbability = Just 0,
+      sourceRepairShockCost = Just fallbackBoundedNormal,
       sourceSourceUpdatedAt = "2026-04-16"
     }
 
@@ -1471,6 +1516,8 @@ fallbackFuelEconomyVehicleRecord =
       fuelEconomyVehicleBaseModel = Just "Fallback",
       fuelEconomyVehicleFuelType = "Regular Gasoline",
       fuelEconomyVehicleAtvType = Nothing,
+      fuelEconomyVehicleDrive = Just "Front-Wheel Drive",
+      fuelEconomyVehicleClass = Just "Compact Cars",
       fuelEconomyVehicleCombinedMpg = 1,
       fuelEconomyVehicleCityMpg = Just 1,
       fuelEconomyVehicleHighwayMpg = Just 1

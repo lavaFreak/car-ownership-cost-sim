@@ -52,6 +52,7 @@ library
         CarOwnershipCostSim.Statistics
         CarOwnershipCostSim.Types
         CarOwnershipCostSim.VehicleCatalog
+        CarOwnershipCostSim.VehicleCatalogDefaults
         CarOwnershipCostSim.VehicleCatalogImport
         CarOwnershipCostSim.VehiclePresets
         CarOwnershipCostSim.WebApp

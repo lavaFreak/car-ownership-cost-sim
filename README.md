@@ -75,8 +75,13 @@ the core simulation code.
   Provides summary helpers such as mean and percentile calculations.
 - `src/CarOwnershipCostSim/VehicleCatalog.hs`
   Defines the normalized local vehicle catalog and shared catalog-facing types.
+- `src/CarOwnershipCostSim/VehicleCatalogDefaults.hs`
+  Generates rule-based ownership assumptions from objective vehicle attributes
+  so bulk catalog growth does not require fully hand-curated data for every
+  model.
 - `src/CarOwnershipCostSim/VehicleCatalogImport.hs`
-  Parses official `vPIC` and `FuelEconomy.gov` payloads into catalog entries.
+  Parses official `vPIC` and `FuelEconomy.gov` payloads into catalog entries
+  and merges optional source-seed overrides on top of generated defaults.
 - `src/CarOwnershipCostSim/WebApp.hs`
   Defines the Scotty routes in a testable form so the API and static assets can
   be exercised without booting a separate server process.

@@ -75,6 +75,10 @@ This workflow depends on the curated source seeds in
 [catalog/vehicle-source-seeds.json](/Users/garion/Work/projects/car-ownership-cost-sim/catalog/vehicle-source-seeds.json)
 plus the importer logic in
 [src/CarOwnershipCostSim/VehicleCatalogImport.hs](/Users/garion/Work/projects/car-ownership-cost-sim/src/CarOwnershipCostSim/VehicleCatalogImport.hs).
+Source seeds can now omit many ownership-cost assumptions; the importer will
+fill them with rule-based defaults derived from official vehicle attributes, and
+curated values only need to be supplied when we want to override those
+generated assumptions.
 
 ## Recommended change workflow
 

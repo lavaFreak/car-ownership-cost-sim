@@ -34,6 +34,10 @@ module CarOwnershipCostSim.VehicleCatalogImport
 where
 
 import CarOwnershipCostSim.Types (BoundedNormal)
+import CarOwnershipCostSim.VehicleCatalogDefaults
+  ( GeneratedCatalogAssumptions (..),
+    defaultCatalogAssumptions,
+  )
 import CarOwnershipCostSim.VehicleCatalog
   ( CatalogImportSeed (..),
     FuelEconomyProfile (..),
@@ -66,17 +70,17 @@ data VehicleCatalogSourceSeed = VehicleCatalogSourceSeed
     sourceTrim :: String,
     sourceBaseModel :: String,
     sourceFuelEconomyVehicleId :: Int,
-    sourcePurchasePrice :: Double,
-    sourceAnnualInsurance :: Double,
-    sourceAnnualRegistration :: Double,
-    sourceAnnualMaintenance :: BoundedNormal,
-    sourceAnnualDepreciationRate :: BoundedNormal,
-    sourceFirstYearDepreciationBonus :: Double,
-    sourceResidualValueFloorPercent :: Double,
-    sourceExpectedAnnualMilesForResale :: Double,
-    sourceExtraMileageDepreciationPerMile :: Double,
-    sourceRepairShockProbability :: Double,
-    sourceRepairShockCost :: BoundedNormal,
+    sourcePurchasePrice :: Maybe Double,
+    sourceAnnualInsurance :: Maybe Double,
+    sourceAnnualRegistration :: Maybe Double,
+    sourceAnnualMaintenance :: Maybe BoundedNormal,
+    sourceAnnualDepreciationRate :: Maybe BoundedNormal,
+    sourceFirstYearDepreciationBonus :: Maybe Double,
+    sourceResidualValueFloorPercent :: Maybe Double,
+    sourceExpectedAnnualMilesForResale :: Maybe Double,
+    sourceExtraMileageDepreciationPerMile :: Maybe Double,
+    sourceRepairShockProbability :: Maybe Double,
+    sourceRepairShockCost :: Maybe BoundedNormal,
     sourceSourceUpdatedAt :: String
   }
   deriving (Eq, Show, Generic)
@@ -118,6 +122,8 @@ data FuelEconomyVehicleRecord = FuelEconomyVehicleRecord
     fuelEconomyVehicleBaseModel :: Maybe String,
     fuelEconomyVehicleFuelType :: String,
     fuelEconomyVehicleAtvType :: Maybe String,
+    fuelEconomyVehicleDrive :: Maybe String,
+    fuelEconomyVehicleClass :: Maybe String,
     fuelEconomyVehicleCombinedMpg :: Double,
     fuelEconomyVehicleCityMpg :: Maybe Double,
     fuelEconomyVehicleHighwayMpg :: Maybe Double
@@ -155,6 +161,8 @@ parseFuelEconomyVehicleRecord rawXml = do
       highwayMpg = parseOptionalDoubleTag "highway08" rawXml
       baseModel = emptyToNothing =<< findLastTagValue "baseModel" rawXml
       atvType = emptyToNothing =<< findLastTagValue "atvType" rawXml
+      driveType = emptyToNothing =<< findLastTagValue "drive" rawXml
+      vehicleClass = emptyToNothing =<< findLastTagValue "VClass" rawXml
   pure
     FuelEconomyVehicleRecord
       { fuelEconomyVehicleYear = vehicleYear,
@@ -163,6 +171,8 @@ parseFuelEconomyVehicleRecord rawXml = do
         fuelEconomyVehicleBaseModel = baseModel,
         fuelEconomyVehicleFuelType = fuelType,
         fuelEconomyVehicleAtvType = atvType,
+        fuelEconomyVehicleDrive = driveType,
+        fuelEconomyVehicleClass = vehicleClass,
         fuelEconomyVehicleCombinedMpg = combinedMpg,
         fuelEconomyVehicleCityMpg = cityMpg,
         fuelEconomyVehicleHighwayMpg = highwayMpg
@@ -180,6 +190,13 @@ buildCatalogImportSeedFromSourceSeed sourceSeed vpicModels fuelEconomyVehicle = 
   ensureMatches "source make" (sourceMake sourceSeed) (fuelEconomyVehicleMake fuelEconomyVehicle)
   assertVpicBaseModelFound (sourceBaseModel sourceSeed) vpicModels
   assertFuelEconomyBaseModelMatches (sourceBaseModel sourceSeed) fuelEconomyVehicle
+  let generatedDefaults =
+        defaultCatalogAssumptions
+          (sourcePurchasePrice sourceSeed)
+          (normalizedFuelType fuelEconomyVehicle)
+          (fuelEconomyVehicleClass fuelEconomyVehicle)
+          (fuelEconomyVehicleDrive fuelEconomyVehicle)
+          (fuelEconomyVehicleCombinedMpg fuelEconomyVehicle)
   pure
     CatalogImportSeed
       { importCatalogId = sourceCatalogId sourceSeed,
@@ -192,17 +209,17 @@ buildCatalogImportSeedFromSourceSeed sourceSeed vpicModels fuelEconomyVehicle = 
               vpicTrim = sourceTrim sourceSeed
             },
         importFuelEconomy = fuelEconomyProfileFromRecord fuelEconomyVehicle,
-        importPurchasePrice = sourcePurchasePrice sourceSeed,
-        importAnnualInsurance = sourceAnnualInsurance sourceSeed,
-        importAnnualRegistration = sourceAnnualRegistration sourceSeed,
-        importAnnualMaintenance = sourceAnnualMaintenance sourceSeed,
-        importAnnualDepreciationRate = sourceAnnualDepreciationRate sourceSeed,
-        importFirstYearDepreciationBonus = sourceFirstYearDepreciationBonus sourceSeed,
-        importResidualValueFloorPercent = sourceResidualValueFloorPercent sourceSeed,
-        importExpectedAnnualMilesForResale = sourceExpectedAnnualMilesForResale sourceSeed,
-        importExtraMileageDepreciationPerMile = sourceExtraMileageDepreciationPerMile sourceSeed,
-        importRepairShockProbability = sourceRepairShockProbability sourceSeed,
-        importRepairShockCost = sourceRepairShockCost sourceSeed,
+        importPurchasePrice = maybe (generatedPurchasePrice generatedDefaults) id (sourcePurchasePrice sourceSeed),
+        importAnnualInsurance = maybe (generatedAnnualInsurance generatedDefaults) id (sourceAnnualInsurance sourceSeed),
+        importAnnualRegistration = maybe (generatedAnnualRegistration generatedDefaults) id (sourceAnnualRegistration sourceSeed),
+        importAnnualMaintenance = maybe (generatedAnnualMaintenance generatedDefaults) id (sourceAnnualMaintenance sourceSeed),
+        importAnnualDepreciationRate = maybe (generatedAnnualDepreciationRate generatedDefaults) id (sourceAnnualDepreciationRate sourceSeed),
+        importFirstYearDepreciationBonus = maybe (generatedFirstYearDepreciationBonus generatedDefaults) id (sourceFirstYearDepreciationBonus sourceSeed),
+        importResidualValueFloorPercent = maybe (generatedResidualValueFloorPercent generatedDefaults) id (sourceResidualValueFloorPercent sourceSeed),
+        importExpectedAnnualMilesForResale = maybe (generatedExpectedAnnualMilesForResale generatedDefaults) id (sourceExpectedAnnualMilesForResale sourceSeed),
+        importExtraMileageDepreciationPerMile = maybe (generatedExtraMileageDepreciationPerMile generatedDefaults) id (sourceExtraMileageDepreciationPerMile sourceSeed),
+        importRepairShockProbability = maybe (generatedRepairShockProbability generatedDefaults) id (sourceRepairShockProbability sourceSeed),
+        importRepairShockCost = maybe (generatedRepairShockCost generatedDefaults) id (sourceRepairShockCost sourceSeed),
         importSourceName = "vpic.nhtsa.dot.gov + fueleconomy.gov",
         importSourceUpdatedAt = sourceSourceUpdatedAt sourceSeed
       }
@@ -245,11 +262,15 @@ buildCatalogFromLiveSources =
 fuelEconomyProfileFromRecord :: FuelEconomyVehicleRecord -> FuelEconomyProfile
 fuelEconomyProfileFromRecord fuelEconomyVehicle =
   FuelEconomyProfile
-    { fuelEconomyFuelType = normalizeFuelType (fuelEconomyVehicleFuelType fuelEconomyVehicle) (fuelEconomyVehicleAtvType fuelEconomyVehicle),
+    { fuelEconomyFuelType = normalizedFuelType fuelEconomyVehicle,
       fuelEconomyCombinedMpg = fuelEconomyVehicleCombinedMpg fuelEconomyVehicle,
       fuelEconomyCityMpg = fuelEconomyVehicleCityMpg fuelEconomyVehicle,
       fuelEconomyHighwayMpg = fuelEconomyVehicleHighwayMpg fuelEconomyVehicle
     }
+
+normalizedFuelType :: FuelEconomyVehicleRecord -> String
+normalizedFuelType fuelEconomyVehicle =
+  normalizeFuelType (fuelEconomyVehicleFuelType fuelEconomyVehicle) (fuelEconomyVehicleAtvType fuelEconomyVehicle)
 
 normalizeFuelType :: String -> Maybe String -> String
 normalizeFuelType rawFuelType rawAtvType
