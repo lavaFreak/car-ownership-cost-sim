@@ -1,0 +1,75 @@
+2025|Toyota|4Runner 2WD
+2025|Toyota|4Runner 4WD
+2025|Toyota|bZ4X
+2025|Toyota|bZ4X AWD (18inch Wheels)
+2025|Toyota|Camry HEV FF LE
+2025|Toyota|Camry HEV AWD LE
+2025|Toyota|Corolla
+2025|Toyota|Corolla Cross
+2025|Toyota|Corolla Cross Hybrid AWD
+2025|Toyota|Crown AWD
+2025|Toyota|Crown Signia AWD
+2025|Toyota|Highlander AWD
+2025|Toyota|Highlander Hybrid AWD
+2025|Toyota|Land Cruiser
+2025|Toyota|Prius
+2025|Toyota|Prius AWD
+2025|Toyota|Prius PHEV
+2025|Toyota|RAV4
+2025|Toyota|RAV4 Hybrid AWD
+2025|Toyota|RAV4 PHEV AWD
+2025|Toyota|Sienna AWD
+2025|Toyota|Tacoma 4WD
+2025|Toyota|Tacoma Hybrid 4WD
+2025|Toyota|Tundra 4WD
+2025|Honda|Accord
+2025|Honda|Accord Hybrid
+2025|Honda|Civic 4Dr
+2025|Honda|Civic 5Dr
+2025|Honda|CR-V FWD
+2025|Honda|CR-V AWD
+2025|Honda|HR-V FWD
+2025|Honda|HR-V AWD
+2025|Honda|Odyssey
+2025|Honda|Passport AWD
+2025|Honda|Pilot FWD
+2025|Honda|Pilot AWD
+2025|Honda|Prologue FWD
+2025|Honda|Prologue AWD Touring
+2025|Honda|Ridgeline AWD
+2025|Hyundai|Elantra
+2025|Hyundai|Elantra Hybrid
+2025|Hyundai|Ioniq 5 RWD
+2025|Hyundai|Ioniq 5 AWD (19 inch Wheels)
+2025|Hyundai|Ioniq 6 RWD (18 inch Wheels)
+2025|Hyundai|Ioniq 6 AWD (18 inch Wheels)
+2025|Hyundai|Kona FWD
+2025|Hyundai|Kona AWD
+2025|Hyundai|Kona Electric (17 inch Wheels)
+2025|Hyundai|Palisade FWD
+2025|Hyundai|Palisade AWD
+2025|Hyundai|Santa Fe FWD
+2025|Hyundai|Santa Fe AWD
+2025|Hyundai|Santa Fe Hybrid FWD
+2025|Hyundai|Tucson FWD
+2025|Hyundai|Tucson AWD
+2025|Hyundai|Tucson Hybrid
+2025|Hyundai|Tucson Plug-in Hybrid
+2025|Hyundai|Venue
+2025|Tesla|Cybertruck Long Range
+2025|Tesla|Model 3 Long Range RWD
+2025|Tesla|Model 3 Long Range AWD
+2025|Tesla|Model S
+2025|Tesla|Model X
+2025|Tesla|Model Y Long Range RWD
+2025|Tesla|Model Y Long Range AWD
+2025|Mazda|3 4-Door 2WD
+2025|Mazda|3 5-Door 2WD
+2025|Mazda|CX-30 4WD
+2025|Mazda|CX-5 4WD
+2025|Mazda|CX-50 4WD
+2025|Mazda|CX-70 4WD
+2025|Mazda|CX-70 4WD PHEV
+2025|Mazda|CX-90 4WD
+2025|Mazda|CX-90 4WD PHEV
+2025|Mazda|MX-5

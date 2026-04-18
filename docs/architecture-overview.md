@@ -61,7 +61,8 @@ The app is split into four layers:
 The normal runtime path looks like this:
 
 1. The browser loads `/`, which serves the static UI.
-2. The frontend fetches `/api/presets` to populate the preset dropdown.
+2. The frontend fetches `/api/catalog` for lookup/search state and
+   `/api/presets` for preset metadata.
 3. The user edits inputs and submits the form.
 4. `static/app.js` validates the form and builds a `SimulationRequest`.
 5. `POST /api/simulate` decodes the JSON payload in `WebApp.hs`.

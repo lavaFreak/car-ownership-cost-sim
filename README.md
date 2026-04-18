@@ -238,10 +238,12 @@ To expand the lightweight roster in a large batch using a curated model list:
 bash scripts/expand-roster-batch.sh catalog/roster-batches/2024-mainstream.txt 1
 ```
 
-To expand a different year batch:
+To expand different year batches:
 
 ```bash
 bash scripts/expand-roster-batch.sh catalog/roster-batches/2023-mainstream.txt 20
+bash scripts/expand-roster-batch.sh catalog/roster-batches/2025-mainstream.txt 50
+bash scripts/expand-roster-batch.sh catalog/roster-batches/2026-mainstream.txt 50
 ```
 
 ## Development Plan
@@ -316,8 +318,8 @@ The catalog importer now supports two project-owned input files:
 That split is the first real scaling step toward broader `2020+` coverage,
 because not every vehicle now needs a fully hand-authored maintenance,
 depreciation, repair-risk, and insurance profile before it can appear in the
-app. The current checked-in runtime catalog now covers `196` vehicles across
-`2023` and `2024`, built from `10` curated source seeds plus `186`
+app. The current checked-in runtime catalog now covers `395` vehicles across
+`2023` through `2026`, built from `10` curated source seeds plus `385`
 lighter-weight roster rows.
 
 The repository also includes a basic GitHub Actions workflow that runs the main

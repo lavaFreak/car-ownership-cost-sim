@@ -757,9 +757,9 @@ vehicleRosterSeedLoadTest =
     sourceSeeds <- loadDefaultVehicleSourceSeeds
     rosterSeeds <- loadDefaultVehicleRosterSeeds
     let rosterYears = sort (nub (map rosterYear rosterSeeds))
-    assertEqual "the lightweight roster stays at one-hundred-eighty-six vehicles" 186 (length rosterSeeds)
-    assertEqual "source plus roster coverage stays at one-hundred-ninety-six vehicles" 196 (length sourceSeeds + length rosterSeeds)
-    assertEqual "the lightweight roster spans both 2023 and 2024" [2023, 2024] rosterYears
+    assertEqual "the lightweight roster stays at three-hundred-eighty-five vehicles" 385 (length rosterSeeds)
+    assertEqual "source plus roster coverage stays at three-hundred-ninety-five vehicles" 395 (length sourceSeeds + length rosterSeeds)
+    assertEqual "the lightweight roster spans 2023 through 2026" [2023, 2024, 2025, 2026] rosterYears
     mapM_ assertVehicleRosterSeedLooksUsable rosterSeeds
 
 vpicFixtureDecodingTest :: Test

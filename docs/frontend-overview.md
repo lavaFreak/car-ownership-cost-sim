@@ -15,13 +15,14 @@ There is no framework, build step, or client-side bundler right now.
 
 ## Responsibilities of `static/app.js`
 
-The frontend controller currently does five jobs:
+The frontend controller currently does six jobs:
 
 1. collect form values
 2. validate inputs before sending a request
 3. convert form data into the backend JSON request shape
-4. keep shareable URLs in sync with the current scenario
-5. render the API response into cards, comparison views, yearly rows, and
+4. keep catalog-backed vehicle lookup state usable as the local catalog grows
+5. keep shareable URLs in sync with the current scenario
+6. render the API response into cards, comparison views, yearly rows, and
    simple canvas charts
 
 ## Form structure
@@ -37,6 +38,22 @@ The scenario form is grouped into these sections:
 
 This grouping is mirrored in the payload-building code so users can reason
 about the model in categories rather than one flat list of fields.
+
+## Vehicle lookup and presets
+
+The browser now supports two catalog-backed lookup paths:
+
+- cascading `year -> make -> model -> trim` selectors
+- a direct catalog search box that filters the exact-match dropdown for larger
+  multi-year catalogs
+
+Those lookup controls intentionally:
+
+- autofill car-specific defaults such as city/highway MPG and maintenance
+  assumptions
+- keep the exact-match dropdown in sync with the current filters and search
+  text
+- still allow every numeric assumption to be manually edited afterward
 
 ## Presets
 

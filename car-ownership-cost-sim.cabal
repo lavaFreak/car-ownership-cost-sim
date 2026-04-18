@@ -20,6 +20,8 @@ extra-source-files:
     catalog/vehicle-roster.json
     catalog/roster-batches/2023-mainstream.txt
     catalog/roster-batches/2024-mainstream.txt
+    catalog/roster-batches/2025-mainstream.txt
+    catalog/roster-batches/2026-mainstream.txt
     docs/vehicle-data-sourcing.md
     scripts/expand-roster-batch.sh
     static/index.html
@@ -64,6 +66,7 @@ library
     build-depends:
         base >=4.18 && <4.21,
         aeson >=2.1 && <2.3,
+        async >=2.2 && <2.3,
         bytestring >=0.11 && <0.13,
         http-types >=0.12 && <0.13,
         process >=1.6 && <1.7,

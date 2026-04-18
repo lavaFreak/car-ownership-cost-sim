@@ -89,10 +89,12 @@ To expand the lightweight roster from a larger curated batch of model queries:
 bash scripts/expand-roster-batch.sh catalog/roster-batches/2024-mainstream.txt 1
 ```
 
-To run the same workflow against a different model-year batch:
+To run the same workflow against different model-year batches:
 
 ```bash
 bash scripts/expand-roster-batch.sh catalog/roster-batches/2023-mainstream.txt 20
+bash scripts/expand-roster-batch.sh catalog/roster-batches/2025-mainstream.txt 50
+bash scripts/expand-roster-batch.sh catalog/roster-batches/2026-mainstream.txt 50
 ```
 
 This workflow depends on the curated source seeds in

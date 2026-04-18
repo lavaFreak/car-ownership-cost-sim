@@ -1,0 +1,80 @@
+2026|Toyota|4Runner 2WD
+2026|Toyota|4Runner 4WD
+2026|Toyota|4Runner Hybrid 4WD
+2026|Toyota|bZ AWD
+2026|Toyota|bZ LIMITED (energy capacity 191 Ah)
+2026|Toyota|C-HR AWD 18inch
+2026|Toyota|Camry HEV FF LE
+2026|Toyota|Camry HEV AWD LE
+2026|Toyota|Corolla
+2026|Toyota|Corolla Cross
+2026|Toyota|Corolla Cross Hybrid AWD
+2026|Toyota|Crown Hybrid AWD
+2026|Toyota|Crown Signia AWD
+2026|Toyota|Highlander AWD
+2026|Toyota|Highlander Hybrid AWD
+2026|Toyota|Land Cruiser
+2026|Toyota|Prius
+2026|Toyota|Prius AWD
+2026|Toyota|RAV4
+2026|Toyota|RAV4 Hybrid AWD Woodland Edition
+2026|Toyota|Sequoia 4WD
+2026|Toyota|Sienna AWD
+2026|Toyota|Tacoma 4WD
+2026|Toyota|Tacoma Hybrid 4WD
+2026|Toyota|Tundra 4WD
+2026|Toyota|Tundra Hybrid 4WD
+2026|Honda|Accord
+2026|Honda|Accord Hybrid
+2026|Honda|Civic 4Dr
+2026|Honda|Civic 5Dr
+2026|Honda|CR-V FWD
+2026|Honda|CR-V AWD
+2026|Honda|HR-V FWD
+2026|Honda|HR-V AWD
+2026|Honda|Odyssey
+2026|Honda|Passport AWD
+2026|Honda|Pilot FWD
+2026|Honda|Pilot AWD
+2026|Honda|Prelude
+2026|Honda|Prologue FWD
+2026|Honda|Prologue AWD
+2026|Honda|Ridgeline AWD
+2026|Hyundai|Elantra
+2026|Hyundai|Elantra Hybrid
+2026|Hyundai|Ioniq 5 RWD
+2026|Hyundai|Ioniq 5 AWD (19inch Wheels)
+2026|Hyundai|Ioniq 9 RWD
+2026|Hyundai|Ioniq 9 AWD
+2026|Hyundai|Kona FWD
+2026|Hyundai|Kona AWD
+2026|Hyundai|Nexo
+2026|Hyundai|Palisade FWD
+2026|Hyundai|Palisade AWD
+2026|Hyundai|Palisade Hybrid FWD
+2026|Hyundai|Santa Fe FWD
+2026|Hyundai|Santa Fe AWD
+2026|Hyundai|Santa Fe Hybrid FWD
+2026|Hyundai|Sonata FWD
+2026|Hyundai|Sonata Hybrid
+2026|Hyundai|Tucson FWD
+2026|Hyundai|Tucson AWD
+2026|Hyundai|Tucson Hybrid
+2026|Hyundai|Tucson Plug-in Hybrid
+2026|Hyundai|Venue
+2026|Tesla|Cybertruck AWD
+2026|Tesla|Model 3 Standard RWD
+2026|Tesla|Model 3 Premium AWD
+2026|Tesla|Model S
+2026|Tesla|Model X
+2026|Tesla|Model Y Standard RWD (18in Wheels)
+2026|Tesla|Model Y Long Range AWD
+2026|Mazda|3 4-Door 2WD
+2026|Mazda|3 5-Door 2WD
+2026|Mazda|CX-30 4WD
+2026|Mazda|CX-5 4WD
+2026|Mazda|CX-50 4WD
+2026|Mazda|CX-70 Hybrid Boost High Power 4WD
+2026|Mazda|CX-70 SC 4WD
+2026|Mazda|CX-90 4WD
+2026|Mazda|MX-5

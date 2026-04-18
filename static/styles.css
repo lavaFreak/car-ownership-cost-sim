@@ -270,6 +270,13 @@ button:disabled {
   line-height: 1.5;
 }
 
+.preset-meta {
+  margin: 0.35rem 0 0.75rem;
+  color: var(--muted);
+  line-height: 1.45;
+  font-size: 0.88rem;
+}
+
 .feedback-panel {
   margin-top: 1rem;
   padding: 0.95rem 1rem;

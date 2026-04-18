@@ -63,8 +63,20 @@
             </div>
 
             <p id="vehicle-lookup-status" class="preset-description">
-              Choose year, make, and model to autofill known vehicle assumptions. You can still edit any value manually afterward.
+              Choose year, make, and model to autofill known vehicle assumptions, or search the catalog directly. You can still edit any value manually afterward.
             </p>
+
+            <label for="vehicle-search">
+              Search the loaded catalog
+              <input
+                id="vehicle-search"
+                name="vehicleSearch"
+                type="search"
+                placeholder="Try 2026 Prius, Model Y, or CR-V"
+                autocomplete="off"
+              />
+            </label>
+            <p id="vehicle-match-count" class="preset-meta">Loading catalog matches...</p>
 
             <label for="vehicle-preset">
               Exact catalog match

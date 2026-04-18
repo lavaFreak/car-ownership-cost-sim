@@ -12,8 +12,10 @@ const vehicleYearSelect = document.getElementById("vehicle-year");
 const vehicleMakeSelect = document.getElementById("vehicle-make");
 const vehicleModelSelect = document.getElementById("vehicle-model");
 const vehicleTrimSelect = document.getElementById("vehicle-trim");
+const vehicleSearchInput = document.getElementById("vehicle-search");
 const vehiclePresetSelect = document.getElementById("vehicle-preset");
 const vehicleLookupStatus = document.getElementById("vehicle-lookup-status");
+const vehicleMatchCount = document.getElementById("vehicle-match-count");
 const presetDescription = document.getElementById("preset-description");
 const submitButton = form.querySelector('button[type="submit"]');
 const saveComparisonButton = document.getElementById("save-comparison-button");
@@ -60,7 +62,7 @@ let comparisonBaseline = null;
 const comparisonStorageKey = "carOwnershipComparisonBaseline.v1";
 
 const defaultVehicleLookupStatus =
-  "Choose year, make, and model to autofill known vehicle assumptions. You can still edit any value manually afterward.";
+  "Choose year, make, and model to autofill known vehicle assumptions, or search the catalog directly. You can still edit any value manually afterward.";
 
 const defaultPresetDescription =
   "Or choose an exact catalog match directly. Any autofilled values can still be edited manually.";
@@ -178,6 +180,55 @@ function sortedUniqueStrings(values) {
   return [...new Set(values)].sort((left, right) => left.localeCompare(right));
 }
 
+function compareCatalogEntries(left, right) {
+  if (left.catalogYear !== right.catalogYear) {
+    return right.catalogYear - left.catalogYear;
+  }
+
+  const makeComparison = left.catalogMake.localeCompare(right.catalogMake);
+  if (makeComparison !== 0) {
+    return makeComparison;
+  }
+
+  const modelComparison = left.catalogModel.localeCompare(right.catalogModel);
+  if (modelComparison !== 0) {
+    return modelComparison;
+  }
+
+  const trimComparison = left.catalogTrim.localeCompare(right.catalogTrim);
+  if (trimComparison !== 0) {
+    return trimComparison;
+  }
+
+  return left.catalogName.localeCompare(right.catalogName);
+}
+
+function normalizeSearchText(value) {
+  return value.trim().toLowerCase();
+}
+
+function catalogSearchTerms(value) {
+  return normalizeSearchText(value)
+    .split(/\s+/)
+    .filter(Boolean);
+}
+
+function catalogSearchText(entry) {
+  return normalizeSearchText(
+    `${entry.catalogYear} ${entry.catalogMake} ${entry.catalogModel} ${entry.catalogTrim} ${entry.catalogName}`
+  );
+}
+
+function catalogEntryMatchesSearch(entry, searchValue = vehicleSearchInput.value) {
+  const terms = catalogSearchTerms(searchValue);
+  if (terms.length === 0) {
+    return true;
+  }
+
+  const haystack = catalogSearchText(entry);
+  return terms.every((term) => haystack.includes(term));
+}
+
 function matchingCatalogEntries({
   year = "",
   make = "",
@@ -207,6 +258,71 @@ function matchingCatalogEntries({
 
 function setVehicleLookupStatus(message = defaultVehicleLookupStatus) {
   vehicleLookupStatus.textContent = message;
+}
+
+function visibleCatalogEntriesForPresetSelect() {
+  return matchingCatalogEntries({
+    year: vehicleYearSelect.value,
+    make: vehicleMakeSelect.value,
+    model: vehicleModelSelect.value,
+    trim: vehicleTrimSelect.value,
+  })
+    .filter((entry) => catalogEntryMatchesSearch(entry))
+    .sort(compareCatalogEntries);
+}
+
+function updateVehicleMatchCount(visibleEntries) {
+  if (vehicleCatalog.length === 0) {
+    vehicleMatchCount.textContent = "Exact catalog search is unavailable until the catalog loads.";
+    return;
+  }
+
+  const loadedYears = sortedUniqueYears(vehicleCatalog);
+  const searchTerms = catalogSearchTerms(vehicleSearchInput.value);
+
+  if (visibleEntries.length === 0) {
+    vehicleMatchCount.textContent =
+      searchTerms.length === 0
+        ? "No exact catalog matches fit the current year, make, model, and trim filters."
+        : "No exact catalog matches fit the current filters and search text.";
+    return;
+  }
+
+  const matchLabel = `${visibleEntries.length.toLocaleString()} exact catalog ${
+    visibleEntries.length === 1 ? "match" : "matches"
+  }`;
+  const coverageLabel = `${vehicleCatalog.length.toLocaleString()} vehicles loaded across ${loadedYears.length} model years`;
+
+  vehicleMatchCount.textContent =
+    searchTerms.length === 0
+      ? `${matchLabel}. ${coverageLabel}.`
+      : `${matchLabel} for "${vehicleSearchInput.value.trim()}". ${coverageLabel}.`;
+}
+
+function populateVehiclePresets(selectedValue = vehiclePresetSelect.value) {
+  if (vehicleCatalog.length === 0) {
+    vehiclePresetSelect.innerHTML = '<option value="">Catalog unavailable</option>';
+    vehiclePresetSelect.disabled = true;
+    updateVehicleMatchCount([]);
+    return;
+  }
+
+  const visibleEntries = visibleCatalogEntriesForPresetSelect();
+  const selectedOptionExists = visibleEntries.some((entry) => entry.catalogId === selectedValue);
+
+  vehiclePresetSelect.innerHTML = `
+    <option value="">Custom / starter assumptions</option>
+    ${visibleEntries
+      .map(
+        (entry) => `
+          <option value="${entry.catalogId}">${entry.catalogName}</option>
+        `
+      )
+      .join("")}
+  `;
+  vehiclePresetSelect.disabled = false;
+  vehiclePresetSelect.value = selectedOptionExists ? selectedValue : "";
+  updateVehicleMatchCount(visibleEntries);
 }
 
 function refreshVehicleLookupOptions({
@@ -255,6 +371,8 @@ function refreshVehicleLookupOptions({
     trim,
     !activeYear || !activeMake || !activeModel
   );
+
+  populateVehiclePresets();
 }
 
 function setVehicleLookupFromEntry(entry) {
@@ -478,25 +596,16 @@ function applyVehicleCatalogSelectionById(vehicleId) {
     return;
   }
 
-  vehiclePresetSelect.value = vehicleId;
+  if (vehicleSearchInput.value && !catalogEntryMatchesSearch(catalogEntry)) {
+    vehicleSearchInput.value = "";
+  }
+
   setVehicleLookupFromEntry(catalogEntry);
+  vehiclePresetSelect.value = vehicleId;
   applyVehiclePreset(preset);
   setVehicleLookupStatus(
     `${catalogEntry.catalogName} selected. Known car-specific assumptions were autofilled, and you can still edit any value manually.`
   );
-}
-
-function populateVehiclePresets(presets) {
-  vehiclePresetSelect.innerHTML = `
-    <option value="">Custom / starter assumptions</option>
-    ${presets
-      .map(
-        (preset) => `
-          <option value="${preset.presetId}">${preset.presetName}</option>
-        `
-      )
-      .join("")}
-  `;
 }
 
 async function loadVehicleCatalog() {
@@ -517,6 +626,7 @@ async function loadVehicleCatalog() {
     populateSelect(vehicleMakeSelect, "Catalog unavailable", [], "", true);
     populateSelect(vehicleModelSelect, "Catalog unavailable", [], "", true);
     populateSelect(vehicleTrimSelect, "Catalog unavailable", [], "", true);
+    populateVehiclePresets();
     setVehicleLookupStatus(
       error.message ||
         "Vehicle catalog could not be loaded, so car-specific fields will need to be entered manually."
@@ -534,12 +644,14 @@ async function loadVehiclePresets() {
     }
 
     vehiclePresets = payload;
-    populateVehiclePresets(vehiclePresets);
+    populateVehiclePresets();
   } catch (error) {
-    vehiclePresetSelect.innerHTML = '<option value="">Presets unavailable</option>';
-    presetDescription.textContent =
-      error.message ||
-      "Vehicle presets could not be loaded, but you can still enter assumptions manually.";
+    vehiclePresets = [];
+    if (vehicleCatalog.length === 0) {
+      presetDescription.textContent =
+        error.message ||
+        "Vehicle presets could not be loaded, but you can still enter assumptions manually.";
+    }
   }
 }
 
@@ -1070,6 +1182,7 @@ function renderInitialResultsState() {
 
 function resetScenarioForm() {
   form.reset();
+  vehicleSearchInput.value = "";
   vehiclePresetSelect.value = "";
   refreshVehicleLookupOptions();
   setVehicleLookupStatus(defaultVehicleLookupStatus);
@@ -2059,6 +2172,10 @@ vehicleModelSelect.addEventListener("change", () => {
 
 vehicleTrimSelect.addEventListener("change", () => {
   maybeApplyVehicleLookupSelection();
+});
+
+vehicleSearchInput.addEventListener("input", () => {
+  populateVehiclePresets();
 });
 
 vehiclePresetSelect.addEventListener("change", (event) => {

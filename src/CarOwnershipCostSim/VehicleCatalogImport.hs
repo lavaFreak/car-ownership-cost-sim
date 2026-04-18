@@ -48,6 +48,9 @@ module CarOwnershipCostSim.VehicleCatalogImport
 where
 
 import Control.Applicative ((<|>))
+import Control.Concurrent.QSem (newQSem, signalQSem, waitQSem)
+import Control.Concurrent.Async (mapConcurrently)
+import Control.Exception (bracket_)
 import CarOwnershipCostSim.Types (BoundedNormal)
 import CarOwnershipCostSim.VehicleCatalogDefaults
   ( GeneratedCatalogAssumptions (..),
@@ -430,7 +433,7 @@ buildVehicleCatalogEntryFromLiveSources sourceSeed = do
 -- | Rebuild the entire local catalog from the curated source-seed list.
 buildCatalogFromLiveSources :: [VehicleCatalogSourceSeed] -> IO [VehicleCatalogEntry]
 buildCatalogFromLiveSources =
-  mapM buildVehicleCatalogEntryFromLiveSources
+  limitedMapConcurrently catalogRefreshConcurrency buildVehicleCatalogEntryFromLiveSources
 
 -- | Rebuild the local catalog from both curated source seeds and lightweight
 -- roster rows. Duplicate catalog ids are rejected to keep the combined catalog
@@ -442,7 +445,7 @@ buildCatalogFromLiveCatalogInputs ::
 buildCatalogFromLiveCatalogInputs sourceSeeds rosterSeeds = do
   assertUniqueCatalogIds (map sourceCatalogId sourceSeeds <> map rosterCatalogId rosterSeeds)
   sourceEntries <- buildCatalogFromLiveSources sourceSeeds
-  rosterEntries <- mapM buildVehicleCatalogEntryFromLiveRosterSeed rosterSeeds
+  rosterEntries <- limitedMapConcurrently catalogRefreshConcurrency buildVehicleCatalogEntryFromLiveRosterSeed rosterSeeds
   pure (sourceEntries <> rosterEntries)
 
 buildVehicleCatalogEntryFromLiveRosterSeed :: VehicleCatalogRosterSeed -> IO VehicleCatalogEntry
@@ -812,10 +815,27 @@ bestCandidateByLength (firstValue : remainingValues) =
 
 fetchUrl :: String -> IO String
 fetchUrl url = do
-  (exitCode, stdoutText, stderrText) <- readProcessWithExitCode "curl" ["-fsSL", url] ""
+  (exitCode, stdoutText, stderrText) <-
+    readProcessWithExitCode
+      "curl"
+      ["-fsSL", "--connect-timeout", "10", "--max-time", "30", "--retry", "2", "--retry-delay", "1", url]
+      ""
   case exitCode of
     ExitSuccess -> pure stdoutText
     _ -> fail ("curl failed for " <> url <> ": " <> stderrText)
+
+catalogRefreshConcurrency :: Int
+catalogRefreshConcurrency = 8
+
+limitedMapConcurrently :: Int -> (a -> IO b) -> [a] -> IO [b]
+limitedMapConcurrently limit action values = do
+  semaphore <- newQSem limit
+  let withPermit value =
+        bracket_
+          (waitQSem semaphore)
+          (signalQSem semaphore)
+          (action value)
+  mapConcurrently withPermit values
 
 vpicModelsUrl :: VehicleCatalogSourceSeed -> String
 vpicModelsUrl sourceSeed =
