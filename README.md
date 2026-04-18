@@ -235,7 +235,13 @@ cabal run discover-vehicle-roster -- 2024 Toyota "Prius Prime"
 To expand the lightweight roster in a large batch using a curated model list:
 
 ```bash
-bash scripts/expand-roster-batch.sh
+bash scripts/expand-roster-batch.sh catalog/roster-batches/2024-mainstream.txt 1
+```
+
+To expand a different year batch:
+
+```bash
+bash scripts/expand-roster-batch.sh catalog/roster-batches/2023-mainstream.txt 20
 ```
 
 ## Development Plan
@@ -310,8 +316,9 @@ The catalog importer now supports two project-owned input files:
 That split is the first real scaling step toward broader `2020+` coverage,
 because not every vehicle now needs a fully hand-authored maintenance,
 depreciation, repair-risk, and insurance profile before it can appear in the
-app. The current checked-in runtime catalog now covers `106` vehicles built
-from `10` curated source seeds plus `96` lighter-weight roster rows.
+app. The current checked-in runtime catalog now covers `196` vehicles across
+`2023` and `2024`, built from `10` curated source seeds plus `186`
+lighter-weight roster rows.
 
 The repository also includes a basic GitHub Actions workflow that runs the main
 build and test checks on pushes and pull requests.

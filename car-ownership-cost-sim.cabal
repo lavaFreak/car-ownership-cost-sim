@@ -18,7 +18,10 @@ extra-source-files:
     docs/testing-and-workflows.md
     catalog/vehicle-source-seeds.json
     catalog/vehicle-roster.json
+    catalog/roster-batches/2023-mainstream.txt
+    catalog/roster-batches/2024-mainstream.txt
     docs/vehicle-data-sourcing.md
+    scripts/expand-roster-batch.sh
     static/index.html
     static/styles.css
     static/app.js

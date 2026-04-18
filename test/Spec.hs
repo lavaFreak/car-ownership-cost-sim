@@ -50,7 +50,7 @@ import Data.Aeson (FromJSON (..), eitherDecode, encode, withObject, (.:))
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as BL
 import qualified Data.ByteString.Lazy.Char8 as BL8
-import Data.List (find, isInfixOf, nub)
+import Data.List (find, isInfixOf, nub, sort)
 import Network.HTTP.Types (Header, hContentType, methodGet, methodHead, methodPost, status200, status400)
 import qualified Network.Wai as Wai
 import Network.Wai (Application)
@@ -756,8 +756,10 @@ vehicleRosterSeedLoadTest =
   TestCase $ do
     sourceSeeds <- loadDefaultVehicleSourceSeeds
     rosterSeeds <- loadDefaultVehicleRosterSeeds
-    assertEqual "the lightweight roster stays at ninety-six vehicles" 96 (length rosterSeeds)
-    assertEqual "source plus roster coverage stays at one-hundred-six vehicles" 106 (length sourceSeeds + length rosterSeeds)
+    let rosterYears = sort (nub (map rosterYear rosterSeeds))
+    assertEqual "the lightweight roster stays at one-hundred-eighty-six vehicles" 186 (length rosterSeeds)
+    assertEqual "source plus roster coverage stays at one-hundred-ninety-six vehicles" 196 (length sourceSeeds + length rosterSeeds)
+    assertEqual "the lightweight roster spans both 2023 and 2024" [2023, 2024] rosterYears
     mapM_ assertVehicleRosterSeedLooksUsable rosterSeeds
 
 vpicFixtureDecodingTest :: Test

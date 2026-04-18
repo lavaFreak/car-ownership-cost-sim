@@ -86,7 +86,13 @@ cabal run discover-vehicle-roster -- 2024 Honda "Prologue FWD"
 To expand the lightweight roster from a larger curated batch of model queries:
 
 ```bash
-bash scripts/expand-roster-batch.sh
+bash scripts/expand-roster-batch.sh catalog/roster-batches/2024-mainstream.txt 1
+```
+
+To run the same workflow against a different model-year batch:
+
+```bash
+bash scripts/expand-roster-batch.sh catalog/roster-batches/2023-mainstream.txt 20
 ```
 
 This workflow depends on the curated source seeds in
@@ -118,6 +124,7 @@ When changing catalog or importer behavior:
 2. use `discover-vehicle-roster` if you need to expand the lightweight roster
 3. use `scripts/expand-roster-batch.sh` if you want to add a larger batch of
    official models in one pass
+   : the checked-in batch inputs currently live in `catalog/roster-batches/`
 4. refresh or verify fixtures plus source-seed or roster expectations
 5. run `cabal test`
 6. rebuild the local catalog if the checked-in runtime data should change

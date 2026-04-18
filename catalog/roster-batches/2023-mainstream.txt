@@ -1,0 +1,71 @@
+2023|Toyota|4Runner 2WD
+2023|Toyota|4Runner 4WD
+2023|Toyota|Camry
+2023|Toyota|Camry AWD LE/SE
+2023|Toyota|Camry AWD XLE/XSE
+2023|Toyota|Camry LE/SE
+2023|Toyota|Camry XLE/XSE
+2023|Toyota|Corolla Hatchback
+2023|Toyota|Corolla Cross
+2023|Toyota|Corolla Cross AWD
+2023|Toyota|Corolla Cross Hybrid AWD
+2023|Toyota|Highlander
+2023|Toyota|Highlander AWD
+2023|Toyota|Highlander Hybrid
+2023|Toyota|Highlander Hybrid AWD
+2023|Toyota|Prius
+2023|Toyota|Prius AWD
+2023|Toyota|Prius Prime
+2023|Toyota|RAV4
+2023|Toyota|RAV4 AWD
+2023|Toyota|RAV4 Prime 4WD
+2023|Toyota|Sienna 2WD
+2023|Toyota|Sienna AWD
+2023|Toyota|Tacoma 2WD
+2023|Toyota|Tacoma 4WD
+2023|Toyota|Tundra 2WD
+2023|Toyota|Tundra 4WD
+2023|Toyota|Venza AWD
+2023|Honda|Accord
+2023|Honda|Accord Hybrid
+2023|Honda|CR-V AWD
+2023|Honda|CR-V FWD
+2023|Honda|Civic 4Dr
+2023|Honda|HR-V AWD
+2023|Honda|HR-V FWD
+2023|Honda|Odyssey
+2023|Honda|Passport AWD
+2023|Honda|Pilot AWD
+2023|Honda|Pilot FWD
+2023|Honda|Ridgeline AWD
+2023|Hyundai|Elantra
+2023|Hyundai|Elantra Hybrid
+2023|Hyundai|Ioniq 5 AWD
+2023|Hyundai|Ioniq 5 RWD
+2023|Hyundai|Kona AWD
+2023|Hyundai|Kona Electric
+2023|Hyundai|Kona FWD
+2023|Hyundai|Palisade AWD
+2023|Hyundai|Palisade FWD
+2023|Hyundai|Santa Fe AWD
+2023|Hyundai|Santa Fe FWD
+2023|Hyundai|Santa Fe Hybrid AWD
+2023|Hyundai|Santa Fe Hybrid FWD
+2023|Hyundai|Sonata AWD
+2023|Hyundai|Sonata FWD
+2023|Hyundai|Tucson AWD
+2023|Hyundai|Tucson FWD
+2023|Hyundai|Tucson Hybrid
+2023|Hyundai|Venue
+2023|Tesla|Model 3 AWD
+2023|Tesla|Model 3 RWD
+2023|Tesla|Model S
+2023|Tesla|Model X
+2023|Tesla|Model Y AWD
+2023|Tesla|Model Y RWD
+2023|Mazda|3 4-Door 2WD
+2023|Mazda|3 5-Door 2WD
+2023|Mazda|CX-30 4WD
+2023|Mazda|CX-5 4WD
+2023|Mazda|CX-50 4WD
+2023|Mazda|MX-5

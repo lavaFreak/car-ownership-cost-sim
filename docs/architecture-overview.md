@@ -46,6 +46,8 @@ The app is split into four layers:
 - [scripts/expand-roster-batch.sh](/Users/garion/Work/projects/car-ownership-cost-sim/scripts/expand-roster-batch.sh)
   Batch helper for widening the lightweight roster from a curated list of
   official model queries.
+- [catalog/roster-batches/](/Users/garion/Work/projects/car-ownership-cost-sim/catalog/roster-batches)
+  Checked-in query lists that drive repeatable batch roster expansion runs.
 - [static/index.html](/Users/garion/Work/projects/car-ownership-cost-sim/static/index.html)
   Form structure and results containers.
 - [static/app.js](/Users/garion/Work/projects/car-ownership-cost-sim/static/app.js)
