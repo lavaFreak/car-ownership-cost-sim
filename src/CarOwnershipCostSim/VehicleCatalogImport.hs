@@ -16,18 +16,26 @@ hybrid:
 
 The code here is used by the catalog-building CLI and heavily exercised by the
 test suite because upstream data normalization is one of the easiest places for
-quiet regressions to appear.
+quiet regressions to appear. The importer now supports both curated source
+seeds, where we want hand-tuned overrides, and lightweight roster rows, where
+generated defaults are good enough to get broader coverage into the catalog.
 -}
 module CarOwnershipCostSim.VehicleCatalogImport
   ( VehicleCatalogSourceSeed (..),
+    VehicleCatalogRosterSeed (..),
     VpicModelResult (..),
     FuelEconomyVehicleRecord (..),
+    buildCatalogFromLiveCatalogInputs,
     buildCatalogFromLiveSources,
     buildCatalogImportSeedFromSourceSeed,
+    buildCatalogImportSeedFromRosterSeed,
     buildVehicleCatalogEntryFromLiveSources,
+    buildVehicleCatalogEntryFromRosterSeed,
     buildVehicleCatalogEntryFromSourceSeed,
     decodeVpicModelResults,
+    defaultVehicleCatalogRosterSeedsRelativePath,
     defaultVehicleCatalogSourceSeedsRelativePath,
+    loadVehicleCatalogRosterSeeds,
     loadVehicleCatalogSourceSeeds,
     parseFuelEconomyVehicleRecord,
   )
@@ -36,6 +44,7 @@ where
 import CarOwnershipCostSim.Types (BoundedNormal)
 import CarOwnershipCostSim.VehicleCatalogDefaults
   ( GeneratedCatalogAssumptions (..),
+    defaultCatalogDescription,
     defaultCatalogAssumptions,
   )
 import CarOwnershipCostSim.VehicleCatalog
@@ -55,7 +64,7 @@ import Data.Aeson
   )
 import qualified Data.ByteString.Char8 as BS8
 import Data.Char (isAlphaNum, toLower)
-import Data.List (find, isInfixOf)
+import Data.List (find, isInfixOf, nub)
 import GHC.Generics (Generic)
 import System.Exit (ExitCode (ExitSuccess))
 import System.Process (readProcessWithExitCode)
@@ -88,6 +97,26 @@ data VehicleCatalogSourceSeed = VehicleCatalogSourceSeed
 instance FromJSON VehicleCatalogSourceSeed
 
 instance ToJSON VehicleCatalogSourceSeed
+
+-- | Lightweight roster row used for scalable catalog growth when we only need
+-- objective identity data plus an optional price anchor.
+data VehicleCatalogRosterSeed = VehicleCatalogRosterSeed
+  { rosterCatalogId :: String,
+    rosterDescription :: Maybe String,
+    rosterYear :: Int,
+    rosterMake :: String,
+    rosterCatalogModel :: String,
+    rosterTrim :: String,
+    rosterBaseModel :: String,
+    rosterFuelEconomyVehicleId :: Int,
+    rosterPurchasePrice :: Maybe Double,
+    rosterSourceUpdatedAt :: String
+  }
+  deriving (Eq, Show, Generic)
+
+instance FromJSON VehicleCatalogRosterSeed
+
+instance ToJSON VehicleCatalogRosterSeed
 
 -- | Minimal shape of the vPIC API wrapper response.
 data VpicApiResponse a = VpicApiResponse
@@ -134,6 +163,10 @@ data FuelEconomyVehicleRecord = FuelEconomyVehicleRecord
 defaultVehicleCatalogSourceSeedsRelativePath :: FilePath
 defaultVehicleCatalogSourceSeedsRelativePath = "catalog/vehicle-source-seeds.json"
 
+-- | Relative path to the checked-in lightweight roster file.
+defaultVehicleCatalogRosterSeedsRelativePath :: FilePath
+defaultVehicleCatalogRosterSeedsRelativePath = "catalog/vehicle-roster.json"
+
 -- | Load the curated source-seed file from disk.
 loadVehicleCatalogSourceSeeds :: FilePath -> IO [VehicleCatalogSourceSeed]
 loadVehicleCatalogSourceSeeds sourceSeedsPath = do
@@ -141,6 +174,15 @@ loadVehicleCatalogSourceSeeds sourceSeedsPath = do
   case decoded of
     Left decodeError ->
       error ("Unable to load vehicle source seeds from " <> sourceSeedsPath <> ": " <> decodeError)
+    Right entries -> pure entries
+
+-- | Load the lightweight roster file from disk.
+loadVehicleCatalogRosterSeeds :: FilePath -> IO [VehicleCatalogRosterSeed]
+loadVehicleCatalogRosterSeeds rosterPath = do
+  decoded <- eitherDecodeFileStrict' rosterPath
+  case decoded of
+    Left decodeError ->
+      error ("Unable to load vehicle roster seeds from " <> rosterPath <> ": " <> decodeError)
     Right entries -> pure entries
 
 -- | Decode the vPIC model list payload into a normalized list of models.
@@ -224,6 +266,62 @@ buildCatalogImportSeedFromSourceSeed sourceSeed vpicModels fuelEconomyVehicle = 
         importSourceUpdatedAt = sourceSourceUpdatedAt sourceSeed
       }
 
+-- | Combine one lightweight roster row with upstream records to produce a
+-- normalized catalog import seed that relies on generated defaults.
+buildCatalogImportSeedFromRosterSeed ::
+  VehicleCatalogRosterSeed ->
+  [VpicModelResult] ->
+  FuelEconomyVehicleRecord ->
+  Either String CatalogImportSeed
+buildCatalogImportSeedFromRosterSeed rosterSeed vpicModels fuelEconomyVehicle = do
+  ensureMatches "roster year" (show (rosterYear rosterSeed)) (show (fuelEconomyVehicleYear fuelEconomyVehicle))
+  ensureMatches "roster make" (rosterMake rosterSeed) (fuelEconomyVehicleMake fuelEconomyVehicle)
+  assertVpicBaseModelFound (rosterBaseModel rosterSeed) vpicModels
+  assertFuelEconomyBaseModelMatches (rosterBaseModel rosterSeed) fuelEconomyVehicle
+  let generatedDefaults =
+        defaultCatalogAssumptions
+          (rosterPurchasePrice rosterSeed)
+          (normalizedFuelType fuelEconomyVehicle)
+          (fuelEconomyVehicleClass fuelEconomyVehicle)
+          (fuelEconomyVehicleDrive fuelEconomyVehicle)
+          (fuelEconomyVehicleCombinedMpg fuelEconomyVehicle)
+      description =
+        maybe
+          ( defaultCatalogDescription
+              (normalizedFuelType fuelEconomyVehicle)
+              (fuelEconomyVehicleClass fuelEconomyVehicle)
+              (fuelEconomyVehicleDrive fuelEconomyVehicle)
+              (fuelEconomyVehicleCombinedMpg fuelEconomyVehicle)
+          )
+          id
+          (rosterDescription rosterSeed)
+  pure
+    CatalogImportSeed
+      { importCatalogId = rosterCatalogId rosterSeed,
+        importDescription = description,
+        importIdentity =
+          VpicVehicleIdentity
+            { vpicYear = rosterYear rosterSeed,
+              vpicMake = rosterMake rosterSeed,
+              vpicModel = rosterCatalogModel rosterSeed,
+              vpicTrim = rosterTrim rosterSeed
+            },
+        importFuelEconomy = fuelEconomyProfileFromRecord fuelEconomyVehicle,
+        importPurchasePrice = generatedPurchasePrice generatedDefaults,
+        importAnnualInsurance = generatedAnnualInsurance generatedDefaults,
+        importAnnualRegistration = generatedAnnualRegistration generatedDefaults,
+        importAnnualMaintenance = generatedAnnualMaintenance generatedDefaults,
+        importAnnualDepreciationRate = generatedAnnualDepreciationRate generatedDefaults,
+        importFirstYearDepreciationBonus = generatedFirstYearDepreciationBonus generatedDefaults,
+        importResidualValueFloorPercent = generatedResidualValueFloorPercent generatedDefaults,
+        importExpectedAnnualMilesForResale = generatedExpectedAnnualMilesForResale generatedDefaults,
+        importExtraMileageDepreciationPerMile = generatedExtraMileageDepreciationPerMile generatedDefaults,
+        importRepairShockProbability = generatedRepairShockProbability generatedDefaults,
+        importRepairShockCost = generatedRepairShockCost generatedDefaults,
+        importSourceName = "vpic.nhtsa.dot.gov + fueleconomy.gov",
+        importSourceUpdatedAt = rosterSourceUpdatedAt rosterSeed
+      }
+
 -- | Build a final catalog entry from already-decoded upstream records.
 buildVehicleCatalogEntryFromSourceSeed ::
   VehicleCatalogSourceSeed ->
@@ -232,6 +330,16 @@ buildVehicleCatalogEntryFromSourceSeed ::
   Either String VehicleCatalogEntry
 buildVehicleCatalogEntryFromSourceSeed sourceSeed vpicModels fuelEconomyVehicle =
   buildVehicleCatalogEntry <$> buildCatalogImportSeedFromSourceSeed sourceSeed vpicModels fuelEconomyVehicle
+
+-- | Build a final catalog entry from a lightweight roster row plus upstream
+-- records.
+buildVehicleCatalogEntryFromRosterSeed ::
+  VehicleCatalogRosterSeed ->
+  [VpicModelResult] ->
+  FuelEconomyVehicleRecord ->
+  Either String VehicleCatalogEntry
+buildVehicleCatalogEntryFromRosterSeed rosterSeed vpicModels fuelEconomyVehicle =
+  buildVehicleCatalogEntry <$> buildCatalogImportSeedFromRosterSeed rosterSeed vpicModels fuelEconomyVehicle
 
 -- | Fetch live upstream payloads for one source seed and build the final
 -- catalog row.
@@ -258,6 +366,38 @@ buildVehicleCatalogEntryFromLiveSources sourceSeed = do
 buildCatalogFromLiveSources :: [VehicleCatalogSourceSeed] -> IO [VehicleCatalogEntry]
 buildCatalogFromLiveSources =
   mapM buildVehicleCatalogEntryFromLiveSources
+
+-- | Rebuild the local catalog from both curated source seeds and lightweight
+-- roster rows. Duplicate catalog ids are rejected to keep the combined catalog
+-- unambiguous.
+buildCatalogFromLiveCatalogInputs ::
+  [VehicleCatalogSourceSeed] ->
+  [VehicleCatalogRosterSeed] ->
+  IO [VehicleCatalogEntry]
+buildCatalogFromLiveCatalogInputs sourceSeeds rosterSeeds = do
+  assertUniqueCatalogIds (map sourceCatalogId sourceSeeds <> map rosterCatalogId rosterSeeds)
+  sourceEntries <- buildCatalogFromLiveSources sourceSeeds
+  rosterEntries <- mapM buildVehicleCatalogEntryFromLiveRosterSeed rosterSeeds
+  pure (sourceEntries <> rosterEntries)
+
+buildVehicleCatalogEntryFromLiveRosterSeed :: VehicleCatalogRosterSeed -> IO VehicleCatalogEntry
+buildVehicleCatalogEntryFromLiveRosterSeed rosterSeed = do
+  vpicPayload <- fetchUrl (vpicModelsUrlForRosterSeed rosterSeed)
+  fuelEconomyPayload <- fetchUrl (fuelEconomyVehicleUrlForRosterSeed rosterSeed)
+  vpicModels <-
+    either
+      (\decodeError -> fail ("Unable to decode vPIC payload for " <> rosterCatalogId rosterSeed <> ": " <> decodeError))
+      pure
+      (decodeVpicModelResults vpicPayload)
+  fuelEconomyVehicle <-
+    either
+      (\decodeError -> fail ("Unable to parse FuelEconomy.gov payload for " <> rosterCatalogId rosterSeed <> ": " <> decodeError))
+      pure
+      (parseFuelEconomyVehicleRecord fuelEconomyPayload)
+  either
+    (\decodeError -> fail ("Unable to build roster-based catalog entry for " <> rosterCatalogId rosterSeed <> ": " <> decodeError))
+    pure
+    (buildVehicleCatalogEntryFromRosterSeed rosterSeed vpicModels fuelEconomyVehicle)
 
 fuelEconomyProfileFromRecord :: FuelEconomyVehicleRecord -> FuelEconomyProfile
 fuelEconomyProfileFromRecord fuelEconomyVehicle =
@@ -441,6 +581,24 @@ emptyToNothing rawValue
   | null rawValue = Nothing
   | otherwise = Just rawValue
 
+assertUniqueCatalogIds :: [String] -> IO ()
+assertUniqueCatalogIds catalogIds =
+  case duplicateValues catalogIds of
+    [] -> pure ()
+    duplicates ->
+      fail
+        ( "Duplicate catalog ids found across source seeds and roster entries: "
+            <> show duplicates
+        )
+
+duplicateValues :: Eq a => [a] -> [a]
+duplicateValues values =
+  [value | value <- nub values, occurrences value values > 1]
+
+occurrences :: Eq a => a -> [a] -> Int
+occurrences target =
+  length . filter (== target)
+
 fetchUrl :: String -> IO String
 fetchUrl url = do
   (exitCode, stdoutText, stderrText) <- readProcessWithExitCode "curl" ["-fsSL", url] ""
@@ -459,3 +617,15 @@ vpicModelsUrl sourceSeed =
 fuelEconomyVehicleUrl :: VehicleCatalogSourceSeed -> String
 fuelEconomyVehicleUrl sourceSeed =
   "https://www.fueleconomy.gov/ws/rest/vehicle/" <> show (sourceFuelEconomyVehicleId sourceSeed)
+
+vpicModelsUrlForRosterSeed :: VehicleCatalogRosterSeed -> String
+vpicModelsUrlForRosterSeed rosterSeed =
+  "https://vpic.nhtsa.dot.gov/api/vehicles/GetModelsForMakeYear/make/"
+    <> rosterMake rosterSeed
+    <> "/modelyear/"
+    <> show (rosterYear rosterSeed)
+    <> "?format=json"
+
+fuelEconomyVehicleUrlForRosterSeed :: VehicleCatalogRosterSeed -> String
+fuelEconomyVehicleUrlForRosterSeed rosterSeed =
+  "https://www.fueleconomy.gov/ws/rest/vehicle/" <> show (rosterFuelEconomyVehicleId rosterSeed)

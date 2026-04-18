@@ -1,0 +1,46 @@
+[
+  {
+    "rosterCatalogId": "ioniq-5-long-range-rwd-2024",
+    "rosterYear": 2024,
+    "rosterMake": "Hyundai",
+    "rosterCatalogModel": "Ioniq 5",
+    "rosterTrim": "Long Range RWD",
+    "rosterBaseModel": "Ioniq 5",
+    "rosterFuelEconomyVehicleId": 46960,
+    "rosterPurchasePrice": 47200,
+    "rosterSourceUpdatedAt": "2026-04-17"
+  },
+  {
+    "rosterCatalogId": "cx-5-awd-2024",
+    "rosterYear": 2024,
+    "rosterMake": "Mazda",
+    "rosterCatalogModel": "CX-5",
+    "rosterTrim": "2.5 S AWD",
+    "rosterBaseModel": "CX-5",
+    "rosterFuelEconomyVehicleId": 47152,
+    "rosterPurchasePrice": 32100,
+    "rosterSourceUpdatedAt": "2026-04-17"
+  },
+  {
+    "rosterCatalogId": "sienna-2wd-2024",
+    "rosterYear": 2024,
+    "rosterMake": "Toyota",
+    "rosterCatalogModel": "Sienna",
+    "rosterTrim": "2WD",
+    "rosterBaseModel": "Sienna",
+    "rosterFuelEconomyVehicleId": 47252,
+    "rosterPurchasePrice": 37700,
+    "rosterSourceUpdatedAt": "2026-04-17"
+  },
+  {
+    "rosterCatalogId": "hr-v-fwd-2024",
+    "rosterYear": 2024,
+    "rosterMake": "Honda",
+    "rosterCatalogModel": "HR-V",
+    "rosterTrim": "FWD",
+    "rosterBaseModel": "HR-V",
+    "rosterFuelEconomyVehicleId": 46588,
+    "rosterPurchasePrice": 25400,
+    "rosterSourceUpdatedAt": "2026-04-17"
+  }
+]

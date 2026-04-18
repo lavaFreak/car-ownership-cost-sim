@@ -80,15 +80,17 @@ the core simulation code.
   so bulk catalog growth does not require fully hand-curated data for every
   model.
 - `src/CarOwnershipCostSim/VehicleCatalogImport.hs`
-  Parses official `vPIC` and `FuelEconomy.gov` payloads into catalog entries
-  and merges optional source-seed overrides on top of generated defaults.
+  Parses official `vPIC` and `FuelEconomy.gov` payloads into catalog entries,
+  supports both curated source seeds and lightweight roster rows, and merges
+  optional overrides on top of generated defaults.
 - `src/CarOwnershipCostSim/WebApp.hs`
   Defines the Scotty routes in a testable form so the API and static assets can
   be exercised without booting a separate server process.
 - `app/Main.hs`
   Runs the Scotty server and exposes the web routes and API endpoints.
 - `app/BuildCatalog.hs`
-  Rebuilds the local vehicle catalog from API-backed source seeds.
+  Rebuilds the local vehicle catalog from API-backed source seeds plus the
+  lightweight roster file.
 - `static/`
   Contains the browser UI.
 - `test/Spec.hs`
@@ -202,7 +204,8 @@ For a quick local verification pass:
 ./scripts/run-checks.sh
 ```
 
-To rebuild the local catalog from the current API-backed source seeds:
+To rebuild the local catalog from the current API-backed source seeds and
+roster:
 
 ```bash
 cabal run build-vehicle-catalog
@@ -274,6 +277,19 @@ simulation invariants, API routes, financing edge cases, deterministic mileage
 and wear logic, resale-floor behavior, mileage-based resale penalties, the new
 city/highway fuel split, and a lightweight in-process smoke test for the web
 assets.
+
+The catalog importer now supports two project-owned input files:
+
+- [catalog/vehicle-source-seeds.json](/Users/garion/Work/projects/car-ownership-cost-sim/catalog/vehicle-source-seeds.json)
+  for curated vehicles where we want hand-tuned assumptions or overrides
+- [catalog/vehicle-roster.json](/Users/garion/Work/projects/car-ownership-cost-sim/catalog/vehicle-roster.json)
+  for lighter-weight rows that rely on generated defaults from official vehicle
+  attributes
+
+That split is the first real scaling step toward broader `2020+` coverage,
+because not every vehicle now needs a fully hand-authored maintenance,
+depreciation, repair-risk, and insurance profile before it can appear in the
+app.
 
 The repository also includes a basic GitHub Actions workflow that runs the main
 build and test checks on pushes and pull requests.

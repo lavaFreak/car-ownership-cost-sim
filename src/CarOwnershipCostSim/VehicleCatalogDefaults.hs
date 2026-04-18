@@ -12,6 +12,7 @@ values when we want higher-fidelity tuning for specific vehicles.
 -}
 module CarOwnershipCostSim.VehicleCatalogDefaults
   ( GeneratedCatalogAssumptions (..),
+    defaultCatalogDescription,
     defaultCatalogAssumptions,
   )
 where
@@ -63,6 +64,20 @@ data DriveBucket
   | AllWheelDrive
   | OtherDrive
   deriving (Eq, Show)
+
+-- | Generate a plain-language catalog description from objective vehicle
+-- attributes. This keeps bulk-imported rows user-friendly without requiring a
+-- hand-written summary for every exact trim.
+defaultCatalogDescription :: String -> Maybe String -> Maybe String -> Double -> String
+defaultCatalogDescription rawFuelType maybeVehicleClass maybeDrive combinedMpg =
+  "Generated baseline for a "
+    <> classLabel (classifyVehicleClass maybeVehicleClass)
+    <> " "
+    <> fuelLabel (classifyFuelType rawFuelType)
+    <> driveSuffix (classifyDrive maybeDrive)
+    <> " using official MPG data and rule-based ownership assumptions"
+    <> efficiencySuffix combinedMpg
+    <> "."
 
 -- | Generate a baseline set of assumptions from objective vehicle attributes.
 --
@@ -403,3 +418,30 @@ roundCents rawValue =
 clamp :: Double -> Double -> Double -> Double
 clamp lowerBound upperBound =
   max lowerBound . min upperBound
+
+classLabel :: ClassBucket -> String
+classLabel CompactCar = "compact car"
+classLabel MidsizeCar = "midsize car"
+classLabel LargeCar = "large car"
+classLabel CrossoverSuv = "crossover/SUV"
+classLabel Minivan = "minivan"
+classLabel TruckLike = "truck-like vehicle"
+classLabel OtherVehicleClass = "passenger vehicle"
+
+fuelLabel :: FuelBucket -> String
+fuelLabel GasolineVehicle = "gasoline"
+fuelLabel HybridVehicle = "hybrid"
+fuelLabel PlugInHybridVehicle = "plug-in hybrid"
+fuelLabel ElectricVehicle = "battery-electric"
+fuelLabel DieselVehicle = "diesel"
+
+driveSuffix :: DriveBucket -> String
+driveSuffix FrontWheelDrive = " with front-wheel drive"
+driveSuffix RearWheelDrive = " with rear-wheel drive"
+driveSuffix AllWheelDrive = " with all-wheel drive"
+driveSuffix OtherDrive = ""
+
+efficiencySuffix :: Double -> String
+efficiencySuffix combinedMpg
+  | combinedMpg > 0 = " at about " <> show (round combinedMpg :: Int) <> " combined MPG"
+  | otherwise = ""

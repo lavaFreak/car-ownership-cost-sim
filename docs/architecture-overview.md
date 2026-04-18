@@ -11,8 +11,8 @@ The app is split into four layers:
    - Haskell types, validation rules, deterministic formulas, and Monte Carlo
      sampling.
 2. Vehicle data layer
-   - A local catalog plus importer code that rebuilds that catalog from curated
-     source seeds and upstream data.
+   - A local catalog plus importer code that rebuilds that catalog from
+     curated source seeds, lightweight roster rows, and upstream data.
 3. Web layer
    - A small Scotty app that serves the frontend and the JSON API.
 4. Frontend
@@ -30,7 +30,8 @@ The app is split into four layers:
 - [src/CarOwnershipCostSim/VehicleCatalog.hs](/Users/garion/Work/projects/car-ownership-cost-sim/src/CarOwnershipCostSim/VehicleCatalog.hs)
   Local catalog types and load helpers.
 - [src/CarOwnershipCostSim/VehicleCatalogImport.hs](/Users/garion/Work/projects/car-ownership-cost-sim/src/CarOwnershipCostSim/VehicleCatalogImport.hs)
-  Import path from curated seeds plus `vPIC` and `FuelEconomy.gov`.
+  Import path from curated seeds, lightweight roster rows, and official
+  upstream data.
 - [src/CarOwnershipCostSim/VehiclePresets.hs](/Users/garion/Work/projects/car-ownership-cost-sim/src/CarOwnershipCostSim/VehiclePresets.hs)
   Browser-facing preset projection from the local catalog.
 - [src/CarOwnershipCostSim/WebApp.hs](/Users/garion/Work/projects/car-ownership-cost-sim/src/CarOwnershipCostSim/WebApp.hs)
@@ -68,13 +69,16 @@ The vehicle catalog is not rebuilt during normal web requests.
 
 1. Curated source seeds live in
    [catalog/vehicle-source-seeds.json](/Users/garion/Work/projects/car-ownership-cost-sim/catalog/vehicle-source-seeds.json).
-2. `app/BuildCatalog.hs` loads those seeds and calls
-   `buildCatalogFromLiveSources`.
-3. `VehicleCatalogImport.hs` fetches upstream data and validates that the
-   source seed still matches the official payloads.
-4. The resulting normalized rows are written to
+2. Lightweight bulk-coverage rows live in
+   [catalog/vehicle-roster.json](/Users/garion/Work/projects/car-ownership-cost-sim/catalog/vehicle-roster.json).
+3. `app/BuildCatalog.hs` loads both files and calls
+   `buildCatalogFromLiveCatalogInputs`.
+4. `VehicleCatalogImport.hs` fetches upstream data and validates that each
+   source or roster row still matches the official payloads. Curated rows may
+   override generated assumptions; roster rows rely on generated defaults.
+5. The resulting normalized rows are written to
    [catalog/vehicle-catalog.json](/Users/garion/Work/projects/car-ownership-cost-sim/catalog/vehicle-catalog.json).
-5. The web server loads that local catalog at startup and serves it from memory.
+6. The web server loads that local catalog at startup and serves it from memory.
 
 ## Testing strategy
 
@@ -83,7 +87,7 @@ The project intentionally mixes three kinds of tests in one Haskell suite:
 - deterministic model tests
   - prove financing, taxes, inflation, mileage growth, and tire wear math
 - importer tests
-  - prove the curated source seeds still match upstream fixture payloads
+  - prove both curated and lightweight catalog inputs still normalize cleanly
 - route tests
   - prove the API and static asset endpoints boot and return valid payloads
 

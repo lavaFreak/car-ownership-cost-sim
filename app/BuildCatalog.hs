@@ -1,17 +1,19 @@
 {-|
 CLI entry point for rebuilding the local vehicle catalog.
 
-This executable reads the curated source-seed file, fetches the upstream
-vehicle data needed for each seed, and writes the refreshed local catalog to the
-default catalog path or to a custom output path provided as the first CLI
-argument.
+This executable reads both the curated source-seed file and the lightweight
+roster file, fetches the upstream vehicle data needed for each entry, and
+writes the refreshed local catalog to the default catalog path or to a custom
+output path provided as the first CLI argument.
 -}
 module Main (main) where
 
 import CarOwnershipCostSim.VehicleCatalog (defaultVehicleCatalogRelativePath)
 import CarOwnershipCostSim.VehicleCatalogImport
-  ( buildCatalogFromLiveSources,
+  ( buildCatalogFromLiveCatalogInputs,
+    defaultVehicleCatalogRosterSeedsRelativePath,
     defaultVehicleCatalogSourceSeedsRelativePath,
+    loadVehicleCatalogRosterSeeds,
     loadVehicleCatalogSourceSeeds,
   )
 import Data.Aeson (encodeFile)
@@ -21,7 +23,8 @@ main :: IO ()
 main = do
   outputPaths <- getArgs
   sourceSeeds <- loadVehicleCatalogSourceSeeds defaultVehicleCatalogSourceSeedsRelativePath
-  vehicleCatalog <- buildCatalogFromLiveSources sourceSeeds
+  rosterSeeds <- loadVehicleCatalogRosterSeeds defaultVehicleCatalogRosterSeedsRelativePath
+  vehicleCatalog <- buildCatalogFromLiveCatalogInputs sourceSeeds rosterSeeds
   let outputPath =
         case outputPaths of
           customPath : _ -> customPath

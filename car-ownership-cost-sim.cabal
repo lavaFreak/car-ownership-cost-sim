@@ -17,6 +17,7 @@ extra-source-files:
     docs/frontend-overview.md
     docs/testing-and-workflows.md
     catalog/vehicle-source-seeds.json
+    catalog/vehicle-roster.json
     docs/vehicle-data-sourcing.md
     static/index.html
     static/styles.css
@@ -29,6 +30,7 @@ extra-source-files:
 data-files:
     catalog/vehicle-catalog.json
     catalog/vehicle-source-seeds.json
+    catalog/vehicle-roster.json
     static/index.html
     static/styles.css
     static/app.js

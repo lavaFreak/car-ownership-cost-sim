@@ -72,13 +72,17 @@ cabal run build-vehicle-catalog -- /tmp/vehicle-catalog.json
 ```
 
 This workflow depends on the curated source seeds in
-[catalog/vehicle-source-seeds.json](/Users/garion/Work/projects/car-ownership-cost-sim/catalog/vehicle-source-seeds.json)
+[catalog/vehicle-source-seeds.json](/Users/garion/Work/projects/car-ownership-cost-sim/catalog/vehicle-source-seeds.json),
+the lightweight roster in
+[catalog/vehicle-roster.json](/Users/garion/Work/projects/car-ownership-cost-sim/catalog/vehicle-roster.json),
 plus the importer logic in
 [src/CarOwnershipCostSim/VehicleCatalogImport.hs](/Users/garion/Work/projects/car-ownership-cost-sim/src/CarOwnershipCostSim/VehicleCatalogImport.hs).
 Source seeds can now omit many ownership-cost assumptions; the importer will
 fill them with rule-based defaults derived from official vehicle attributes, and
 curated values only need to be supplied when we want to override those
-generated assumptions.
+generated assumptions. Roster rows go one step lighter and can omit the
+ownership-cost tuning entirely, using only identity fields plus an optional
+price anchor.
 
 ## Recommended change workflow
 
@@ -93,7 +97,7 @@ When changing simulation behavior:
 When changing catalog or importer behavior:
 
 1. update the relevant catalog/import modules
-2. refresh or verify fixtures and source-seed expectations
+2. refresh or verify fixtures plus source-seed or roster expectations
 3. run `cabal test`
 4. rebuild the local catalog if the checked-in runtime data should change
 

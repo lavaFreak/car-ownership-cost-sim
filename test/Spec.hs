@@ -27,12 +27,16 @@ import CarOwnershipCostSim.VehicleCatalog
   )
 import CarOwnershipCostSim.VehicleCatalogImport
   ( FuelEconomyVehicleRecord (..),
+    VehicleCatalogRosterSeed (..),
     VehicleCatalogSourceSeed (..),
     VpicModelResult (..),
+    buildCatalogImportSeedFromRosterSeed,
     buildCatalogImportSeedFromSourceSeed,
     buildVehicleCatalogEntryFromSourceSeed,
     decodeVpicModelResults,
+    defaultVehicleCatalogRosterSeedsRelativePath,
     defaultVehicleCatalogSourceSeedsRelativePath,
+    loadVehicleCatalogRosterSeeds,
     loadVehicleCatalogSourceSeeds,
     parseFuelEconomyVehicleRecord,
   )
@@ -42,7 +46,7 @@ import Data.Aeson (FromJSON (..), eitherDecode, encode, withObject, (.:))
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as BL
 import qualified Data.ByteString.Lazy.Char8 as BL8
-import Data.List (find, isInfixOf)
+import Data.List (find, isInfixOf, nub)
 import Network.HTTP.Types (Header, hContentType, methodGet, methodHead, methodPost, status200, status400)
 import qualified Network.Wai as Wai
 import Network.Wai (Application)
@@ -75,9 +79,11 @@ tests =
       TestLabel "vehicle catalog loads and drives presets" vehicleCatalogTest,
       TestLabel "catalog import seeds build normalized entries" catalogImportSeedTest,
       TestLabel "vehicle source seeds load cleanly" vehicleSourceSeedLoadTest,
+      TestLabel "vehicle roster seeds load cleanly" vehicleRosterSeedLoadTest,
       TestLabel "vPIC fixtures decode model listings" vpicFixtureDecodingTest,
       TestLabel "FuelEconomy fixtures decode vehicle details" fuelEconomyFixtureDecodingTest,
       TestLabel "source seeds build catalog entries from official fixtures" sourceSeedCatalogBuildTest,
+      TestLabel "roster seeds build catalog entries from official fixtures" rosterSeedCatalogBuildTest,
       TestLabel "missing source assumptions fall back to generated defaults" generatedSourceDefaultsTest,
       TestLabel "source seed validation rejects wrong vPIC model matches" sourceSeedValidationFailureTest,
       TestLabel "API example route returns a valid simulation request" apiExampleRouteTest,
@@ -731,10 +737,21 @@ catalogImportSeedTest =
 vehicleSourceSeedLoadTest :: Test
 vehicleSourceSeedLoadTest =
   TestCase $ do
-    sourceSeedPath <- getDataFileName defaultVehicleCatalogSourceSeedsRelativePath
-    sourceSeeds <- loadVehicleCatalogSourceSeeds sourceSeedPath
-    assertEqual "the starter source seed set stays at fourteen vehicles" 14 (length sourceSeeds)
+    sourceSeeds <- loadDefaultVehicleSourceSeeds
+    assertEqual "the curated source seed set stays at ten vehicles" 10 (length sourceSeeds)
     mapM_ assertVehicleSourceSeedLooksUsable sourceSeeds
+    rosterSeeds <- loadDefaultVehicleRosterSeeds
+    let combinedCatalogIds = map sourceCatalogId sourceSeeds <> map rosterCatalogId rosterSeeds
+    assertEqual "combined source and roster ids stay unique" (length combinedCatalogIds) (length (nub combinedCatalogIds))
+
+vehicleRosterSeedLoadTest :: Test
+vehicleRosterSeedLoadTest =
+  TestCase $ do
+    sourceSeeds <- loadDefaultVehicleSourceSeeds
+    rosterSeeds <- loadDefaultVehicleRosterSeeds
+    assertEqual "the lightweight roster stays at four vehicles" 4 (length rosterSeeds)
+    assertEqual "source plus roster coverage stays at fourteen vehicles" 14 (length sourceSeeds + length rosterSeeds)
+    mapM_ assertVehicleRosterSeedLooksUsable rosterSeeds
 
 vpicFixtureDecodingTest :: Test
 vpicFixtureDecodingTest =
@@ -816,6 +833,36 @@ sourceSeedCatalogBuildTest =
     assertBool "Corolla entry carries an extra-mile resale penalty" (catalogExtraMileageDepreciationPerMile corollaCatalogEntry > 0)
     assertBool "Civic import keeps curated first-year depreciation bonus" (importFirstYearDepreciationBonus civicCatalogImportSeed > 0)
     assertClose "Civic import keeps expected annual resale miles" 12000 (importExpectedAnnualMilesForResale civicCatalogImportSeed)
+
+rosterSeedCatalogBuildTest :: Test
+rosterSeedCatalogBuildTest =
+  TestCase $ do
+    toyotaVpicModels <- decodeVpicFixture "test/fixtures/vpic/toyota-2024-models.json"
+    corollaFuelEconomyVehicle <- decodeFuelEconomyFixture "test/fixtures/fueleconomy/vehicle-47339.xml"
+    let rosterSeed =
+          VehicleCatalogRosterSeed
+            { rosterCatalogId = "corolla-hybrid-roster-test",
+              rosterDescription = Nothing,
+              rosterYear = 2024,
+              rosterMake = "Toyota",
+              rosterCatalogModel = "Corolla Hybrid",
+              rosterTrim = "LE",
+              rosterBaseModel = "Corolla",
+              rosterFuelEconomyVehicleId = 47339,
+              rosterPurchasePrice = Just 25100,
+              rosterSourceUpdatedAt = "2026-04-17"
+            }
+    rosterImportSeed <-
+      either
+        (\decodeError -> assertFailure ("Roster seed did not build: " <> decodeError) >> pure fallbackCatalogImportSeed)
+        pure
+        (buildCatalogImportSeedFromRosterSeed rosterSeed toyotaVpicModels corollaFuelEconomyVehicle)
+    assertEqual "roster import uses the requested display model" "Corolla Hybrid" (vpicModel (importIdentity rosterImportSeed))
+    assertEqual "roster import preserves official fuel mapping" "hybrid-gasoline" (fuelEconomyFuelType (importFuelEconomy rosterImportSeed))
+    assertBool "roster description is generated when omitted" ("Generated baseline" `contains` importDescription rosterImportSeed)
+    assertBool "roster defaults generate insurance" (importAnnualInsurance rosterImportSeed > 1000)
+    assertBool "roster defaults generate maintenance" (boundedNormalMean (importAnnualMaintenance rosterImportSeed) > 0)
+    assertBool "roster defaults generate depreciation" (boundedNormalMean (importAnnualDepreciationRate rosterImportSeed) > 0)
 
 generatedSourceDefaultsTest :: Test
 generatedSourceDefaultsTest =
@@ -1197,10 +1244,24 @@ assertVehicleSourceSeedLooksUsable sourceSeed = do
   maybe (pure ()) (\value -> assertBool "source seed expected annual resale miles are non-negative" (value >= 0)) (sourceExpectedAnnualMilesForResale sourceSeed)
   maybe (pure ()) (\value -> assertBool "source seed extra-mile penalty is non-negative" (value >= 0)) (sourceExtraMileageDepreciationPerMile sourceSeed)
 
+assertVehicleRosterSeedLooksUsable :: VehicleCatalogRosterSeed -> Assertion
+assertVehicleRosterSeedLooksUsable rosterSeed = do
+  assertBool "roster seed has a catalog id" (not (null (rosterCatalogId rosterSeed)))
+  assertBool "roster seed has a make" (not (null (rosterMake rosterSeed)))
+  assertBool "roster seed has a display model" (not (null (rosterCatalogModel rosterSeed)))
+  assertBool "roster seed has a base model for matching" (not (null (rosterBaseModel rosterSeed)))
+  assertBool "roster seed uses a positive FuelEconomy.gov vehicle id" (rosterFuelEconomyVehicleId rosterSeed > 0)
+  maybe (pure ()) (\value -> assertBool "roster price anchor is positive" (value > 0)) (rosterPurchasePrice rosterSeed)
+
 loadDefaultVehicleSourceSeeds :: IO [VehicleCatalogSourceSeed]
 loadDefaultVehicleSourceSeeds = do
   sourceSeedPath <- getDataFileName defaultVehicleCatalogSourceSeedsRelativePath
   loadVehicleCatalogSourceSeeds sourceSeedPath
+
+loadDefaultVehicleRosterSeeds :: IO [VehicleCatalogRosterSeed]
+loadDefaultVehicleRosterSeeds = do
+  rosterSeedPath <- getDataFileName defaultVehicleCatalogRosterSeedsRelativePath
+  loadVehicleCatalogRosterSeeds rosterSeedPath
 
 loadDefaultVehicleCatalog :: IO [VehicleCatalogEntry]
 loadDefaultVehicleCatalog = do
