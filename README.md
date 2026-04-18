@@ -91,6 +91,9 @@ the core simulation code.
 - `app/BuildCatalog.hs`
   Rebuilds the local vehicle catalog from API-backed source seeds plus the
   lightweight roster file.
+- `app/DiscoverVehicleRoster.hs`
+  Queries official FuelEconomy.gov menus and prints model lists or paste-ready
+  lightweight roster rows for faster catalog growth.
 - `static/`
   Contains the browser UI.
 - `test/Spec.hs`
@@ -217,6 +220,18 @@ To write a preview catalog somewhere else without touching the checked-in file:
 cabal run build-vehicle-catalog -- /tmp/vehicle-catalog.json
 ```
 
+To list official model names for a make and year:
+
+```bash
+cabal run discover-vehicle-roster -- 2024 Toyota
+```
+
+To generate paste-ready lightweight roster rows for a model:
+
+```bash
+cabal run discover-vehicle-roster -- 2024 Toyota "Prius Prime"
+```
+
 ## Development Plan
 
 ### Phase 1: Core simulation
@@ -289,7 +304,8 @@ The catalog importer now supports two project-owned input files:
 That split is the first real scaling step toward broader `2020+` coverage,
 because not every vehicle now needs a fully hand-authored maintenance,
 depreciation, repair-risk, and insurance profile before it can appear in the
-app.
+app. The current checked-in runtime catalog now covers `24` vehicles built from
+`10` curated source seeds plus `14` lighter-weight roster rows.
 
 The repository also includes a basic GitHub Actions workflow that runs the main
 build and test checks on pushes and pull requests.

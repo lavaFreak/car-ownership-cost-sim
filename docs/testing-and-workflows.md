@@ -71,6 +71,18 @@ To generate a preview catalog somewhere else:
 cabal run build-vehicle-catalog -- /tmp/vehicle-catalog.json
 ```
 
+To discover official model names for a given make and year:
+
+```bash
+cabal run discover-vehicle-roster -- 2024 Honda
+```
+
+To generate roster-ready JSON rows for a specific model:
+
+```bash
+cabal run discover-vehicle-roster -- 2024 Honda "Prologue FWD"
+```
+
 This workflow depends on the curated source seeds in
 [catalog/vehicle-source-seeds.json](/Users/garion/Work/projects/car-ownership-cost-sim/catalog/vehicle-source-seeds.json),
 the lightweight roster in
@@ -97,9 +109,10 @@ When changing simulation behavior:
 When changing catalog or importer behavior:
 
 1. update the relevant catalog/import modules
-2. refresh or verify fixtures plus source-seed or roster expectations
-3. run `cabal test`
-4. rebuild the local catalog if the checked-in runtime data should change
+2. use `discover-vehicle-roster` if you need to expand the lightweight roster
+3. refresh or verify fixtures plus source-seed or roster expectations
+4. run `cabal test`
+5. rebuild the local catalog if the checked-in runtime data should change
 
 ## Current testing gaps
 

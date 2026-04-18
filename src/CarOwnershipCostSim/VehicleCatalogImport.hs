@@ -25,6 +25,7 @@ module CarOwnershipCostSim.VehicleCatalogImport
     VehicleCatalogRosterSeed (..),
     VpicModelResult (..),
     FuelEconomyVehicleRecord (..),
+    FuelEconomyMenuItem (..),
     buildCatalogFromLiveCatalogInputs,
     buildCatalogFromLiveSources,
     buildCatalogImportSeedFromSourceSeed,
@@ -32,12 +33,16 @@ module CarOwnershipCostSim.VehicleCatalogImport
     buildVehicleCatalogEntryFromLiveSources,
     buildVehicleCatalogEntryFromRosterSeed,
     buildVehicleCatalogEntryFromSourceSeed,
+    discoverFuelEconomyModels,
+    discoverVehicleRosterSeeds,
     decodeVpicModelResults,
     defaultVehicleCatalogRosterSeedsRelativePath,
     defaultVehicleCatalogSourceSeedsRelativePath,
     loadVehicleCatalogRosterSeeds,
     loadVehicleCatalogSourceSeeds,
+    parseFuelEconomyMenuItems,
     parseFuelEconomyVehicleRecord,
+    suggestVehicleCatalogRosterSeeds,
   )
 where
 
@@ -64,8 +69,9 @@ import Data.Aeson
   )
 import qualified Data.ByteString.Char8 as BS8
 import Data.Char (isAlphaNum, toLower)
-import Data.List (find, isInfixOf, nub)
+import Data.List (find, isInfixOf, isPrefixOf, nub)
 import GHC.Generics (Generic)
+import Numeric (showHex)
 import System.Exit (ExitCode (ExitSuccess))
 import System.Process (readProcessWithExitCode)
 
@@ -108,6 +114,7 @@ data VehicleCatalogRosterSeed = VehicleCatalogRosterSeed
     rosterCatalogModel :: String,
     rosterTrim :: String,
     rosterBaseModel :: String,
+    rosterVpicBaseModel :: Maybe String,
     rosterFuelEconomyVehicleId :: Int,
     rosterPurchasePrice :: Maybe Double,
     rosterSourceUpdatedAt :: String
@@ -156,6 +163,13 @@ data FuelEconomyVehicleRecord = FuelEconomyVehicleRecord
     fuelEconomyVehicleCombinedMpg :: Double,
     fuelEconomyVehicleCityMpg :: Maybe Double,
     fuelEconomyVehicleHighwayMpg :: Maybe Double
+  }
+  deriving (Eq, Show, Generic)
+
+-- | Normalized menu item returned by FuelEconomy.gov menu endpoints.
+data FuelEconomyMenuItem = FuelEconomyMenuItem
+  { fuelEconomyMenuText :: String,
+    fuelEconomyMenuValue :: String
   }
   deriving (Eq, Show, Generic)
 
@@ -220,6 +234,52 @@ parseFuelEconomyVehicleRecord rawXml = do
         fuelEconomyVehicleHighwayMpg = highwayMpg
       }
 
+-- | Parse the subset of FuelEconomy.gov menu XML used by the discovery helper.
+parseFuelEconomyMenuItems :: String -> Either String [FuelEconomyMenuItem]
+parseFuelEconomyMenuItems rawXml =
+  traverse parseMenuItem (findAllTagValues "menuItem" rawXml)
+  where
+    parseMenuItem menuItemXml =
+      FuelEconomyMenuItem
+        <$> parseRequiredTag "text" menuItemXml
+        <*> parseRequiredTag "value" menuItemXml
+
+-- | Fetch official model names for a make and model year.
+discoverFuelEconomyModels :: Int -> String -> IO [String]
+discoverFuelEconomyModels vehicleYear vehicleMake = do
+  payload <- fetchUrl (fuelEconomyModelsUrl vehicleYear vehicleMake)
+  menuItems <-
+    either
+      (\decodeError -> fail ("Unable to parse FuelEconomy.gov model menu: " <> decodeError))
+      pure
+      (parseFuelEconomyMenuItems payload)
+  pure (map fuelEconomyMenuText menuItems)
+
+-- | Turn official FuelEconomy.gov option items into roster-ready JSON rows.
+suggestVehicleCatalogRosterSeeds ::
+  String ->
+  Int ->
+  String ->
+  String ->
+  [FuelEconomyMenuItem] ->
+  Either String [VehicleCatalogRosterSeed]
+suggestVehicleCatalogRosterSeeds sourceUpdatedAt vehicleYear vehicleMake catalogModel =
+  traverse (rosterSeedFromMenuItem sourceUpdatedAt vehicleYear vehicleMake catalogModel)
+
+-- | Fetch official trim options for a model and return paste-ready roster rows.
+discoverVehicleRosterSeeds :: String -> Int -> String -> String -> IO [VehicleCatalogRosterSeed]
+discoverVehicleRosterSeeds sourceUpdatedAt vehicleYear vehicleMake catalogModel = do
+  payload <- fetchUrl (fuelEconomyOptionsUrl vehicleYear vehicleMake catalogModel)
+  menuItems <-
+    either
+      (\decodeError -> fail ("Unable to parse FuelEconomy.gov options menu: " <> decodeError))
+      pure
+      (parseFuelEconomyMenuItems payload)
+  either
+    (\decodeError -> fail ("Unable to build roster seeds from official menu items: " <> decodeError))
+    pure
+    (suggestVehicleCatalogRosterSeeds sourceUpdatedAt vehicleYear vehicleMake catalogModel menuItems)
+
 -- | Combine one source seed with upstream records to produce a normalized
 -- catalog import seed.
 buildCatalogImportSeedFromSourceSeed ::
@@ -276,7 +336,7 @@ buildCatalogImportSeedFromRosterSeed ::
 buildCatalogImportSeedFromRosterSeed rosterSeed vpicModels fuelEconomyVehicle = do
   ensureMatches "roster year" (show (rosterYear rosterSeed)) (show (fuelEconomyVehicleYear fuelEconomyVehicle))
   ensureMatches "roster make" (rosterMake rosterSeed) (fuelEconomyVehicleMake fuelEconomyVehicle)
-  assertVpicBaseModelFound (rosterBaseModel rosterSeed) vpicModels
+  assertVpicBaseModelFound (maybe (rosterBaseModel rosterSeed) id (rosterVpicBaseModel rosterSeed)) vpicModels
   assertFuelEconomyBaseModelMatches (rosterBaseModel rosterSeed) fuelEconomyVehicle
   let generatedDefaults =
         defaultCatalogAssumptions
@@ -599,6 +659,68 @@ occurrences :: Eq a => a -> [a] -> Int
 occurrences target =
   length . filter (== target)
 
+rosterSeedFromMenuItem ::
+  String ->
+  Int ->
+  String ->
+  String ->
+  FuelEconomyMenuItem ->
+  Either String VehicleCatalogRosterSeed
+rosterSeedFromMenuItem sourceUpdatedAt vehicleYear vehicleMake catalogModel menuItem = do
+  vehicleId <- parseIntValue "FuelEconomy.gov option id" (fuelEconomyMenuValue menuItem)
+  let trimName = suggestedTrimName catalogModel (fuelEconomyMenuText menuItem)
+  pure
+    VehicleCatalogRosterSeed
+      { rosterCatalogId = kebabCase (catalogModel <> "-" <> trimName <> "-" <> show vehicleYear),
+        rosterDescription = Nothing,
+        rosterYear = vehicleYear,
+        rosterMake = vehicleMake,
+        rosterCatalogModel = catalogModel,
+        rosterTrim = trimName,
+        rosterBaseModel = inferBaseModel catalogModel,
+        rosterVpicBaseModel = Nothing,
+        rosterFuelEconomyVehicleId = vehicleId,
+        rosterPurchasePrice = Nothing,
+        rosterSourceUpdatedAt = sourceUpdatedAt
+      }
+
+suggestedTrimName :: String -> String -> String
+suggestedTrimName catalogModel rawMenuText =
+  let trimmedValue = trimWhitespace rawMenuText
+      comparableModel = normalizeComparable catalogModel
+      comparableText = normalizeComparable trimmedValue
+      strippedText =
+        if comparableModel `isPrefixOf` comparableText
+          then trimWhitespace (drop (length catalogModel) trimmedValue)
+          else trimmedValue
+   in if null strippedText then "Base" else strippedText
+
+inferBaseModel :: String -> String
+inferBaseModel catalogModel =
+  maybe catalogModel id (firstMatchingBaseModel catalogModel)
+
+firstMatchingBaseModel :: String -> Maybe String
+firstMatchingBaseModel catalogModel =
+  find nonEmpty
+    [ stripKnownSuffix " Plug-in Hybrid" catalogModel,
+      stripKnownSuffix " Hybrid" catalogModel
+    ]
+  where
+    nonEmpty candidate = not (null candidate)
+
+stripKnownSuffix :: String -> String -> String
+stripKnownSuffix suffixValue rawValue
+  | suffixValue `isSuffixOfExact` rawValue = trimWhitespace (take (length rawValue - length suffixValue) rawValue)
+  | otherwise = ""
+
+isSuffixOfExact :: String -> String -> Bool
+isSuffixOfExact expectedSuffix rawValue =
+  reverse expectedSuffix `isPrefixOfExact` reverse rawValue
+
+trimWhitespace :: String -> String
+trimWhitespace =
+  dropWhile (== ' ') . reverse . dropWhile (== ' ') . reverse
+
 fetchUrl :: String -> IO String
 fetchUrl url = do
   (exitCode, stdoutText, stderrText) <- readProcessWithExitCode "curl" ["-fsSL", url] ""
@@ -629,3 +751,33 @@ vpicModelsUrlForRosterSeed rosterSeed =
 fuelEconomyVehicleUrlForRosterSeed :: VehicleCatalogRosterSeed -> String
 fuelEconomyVehicleUrlForRosterSeed rosterSeed =
   "https://www.fueleconomy.gov/ws/rest/vehicle/" <> show (rosterFuelEconomyVehicleId rosterSeed)
+
+fuelEconomyModelsUrl :: Int -> String -> String
+fuelEconomyModelsUrl vehicleYear vehicleMake =
+  "https://www.fueleconomy.gov/ws/rest/vehicle/menu/model?year="
+    <> show vehicleYear
+    <> "&make="
+    <> urlEncodeComponent vehicleMake
+
+fuelEconomyOptionsUrl :: Int -> String -> String -> String
+fuelEconomyOptionsUrl vehicleYear vehicleMake catalogModel =
+  "https://www.fueleconomy.gov/ws/rest/vehicle/menu/options?year="
+    <> show vehicleYear
+    <> "&make="
+    <> urlEncodeComponent vehicleMake
+    <> "&model="
+    <> urlEncodeComponent catalogModel
+
+urlEncodeComponent :: String -> String
+urlEncodeComponent =
+  concatMap encodeCharacter
+  where
+    encodeCharacter character
+      | isAlphaNum character = [character]
+      | character `elem` ("-_.~" :: String) = [character]
+      | character == ' ' = "%20"
+      | otherwise =
+          let hexValue = showHex (fromEnum character) ""
+           in "%" <> map toLower (padHex hexValue)
+    padHex [singleDigit] = ['0', singleDigit]
+    padHex multipleDigits = multipleDigits

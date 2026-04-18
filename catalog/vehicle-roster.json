@@ -42,5 +42,107 @@
     "rosterFuelEconomyVehicleId": 46588,
     "rosterPurchasePrice": 25400,
     "rosterSourceUpdatedAt": "2026-04-17"
+  },
+  {
+    "rosterCatalogId": "corolla-sedan-2-0l-2024",
+    "rosterYear": 2024,
+    "rosterMake": "Toyota",
+    "rosterCatalogModel": "Corolla",
+    "rosterTrim": "2.0L CVT",
+    "rosterBaseModel": "Corolla",
+    "rosterFuelEconomyVehicleId": 47343,
+    "rosterSourceUpdatedAt": "2026-04-18"
+  },
+  {
+    "rosterCatalogId": "prius-prime-2024",
+    "rosterYear": 2024,
+    "rosterMake": "Toyota",
+    "rosterCatalogModel": "Prius Prime",
+    "rosterTrim": "Base",
+    "rosterBaseModel": "Prius Prime",
+    "rosterVpicBaseModel": "Prius",
+    "rosterFuelEconomyVehicleId": 47500,
+    "rosterSourceUpdatedAt": "2026-04-18"
+  },
+  {
+    "rosterCatalogId": "bz4x-2024",
+    "rosterYear": 2024,
+    "rosterMake": "Toyota",
+    "rosterCatalogModel": "bZ4X",
+    "rosterTrim": "Base",
+    "rosterBaseModel": "bZ4X",
+    "rosterFuelEconomyVehicleId": 47918,
+    "rosterSourceUpdatedAt": "2026-04-18"
+  },
+  {
+    "rosterCatalogId": "civic-sedan-2-0l-2024",
+    "rosterYear": 2024,
+    "rosterMake": "Honda",
+    "rosterCatalogModel": "Civic Sedan",
+    "rosterTrim": "2.0L CVT",
+    "rosterBaseModel": "Civic",
+    "rosterFuelEconomyVehicleId": 47071,
+    "rosterSourceUpdatedAt": "2026-04-18"
+  },
+  {
+    "rosterCatalogId": "pilot-fwd-2024",
+    "rosterYear": 2024,
+    "rosterMake": "Honda",
+    "rosterCatalogModel": "Pilot",
+    "rosterTrim": "FWD",
+    "rosterBaseModel": "Pilot",
+    "rosterFuelEconomyVehicleId": 47135,
+    "rosterSourceUpdatedAt": "2026-04-18"
+  },
+  {
+    "rosterCatalogId": "prologue-fwd-2024",
+    "rosterYear": 2024,
+    "rosterMake": "Honda",
+    "rosterCatalogModel": "Prologue",
+    "rosterTrim": "FWD",
+    "rosterBaseModel": "Prologue",
+    "rosterFuelEconomyVehicleId": 47828,
+    "rosterSourceUpdatedAt": "2026-04-18"
+  },
+  {
+    "rosterCatalogId": "tucson-hybrid-blue-2024",
+    "rosterYear": 2024,
+    "rosterMake": "Hyundai",
+    "rosterCatalogModel": "Tucson Hybrid",
+    "rosterTrim": "Blue",
+    "rosterBaseModel": "Tucson",
+    "rosterFuelEconomyVehicleId": 46722,
+    "rosterSourceUpdatedAt": "2026-04-18"
+  },
+  {
+    "rosterCatalogId": "kona-electric-long-range-2024",
+    "rosterYear": 2024,
+    "rosterMake": "Hyundai",
+    "rosterCatalogModel": "Kona Electric",
+    "rosterTrim": "Long Range",
+    "rosterBaseModel": "Kona",
+    "rosterVpicBaseModel": "Kona",
+    "rosterFuelEconomyVehicleId": 47449,
+    "rosterSourceUpdatedAt": "2026-04-18"
+  },
+  {
+    "rosterCatalogId": "cx-30-awd-2024",
+    "rosterYear": 2024,
+    "rosterMake": "Mazda",
+    "rosterCatalogModel": "CX-30",
+    "rosterTrim": "AWD 2.5",
+    "rosterBaseModel": "CX-30",
+    "rosterFuelEconomyVehicleId": 47383,
+    "rosterSourceUpdatedAt": "2026-04-18"
+  },
+  {
+    "rosterCatalogId": "model-y-rwd-2024",
+    "rosterYear": 2024,
+    "rosterMake": "Tesla",
+    "rosterCatalogModel": "Model Y",
+    "rosterTrim": "RWD",
+    "rosterBaseModel": "Model Y",
+    "rosterFuelEconomyVehicleId": 48476,
+    "rosterSourceUpdatedAt": "2026-04-18"
   }
 ]

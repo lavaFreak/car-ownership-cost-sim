@@ -26,7 +26,8 @@ import CarOwnershipCostSim.VehicleCatalog
     loadVehicleCatalog,
   )
 import CarOwnershipCostSim.VehicleCatalogImport
-  ( FuelEconomyVehicleRecord (..),
+  ( FuelEconomyMenuItem (..),
+    FuelEconomyVehicleRecord (..),
     VehicleCatalogRosterSeed (..),
     VehicleCatalogSourceSeed (..),
     VpicModelResult (..),
@@ -38,7 +39,9 @@ import CarOwnershipCostSim.VehicleCatalogImport
     defaultVehicleCatalogSourceSeedsRelativePath,
     loadVehicleCatalogRosterSeeds,
     loadVehicleCatalogSourceSeeds,
+    parseFuelEconomyMenuItems,
     parseFuelEconomyVehicleRecord,
+    suggestVehicleCatalogRosterSeeds,
   )
 import CarOwnershipCostSim.VehiclePresets (VehiclePreset (..), vehiclePresetsFromCatalog)
 import CarOwnershipCostSim.WebApp (StaticAssetPaths (..), buildApplication)
@@ -81,9 +84,11 @@ tests =
       TestLabel "vehicle source seeds load cleanly" vehicleSourceSeedLoadTest,
       TestLabel "vehicle roster seeds load cleanly" vehicleRosterSeedLoadTest,
       TestLabel "vPIC fixtures decode model listings" vpicFixtureDecodingTest,
+      TestLabel "FuelEconomy menus decode cleanly" fuelEconomyMenuDecodingTest,
       TestLabel "FuelEconomy fixtures decode vehicle details" fuelEconomyFixtureDecodingTest,
       TestLabel "source seeds build catalog entries from official fixtures" sourceSeedCatalogBuildTest,
       TestLabel "roster seeds build catalog entries from official fixtures" rosterSeedCatalogBuildTest,
+      TestLabel "FuelEconomy options can suggest roster seeds" fuelEconomyRosterSuggestionTest,
       TestLabel "missing source assumptions fall back to generated defaults" generatedSourceDefaultsTest,
       TestLabel "source seed validation rejects wrong vPIC model matches" sourceSeedValidationFailureTest,
       TestLabel "API example route returns a valid simulation request" apiExampleRouteTest,
@@ -749,8 +754,8 @@ vehicleRosterSeedLoadTest =
   TestCase $ do
     sourceSeeds <- loadDefaultVehicleSourceSeeds
     rosterSeeds <- loadDefaultVehicleRosterSeeds
-    assertEqual "the lightweight roster stays at four vehicles" 4 (length rosterSeeds)
-    assertEqual "source plus roster coverage stays at fourteen vehicles" 14 (length sourceSeeds + length rosterSeeds)
+    assertEqual "the lightweight roster stays at fourteen vehicles" 14 (length rosterSeeds)
+    assertEqual "source plus roster coverage stays at twenty-four vehicles" 24 (length sourceSeeds + length rosterSeeds)
     mapM_ assertVehicleRosterSeedLooksUsable rosterSeeds
 
 vpicFixtureDecodingTest :: Test
@@ -771,6 +776,18 @@ vpicFixtureDecodingTest =
     assertBool "Toyota models include Corolla" (any ((== "Corolla") . vpicResultModelName) toyotaModels)
     assertBool "Toyota models include RAV4" (any ((== "RAV4") . vpicResultModelName) toyotaModels)
     assertBool "Honda models include Civic" (any ((== "Civic") . vpicResultModelName) hondaModels)
+
+fuelEconomyMenuDecodingTest :: Test
+fuelEconomyMenuDecodingTest =
+  TestCase $ do
+    menuItems <-
+      either
+        (\decodeError -> assertFailure ("FuelEconomy menu fixture did not decode: " <> decodeError) >> pure [])
+        pure
+        (parseFuelEconomyMenuItems sampleFuelEconomyOptionsMenuXml)
+    assertEqual "menu parsing keeps the expected count" 2 (length menuItems)
+    assertEqual "menu parsing keeps option labels" ["LE", "XLE AWD"] (map fuelEconomyMenuText menuItems)
+    assertEqual "menu parsing keeps option ids" ["47339", "47340"] (map fuelEconomyMenuValue menuItems)
 
 fuelEconomyFixtureDecodingTest :: Test
 fuelEconomyFixtureDecodingTest =
@@ -848,6 +865,7 @@ rosterSeedCatalogBuildTest =
               rosterCatalogModel = "Corolla Hybrid",
               rosterTrim = "LE",
               rosterBaseModel = "Corolla",
+              rosterVpicBaseModel = Nothing,
               rosterFuelEconomyVehicleId = 47339,
               rosterPurchasePrice = Just 25100,
               rosterSourceUpdatedAt = "2026-04-17"
@@ -863,6 +881,25 @@ rosterSeedCatalogBuildTest =
     assertBool "roster defaults generate insurance" (importAnnualInsurance rosterImportSeed > 1000)
     assertBool "roster defaults generate maintenance" (boundedNormalMean (importAnnualMaintenance rosterImportSeed) > 0)
     assertBool "roster defaults generate depreciation" (boundedNormalMean (importAnnualDepreciationRate rosterImportSeed) > 0)
+
+fuelEconomyRosterSuggestionTest :: Test
+fuelEconomyRosterSuggestionTest =
+  TestCase $ do
+    menuItems <-
+      either
+        (\decodeError -> assertFailure ("FuelEconomy menu fixture did not decode: " <> decodeError) >> pure [])
+        pure
+        (parseFuelEconomyMenuItems sampleFuelEconomyOptionsMenuXml)
+    suggestedRosterSeeds <-
+      either
+        (\decodeError -> assertFailure ("FuelEconomy menu items did not build roster suggestions: " <> decodeError) >> pure [])
+        pure
+        (suggestVehicleCatalogRosterSeeds "2026-04-17" 2024 "Toyota" "Corolla Hybrid" menuItems)
+    assertEqual "roster suggestions keep the same option count" 2 (length suggestedRosterSeeds)
+    assertEqual "suggested ids are slugged from model trim and year" ["corolla-hybrid-le-2024", "corolla-hybrid-xle-awd-2024"] (map rosterCatalogId suggestedRosterSeeds)
+    assertEqual "suggested trims come from the official menu labels" ["LE", "XLE AWD"] (map rosterTrim suggestedRosterSeeds)
+    assertEqual "hybrid display models infer a gasoline base model" ["Corolla", "Corolla"] (map rosterBaseModel suggestedRosterSeeds)
+    assertEqual "suggestions leave price anchors empty by default" [Nothing, Nothing] (map rosterPurchasePrice suggestedRosterSeeds)
 
 generatedSourceDefaultsTest :: Test
 generatedSourceDefaultsTest =
@@ -1250,6 +1287,7 @@ assertVehicleRosterSeedLooksUsable rosterSeed = do
   assertBool "roster seed has a make" (not (null (rosterMake rosterSeed)))
   assertBool "roster seed has a display model" (not (null (rosterCatalogModel rosterSeed)))
   assertBool "roster seed has a base model for matching" (not (null (rosterBaseModel rosterSeed)))
+  maybe (pure ()) (\value -> assertBool "roster seed override base model is non-empty" (not (null value))) (rosterVpicBaseModel rosterSeed)
   assertBool "roster seed uses a positive FuelEconomy.gov vehicle id" (rosterFuelEconomyVehicleId rosterSeed > 0)
   maybe (pure ()) (\value -> assertBool "roster price anchor is positive" (value > 0)) (rosterPurchasePrice rosterSeed)
 
@@ -1542,6 +1580,21 @@ deterministicRequest seed simulationInput =
       requestSeed = Just seed,
       requestInput = simulationInput
     }
+
+sampleFuelEconomyOptionsMenuXml :: String
+sampleFuelEconomyOptionsMenuXml =
+  unlines
+    [ "<menuItems>",
+      "  <menuItem>",
+      "    <text>LE</text>",
+      "    <value>47339</value>",
+      "  </menuItem>",
+      "  <menuItem>",
+      "    <text>XLE AWD</text>",
+      "    <value>47340</value>",
+      "  </menuItem>",
+      "</menuItems>"
+    ]
 
 fallbackVehicleSourceSeed :: VehicleCatalogSourceSeed
 fallbackVehicleSourceSeed =

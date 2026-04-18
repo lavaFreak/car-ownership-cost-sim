@@ -40,6 +40,9 @@ The app is split into four layers:
   Production server entrypoint.
 - [app/BuildCatalog.hs](/Users/garion/Work/projects/car-ownership-cost-sim/app/BuildCatalog.hs)
   CLI for rebuilding the local catalog.
+- [app/DiscoverVehicleRoster.hs](/Users/garion/Work/projects/car-ownership-cost-sim/app/DiscoverVehicleRoster.hs)
+  CLI helper for discovering official model names and generating roster-ready
+  JSON rows from FuelEconomy.gov menus.
 - [static/index.html](/Users/garion/Work/projects/car-ownership-cost-sim/static/index.html)
   Form structure and results containers.
 - [static/app.js](/Users/garion/Work/projects/car-ownership-cost-sim/static/app.js)
@@ -71,14 +74,16 @@ The vehicle catalog is not rebuilt during normal web requests.
    [catalog/vehicle-source-seeds.json](/Users/garion/Work/projects/car-ownership-cost-sim/catalog/vehicle-source-seeds.json).
 2. Lightweight bulk-coverage rows live in
    [catalog/vehicle-roster.json](/Users/garion/Work/projects/car-ownership-cost-sim/catalog/vehicle-roster.json).
-3. `app/BuildCatalog.hs` loads both files and calls
+3. `app/DiscoverVehicleRoster.hs` can query official menus and generate new
+   roster candidates before they are checked in.
+4. `app/BuildCatalog.hs` loads both files and calls
    `buildCatalogFromLiveCatalogInputs`.
-4. `VehicleCatalogImport.hs` fetches upstream data and validates that each
+5. `VehicleCatalogImport.hs` fetches upstream data and validates that each
    source or roster row still matches the official payloads. Curated rows may
    override generated assumptions; roster rows rely on generated defaults.
-5. The resulting normalized rows are written to
+6. The resulting normalized rows are written to
    [catalog/vehicle-catalog.json](/Users/garion/Work/projects/car-ownership-cost-sim/catalog/vehicle-catalog.json).
-6. The web server loads that local catalog at startup and serves it from memory.
+7. The web server loads that local catalog at startup and serves it from memory.
 
 ## Testing strategy
 

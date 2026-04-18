@@ -97,6 +97,17 @@ executable build-vehicle-catalog
         aeson >=2.1 && <2.3,
         car-ownership-cost-sim
 
+executable discover-vehicle-roster
+    import:           shared-properties
+    hs-source-dirs:   app
+    main-is:          DiscoverVehicleRoster.hs
+    build-depends:
+        base >=4.18 && <4.21,
+        aeson >=2.1 && <2.3,
+        car-ownership-cost-sim,
+        bytestring >=0.11 && <0.13,
+        time >=1.12 && <1.15
+
 -- Unified regression suite covering the simulation model, catalog import path,
 -- and in-process route behavior.
 test-suite car-ownership-cost-sim-test
