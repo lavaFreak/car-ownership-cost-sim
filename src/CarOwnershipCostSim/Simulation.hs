@@ -254,6 +254,7 @@ simulateDetailedCostBreakdown simulationInput initialGen =
 
 data SampledYear = SampledYear
   { sampledYearMilesDriven :: Double,
+    sampledYearCumulativeMilesDriven :: Double,
     sampledYearCityMilesDriven :: Double,
     sampledYearHighwayMilesDriven :: Double,
     sampledYearElectricMilesDriven :: Double,
@@ -274,7 +275,10 @@ data SampledYear = SampledYear
     sampledYearHighwayFuelGallons :: Double,
     sampledYearFuelCost :: Double,
     sampledYearMaintenanceCost :: Double,
+    sampledYearMaintenanceCalibrationMultiplier :: Double,
     sampledYearRepairShockCost :: Double,
+    sampledYearRepairShockProbabilityApplied :: Double,
+    sampledYearRepairShockCostCalibrationMultiplier :: Double,
     sampledYearTireCost :: Double,
     sampledYearExpectedCumulativeMiles :: Double,
     sampledYearMileageDepreciationPenalty :: Double,
@@ -347,6 +351,12 @@ simulateYears yearsRemaining carValue baseAnnualMiles annualMileageChangeRate ci
             tireReplacementCost
               * fromIntegral (tireReplacementCount tireLifeMiles priorMilesDriven (priorMilesDriven + yearlyMiles))
           actualCumulativeMiles = priorMilesDriven + yearlyMiles
+          maintenanceMultiplier =
+            maintenanceCalibrationMultiplier fuelType yearIndex actualCumulativeMiles
+          repairShockProbabilityApplied =
+            calibratedRepairShockProbability fuelType repairShockProbability yearIndex actualCumulativeMiles
+          repairShockCostMultiplier =
+            repairShockCostCalibrationMultiplier fuelType yearIndex actualCumulativeMiles
           expectedCumulativeMiles = expectedCumulativeMilesForYear expectedAnnualMilesForResale yearIndex
           mileagePenalty =
             incrementalMileageDepreciationPenalty
@@ -371,11 +381,14 @@ simulateYears yearsRemaining carValue baseAnnualMiles annualMileageChangeRate ci
             annualGallons * fuelPrice
               + homePurchasedEnergyUnits * homeChargingPrice
               + publicPurchasedEnergyUnits * publicChargingPrice
-          (maintenanceCost, gen4) = sampleBoundedNormal maintenanceModel gen3
+          (sampledMaintenanceCost, gen4) = sampleBoundedNormal maintenanceModel gen3
+          maintenanceCost = sampledMaintenanceCost * maintenanceMultiplier
           (repairShockRoll, gen5) = randomR (0.0, 1.0 :: Double) gen4
           (repairShockCost, gen6) =
-            if repairShockRoll < repairShockProbability
-              then sampleBoundedNormal repairShockModel gen5
+            if repairShockRoll < repairShockProbabilityApplied
+              then
+                let (sampledRepairShockCost, nextGen) = sampleBoundedNormal repairShockModel gen5
+                 in (sampledRepairShockCost * repairShockCostMultiplier, nextGen)
               else (0, gen5)
           (sampledDepreciationRate, gen7) = sampleBoundedNormal depreciationModel gen6
           depreciationRate =
@@ -386,6 +399,7 @@ simulateYears yearsRemaining carValue baseAnnualMiles annualMileageChangeRate ci
           sampledYear =
             SampledYear
               { sampledYearMilesDriven = yearlyMiles,
+                sampledYearCumulativeMilesDriven = actualCumulativeMiles,
                 sampledYearCityMilesDriven = cityMiles,
                 sampledYearHighwayMilesDriven = highwayMiles,
                 sampledYearElectricMilesDriven = cityElectricMiles + highwayElectricMiles,
@@ -406,7 +420,10 @@ simulateYears yearsRemaining carValue baseAnnualMiles annualMileageChangeRate ci
                 sampledYearHighwayFuelGallons = highwayGallons,
                 sampledYearFuelCost = annualEnergyCost,
                 sampledYearMaintenanceCost = maintenanceCost,
+                sampledYearMaintenanceCalibrationMultiplier = maintenanceMultiplier,
                 sampledYearRepairShockCost = repairShockCost,
+                sampledYearRepairShockProbabilityApplied = repairShockProbabilityApplied,
+                sampledYearRepairShockCostCalibrationMultiplier = repairShockCostMultiplier,
                 sampledYearTireCost = tireCost,
                 sampledYearExpectedCumulativeMiles = expectedCumulativeMiles,
                 sampledYearMileageDepreciationPenalty = mileagePenalty,
@@ -521,6 +538,7 @@ buildYearlyCostBreakdown financing purchaseTax upfrontFees annualInflationRate a
    in YearlyCostBreakdown
         { yearlyYear = yearIndex,
           yearlyMilesDriven = sampledYearMilesDriven sampledYear,
+          yearlyCumulativeMilesDriven = sampledYearCumulativeMilesDriven sampledYear,
           yearlyCityMilesDriven = sampledYearCityMilesDriven sampledYear,
           yearlyHighwayMilesDriven = sampledYearHighwayMilesDriven sampledYear,
           yearlyElectricMilesDriven = sampledYearElectricMilesDriven sampledYear,
@@ -548,7 +566,10 @@ buildYearlyCostBreakdown financing purchaseTax upfrontFees annualInflationRate a
           yearlyLoanInterest = yearlyLoanInterestPaid loanBreakdown,
           yearlyFuel = inflatedFuelCost,
           yearlyMaintenance = inflatedMaintenanceCost,
+          yearlyMaintenanceCalibrationMultiplier = sampledYearMaintenanceCalibrationMultiplier sampledYear,
           yearlyRepairShocks = inflatedRepairShockCost,
+          yearlyRepairShockProbabilityApplied = sampledYearRepairShockProbabilityApplied sampledYear,
+          yearlyRepairShockCostCalibrationMultiplier = sampledYearRepairShockCostCalibrationMultiplier sampledYear,
           yearlyInsurance = inflatedInsuranceCost,
           yearlyRegistration = inflatedRegistrationCost,
           yearlyParking = inflatedParkingCost,
@@ -565,6 +586,97 @@ buildYearlyCostBreakdown financing purchaseTax upfrontFees annualInflationRate a
           yearlyEstimatedEquity = endingVehicleValue - yearEndLoanBalance,
           yearlyTotalCost = totalCost
         }
+
+data WearCalibrationProfile = WearCalibrationProfile
+  { wearMaintenanceAgeRate :: Double,
+    wearMaintenanceMileageRate :: Double,
+    wearRepairProbabilityAgeRate :: Double,
+    wearRepairProbabilityMileageRate :: Double,
+    wearRepairCostAgeRate :: Double,
+    wearRepairCostMileageRate :: Double
+  }
+
+maintenanceCalibrationMultiplier :: String -> Int -> Double -> Double
+maintenanceCalibrationMultiplier fuelType yearIndex cumulativeMilesDriven =
+  min 2.6 $
+    (1 + fromIntegral (wearAgeYears yearIndex) * wearMaintenanceAgeRate wearProfile)
+      * (1 + wearMileageSteps cumulativeMilesDriven * wearMaintenanceMileageRate wearProfile)
+  where
+    wearProfile = wearCalibrationProfileForFuelType fuelType
+
+calibratedRepairShockProbability :: String -> Double -> Int -> Double -> Double
+calibratedRepairShockProbability fuelType baseProbability yearIndex cumulativeMilesDriven =
+  clampUnitInterval $
+    baseProbability
+      * (1 + fromIntegral (wearAgeYears yearIndex) * wearRepairProbabilityAgeRate wearProfile)
+      * (1 + wearMileageSteps cumulativeMilesDriven * wearRepairProbabilityMileageRate wearProfile)
+  where
+    wearProfile = wearCalibrationProfileForFuelType fuelType
+
+repairShockCostCalibrationMultiplier :: String -> Int -> Double -> Double
+repairShockCostCalibrationMultiplier fuelType yearIndex cumulativeMilesDriven =
+  min 2.8 $
+    (1 + fromIntegral (wearAgeYears yearIndex) * wearRepairCostAgeRate wearProfile)
+      * (1 + wearMileageSteps cumulativeMilesDriven * wearRepairCostMileageRate wearProfile)
+  where
+    wearProfile = wearCalibrationProfileForFuelType fuelType
+
+wearCalibrationProfileForFuelType :: String -> WearCalibrationProfile
+wearCalibrationProfileForFuelType fuelType =
+  case normalizeFuelType fuelType of
+    "electric" ->
+      WearCalibrationProfile
+        { wearMaintenanceAgeRate = 0.035,
+          wearMaintenanceMileageRate = 0.015,
+          wearRepairProbabilityAgeRate = 0.05,
+          wearRepairProbabilityMileageRate = 0.02,
+          wearRepairCostAgeRate = 0.035,
+          wearRepairCostMileageRate = 0.02
+        }
+    "plug-in-hybrid" ->
+      WearCalibrationProfile
+        { wearMaintenanceAgeRate = 0.06,
+          wearMaintenanceMileageRate = 0.03,
+          wearRepairProbabilityAgeRate = 0.075,
+          wearRepairProbabilityMileageRate = 0.03,
+          wearRepairCostAgeRate = 0.055,
+          wearRepairCostMileageRate = 0.035
+        }
+    "diesel" ->
+      WearCalibrationProfile
+        { wearMaintenanceAgeRate = 0.065,
+          wearMaintenanceMileageRate = 0.03,
+          wearRepairProbabilityAgeRate = 0.08,
+          wearRepairProbabilityMileageRate = 0.035,
+          wearRepairCostAgeRate = 0.06,
+          wearRepairCostMileageRate = 0.04
+        }
+    "hybrid-gasoline" ->
+      WearCalibrationProfile
+        { wearMaintenanceAgeRate = 0.05,
+          wearMaintenanceMileageRate = 0.022,
+          wearRepairProbabilityAgeRate = 0.065,
+          wearRepairProbabilityMileageRate = 0.028,
+          wearRepairCostAgeRate = 0.045,
+          wearRepairCostMileageRate = 0.028
+        }
+    _ ->
+      WearCalibrationProfile
+        { wearMaintenanceAgeRate = 0.055,
+          wearMaintenanceMileageRate = 0.025,
+          wearRepairProbabilityAgeRate = 0.07,
+          wearRepairProbabilityMileageRate = 0.03,
+          wearRepairCostAgeRate = 0.05,
+          wearRepairCostMileageRate = 0.03
+        }
+
+wearAgeYears :: Int -> Int
+wearAgeYears yearIndex =
+  max 0 (yearIndex - 1)
+
+wearMileageSteps :: Double -> Double
+wearMileageSteps cumulativeMilesDriven =
+  max 0 ((cumulativeMilesDriven - 36000) / 12000)
 
 data YearlyLoanBreakdown = YearlyLoanBreakdown
   { yearlyLoanPaymentTotal :: Double,

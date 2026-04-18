@@ -64,6 +64,9 @@ These inputs determine:
 - plug-in-hybrid gasoline gallons after the electric-driving share is applied
 - tire replacement timing from cumulative miles
 - recurring local ownership costs
+- age- and mileage-based maintenance calibration on top of the sampled annual
+  maintenance baseline
+- age- and mileage-based repair-shock probability and repair-cost calibration
 - the floor-limited part of the resale path
 - how much extra driving reduces resale value
 
@@ -108,8 +111,8 @@ For each modeled year, the simulator currently computes:
 - charging-loss overhead that never reaches the battery
 - sampled gasoline, diesel, home-charging, and public-charging costs as
   applicable to the current powertrain
-- sampled maintenance cost
-- sampled repair shock cost, if triggered
+- sampled maintenance cost scaled by age and cumulative mileage
+- sampled repair shock cost, if triggered, scaled by age and cumulative mileage
 - tire replacement cost if cumulative miles cross a tire-life threshold
 - inflated insurance, registration, parking, toll, and inspection costs
 - loan payment, principal, interest, and remaining balance
@@ -123,7 +126,30 @@ The yearly breakdown is returned to the frontend so the UI can explain how one
 sampled path evolves over time. That response now includes explicit electric
 miles, liquid-fuel miles, purchased energy, home/public charging energy, and
 charging-loss units instead of leaving the frontend to infer them from the
-request.
+request. It also returns cumulative miles plus the applied maintenance and
+repair calibration fields so the wear model is explainable year by year.
+
+## Wear calibration
+
+The simulator now treats maintenance and repair inputs as baseline
+distributions, then calibrates them over the ownership horizon.
+
+For each modeled year, the backend derives:
+
+- a maintenance calibration multiplier
+- a repair-shock probability for that year
+- a repair-shock cost multiplier
+
+Those values are driven by:
+
+- ownership year within the scenario
+- cumulative miles driven so far
+- the selected fuel or powertrain type
+
+The current calibration is heuristic rather than market-trained, but it now
+captures a basic truth the previous model missed: a car that is older and has
+accumulated more miles should not draw maintenance and repair risk the same way
+it did in year one.
 
 ## Region-aware calibration
 
@@ -206,8 +232,9 @@ important simplifications:
   and home/public charging price assumptions, but the model still
   assumes one fixed city-driving share and one fixed plug-in electric-driving
   share across the full ownership horizon
-- maintenance and repair shocks are independent draws rather than age- or
-  mileage-conditioned processes
+- wear calibration is still heuristic rather than calibrated from large repair
+  datasets, even though it now conditions maintenance and repair risk on age
+  and cumulative miles
 - financing assumes a standard amortizing loan and does not model refinancing,
   late payments, or early payoff decisions
 - region calibration is still profile-based rather than state-by-state or
@@ -221,7 +248,6 @@ The highest-value modeling improvements from here are:
    curated depreciation heuristics
 2. richer fuel-use assumptions such as commute/weekend or seasonal patterns on
    top of the current city/highway split
-3. maintenance and repair distributions that change with age and mileage
-4. state-specific registration and tax rules
-5. better calibration of deterministic defaults from the vehicle catalog and
+3. state-specific registration and tax rules
+4. better calibration of deterministic defaults from the vehicle catalog and
    future enrichment sources

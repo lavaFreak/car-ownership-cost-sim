@@ -1506,6 +1506,7 @@ function renderYearlyBreakdownPlaceholder() {
           <h4>Yearly timeline</h4>
           <dl>
             <div><dt>Miles driven</dt><dd>After a run</dd></div>
+            <div><dt>Cumulative miles</dt><dd>After a run</dd></div>
             <div><dt>City + highway miles</dt><dd>After a run</dd></div>
             <div><dt>Energy used</dt><dd>After a run</dd></div>
             <div><dt>City + highway energy</dt><dd>After a run</dd></div>
@@ -1514,6 +1515,8 @@ function renderYearlyBreakdownPlaceholder() {
             <div><dt>Insurance + registration</dt><dd>After a run</dd></div>
             <div><dt>Parking + tolls + inspection</dt><dd>After a run</dd></div>
             <div><dt>Inflation factor</dt><dd>After a run</dd></div>
+            <div><dt>Maintenance factor</dt><dd>After a run</dd></div>
+            <div><dt>Repair risk</dt><dd>After a run</dd></div>
             <div><dt>Loan interest</dt><dd>After a run</dd></div>
             <div><dt>Tires</dt><dd>After a run</dd></div>
             <div><dt>Expected cumulative miles</dt><dd>After a run</dd></div>
@@ -2152,6 +2155,10 @@ function formatPercentage(value) {
   return `${value.toFixed(1)}%`;
 }
 
+function formatMultiplier(value) {
+  return `${value.toFixed(2)}x`;
+}
+
 function chargingUsageMetrics(yearlyBreakdown) {
   const deliveredEnergyUnits = yearlyBreakdown.reduce((sum, year) => sum + year.yearlyEnergyUnitsConsumed, 0);
   const purchasedEnergyUnits = yearlyBreakdown.reduce((sum, year) => sum + year.yearlyPurchasedEnergyUnits, 0);
@@ -2260,6 +2267,7 @@ function renderInsights(response) {
     response.responseExampleBreakdown.costTotal <= 0
       ? null
       : response.responseExampleBreakdown.costRepairShocks / response.responseExampleBreakdown.costTotal;
+  const finalYear = yearlyBreakdown[yearlyBreakdown.length - 1] || null;
 
   const insightCards = [
     {
@@ -2313,6 +2321,17 @@ function renderInsights(response) {
         chargingProfile.purchasedEnergyUnits <= 0
           ? "N/A"
           : formatPercentage((chargingProfile.chargingOverhead / chargingProfile.purchasedEnergyUnits) * 100),
+    });
+  }
+
+  if (finalYear) {
+    insightCards.push({
+      label: "Final-year maintenance factor",
+      value: formatMultiplier(finalYear.yearlyMaintenanceCalibrationMultiplier || 1),
+    });
+    insightCards.push({
+      label: "Final-year repair risk",
+      value: formatPercentage((finalYear.yearlyRepairShockProbabilityApplied || 0) * 100),
     });
   }
 
@@ -2391,6 +2410,7 @@ function renderYearlyBreakdown(response) {
           <h4>Year ${year.yearlyYear}</h4>
           <dl>
             <div><dt>Miles driven</dt><dd>${formatMiles(year.yearlyMilesDriven)}</dd></div>
+            <div><dt>Cumulative miles</dt><dd>${formatMiles(year.yearlyCumulativeMilesDriven)}</dd></div>
             <div><dt>City + highway miles</dt><dd>${formatMiles(year.yearlyCityMilesDriven)} / ${formatMiles(
               year.yearlyHighwayMilesDriven
             )}</dd></div>
@@ -2404,6 +2424,12 @@ function renderYearlyBreakdown(response) {
               year.yearlyParking + year.yearlyTolls + year.yearlyInspection
             )}</dd></div>
             <div><dt>Inflation factor</dt><dd>${year.yearlyInflationMultiplier.toFixed(2)}x</dd></div>
+            <div><dt>Maintenance factor</dt><dd>${formatMultiplier(
+              year.yearlyMaintenanceCalibrationMultiplier || 1
+            )}</dd></div>
+            <div><dt>Repair risk</dt><dd>${formatPercentage(
+              (year.yearlyRepairShockProbabilityApplied || 0) * 100
+            )}</dd></div>
             <div><dt>Repair shocks</dt><dd>${currency.format(year.yearlyRepairShocks)}</dd></div>
             <div><dt>Loan payments</dt><dd>${currency.format(year.yearlyLoanPayments)}</dd></div>
             <div><dt>Loan interest</dt><dd>${currency.format(year.yearlyLoanInterest)}</dd></div>

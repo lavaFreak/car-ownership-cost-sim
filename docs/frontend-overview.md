@@ -158,6 +158,8 @@ The frontend currently renders five views of the simulation response:
   - annual timeline for that sampled path, including gasoline gallons,
     electricity use, home/public charging splits, electric-vs-liquid miles, and
     charging-overhead details when relevant
+  - the yearly cards now also surface cumulative miles, maintenance
+    calibration, and repair risk so the wear model is visible from the UI
 
 Two simple canvas charts complement those cards:
 

@@ -76,7 +76,9 @@ tests =
     [ TestLabel "deterministic cash purchase keeps only operating costs" deterministicCashPurchaseTest,
       TestLabel "purchase taxes and fees are included" purchaseTaxAndFeesTest,
       TestLabel "inflation raises later-year recurring costs" inflationTest,
+      TestLabel "maintenance calibration grows with age and mileage" maintenanceCalibrationTest,
       TestLabel "repair shocks add tail-risk costs" repairShockTest,
+      TestLabel "repair shock calibration grows probability and cost over time" repairShockCalibrationTest,
       TestLabel "zero APR financing tracks partial payoff correctly" zeroAprFinancingTest,
       TestLabel "loan payments stop after the payoff year" loanPayoffHorizonTest,
       TestLabel "full depreciation floors resale at zero" fullDepreciationFloorTest,
@@ -381,19 +383,54 @@ inflationTest =
         breakdown = responseExampleBreakdown response
         yearlyBreakdown = responseExampleYearlyBreakdown response
     assertClose "fuel total includes inflation" 840 (costFuel breakdown)
-    assertClose "maintenance total includes inflation" 420 (costMaintenance breakdown)
+    assertClose "maintenance total includes inflation and wear calibration" 432.1 (costMaintenance breakdown)
     assertClose "insurance total includes inflation" 210 (costInsurance breakdown)
     assertClose "registration total includes inflation" 105 (costRegistration breakdown)
-    assertClose "total reflects inflated recurring costs across both years" 1575 (costTotal breakdown)
+    assertClose "total reflects inflated recurring costs across both years" 1587.1 (costTotal breakdown)
     case yearlyBreakdown of
       [yearOne, yearTwo] -> do
         assertClose "year one inflation multiplier is 1.0" 1.0 (yearlyInflationMultiplier yearOne)
         assertClose "year two inflation multiplier grows" 1.1 (yearlyInflationMultiplier yearTwo)
         assertClose "year one fuel is uninflated" 400 (yearlyFuel yearOne)
         assertClose "year two fuel is inflated" 440 (yearlyFuel yearTwo)
+        assertClose "year one maintenance calibration starts at baseline" 1.0 (yearlyMaintenanceCalibrationMultiplier yearOne)
+        assertClose "year two maintenance calibration grows with age" 1.055 (yearlyMaintenanceCalibrationMultiplier yearTwo)
         assertClose "year one total includes upfront purchase" 10750 (yearlyTotalCost yearOne)
-        assertClose "year two total reflects inflation only" 825 (yearlyTotalCost yearTwo)
+        assertClose "year two total reflects inflation plus wear calibration" 837.1 (yearlyTotalCost yearTwo)
       _ -> assertFailure "Expected exactly two yearly breakdown rows."
+
+maintenanceCalibrationTest :: Test
+maintenanceCalibrationTest =
+  TestCase $ do
+    let request =
+          deterministicRequest
+            14
+            baselineSimulationInput
+              { simulationPurchasePrice = 10000,
+                simulationYearsOwned = 4,
+                simulationAnnualMiles = 15000,
+                simulationFuelType = "gasoline",
+                simulationAnnualMaintenance = deterministicBoundedNormal 500
+              }
+        response = simulateRequestWithSeed 14 request
+        breakdown = responseExampleBreakdown response
+        yearlyBreakdown = responseExampleYearlyBreakdown response
+        expectedMaintenanceFactors = [1.0, 1.055, 1.1308125, 1.22325]
+        expectedMaintenanceCosts = zipWith (*) (repeat 500) expectedMaintenanceFactors
+    assertClose "maintenance totals include age and mileage calibration" (sum expectedMaintenanceCosts) (costMaintenance breakdown)
+    case yearlyBreakdown of
+      [yearOne, yearTwo, yearThree, yearFour] -> do
+        assertClose "year one cumulative miles are tracked" 15000 (yearlyCumulativeMilesDriven yearOne)
+        assertClose "year two cumulative miles are tracked" 30000 (yearlyCumulativeMilesDriven yearTwo)
+        assertClose "year three cumulative miles are tracked" 45000 (yearlyCumulativeMilesDriven yearThree)
+        assertClose "year four cumulative miles are tracked" 60000 (yearlyCumulativeMilesDriven yearFour)
+        assertClose "year one maintenance calibration starts at 1.0" 1.0 (yearlyMaintenanceCalibrationMultiplier yearOne)
+        assertClose "year two maintenance calibration grows with age" 1.055 (yearlyMaintenanceCalibrationMultiplier yearTwo)
+        assertClose "year three maintenance calibration grows with mileage" 1.1308125 (yearlyMaintenanceCalibrationMultiplier yearThree)
+        assertClose "year four maintenance calibration keeps rising" 1.22325 (yearlyMaintenanceCalibrationMultiplier yearFour)
+        assertClose "year one maintenance uses the calibrated amount" (expectedMaintenanceCosts !! 0) (yearlyMaintenance yearOne)
+        assertClose "year four maintenance uses the calibrated amount" (expectedMaintenanceCosts !! 3) (yearlyMaintenance yearFour)
+      _ -> assertFailure "Expected exactly four yearly breakdown rows."
 
 repairShockTest :: Test
 repairShockTest =
@@ -480,6 +517,54 @@ repairShockTest =
         assertClose "year one repair shock is tracked" 1500 (yearlyRepairShocks yearOne)
         assertClose "year one total includes repair shock" 13500 (yearlyTotalCost yearOne)
       _ -> assertFailure "Expected exactly one yearly breakdown row."
+
+repairShockCalibrationTest :: Test
+repairShockCalibrationTest =
+  TestCase $ do
+    let request =
+          deterministicRequest
+            18
+            baselineSimulationInput
+              { simulationPurchasePrice = 10000,
+                simulationYearsOwned = 4,
+                simulationAnnualMiles = 15000,
+                simulationFuelType = "gasoline",
+                simulationRepairShockProbability = 0.2,
+                simulationRepairShockCost = deterministicBoundedNormal 1000
+              }
+        response = simulateRequestWithSeed 18 request
+        yearlyBreakdown = responseExampleYearlyBreakdown response
+        forcedShockRequest =
+          deterministicRequest
+            18
+            baselineSimulationInput
+              { simulationPurchasePrice = 10000,
+                simulationYearsOwned = 4,
+                simulationAnnualMiles = 15000,
+                simulationFuelType = "gasoline",
+                simulationRepairShockProbability = 1,
+                simulationRepairShockCost = deterministicBoundedNormal 1000
+              }
+        forcedShockResponse = simulateRequestWithSeed 18 forcedShockRequest
+        forcedShockBreakdown = responseExampleYearlyBreakdown forcedShockResponse
+    case yearlyBreakdown of
+      [yearOne, yearTwo, yearThree, yearFour] -> do
+        assertClose "year one repair probability stays at the baseline" 0.2 (yearlyRepairShockProbabilityApplied yearOne)
+        assertClose "year two repair probability grows with age" 0.214 (yearlyRepairShockProbabilityApplied yearTwo)
+        assertClose "year three repair probability grows with mileage" 0.23313 (yearlyRepairShockProbabilityApplied yearThree)
+        assertClose "year four repair probability keeps rising" 0.25652 (yearlyRepairShockProbabilityApplied yearFour)
+        assertClose "year one repair-cost multiplier stays at the baseline" 1.0 (yearlyRepairShockCostCalibrationMultiplier yearOne)
+        assertClose "year two repair-cost multiplier grows with age" 1.05 (yearlyRepairShockCostCalibrationMultiplier yearTwo)
+        assertClose "year three repair-cost multiplier grows with mileage" 1.12475 (yearlyRepairShockCostCalibrationMultiplier yearThree)
+        assertClose "year four repair-cost multiplier keeps rising" 1.219 (yearlyRepairShockCostCalibrationMultiplier yearFour)
+      _ -> assertFailure "Expected exactly four yearly breakdown rows."
+    case forcedShockBreakdown of
+      [yearOne, yearTwo, yearThree, yearFour] -> do
+        assertClose "forced year one repair shock uses the baseline cost" 1000 (yearlyRepairShocks yearOne)
+        assertClose "forced year two repair shock uses the age-adjusted cost" 1050 (yearlyRepairShocks yearTwo)
+        assertClose "forced year three repair shock uses the age-and-mileage-adjusted cost" 1124.75 (yearlyRepairShocks yearThree)
+        assertClose "forced year four repair shock keeps rising" 1219 (yearlyRepairShocks yearFour)
+      _ -> assertFailure "Expected exactly four yearly breakdown rows."
 
 zeroAprFinancingTest :: Test
 zeroAprFinancingTest =
@@ -1692,9 +1777,20 @@ assertResponseInvariants seed = do
        (\yearBreakdown -> abs ((yearlyCityMilesDriven yearBreakdown + yearlyHighwayMilesDriven yearBreakdown) - yearlyMilesDriven yearBreakdown) <= 1.0e-6)
        yearlyBreakdown)
   assertBool
+    "cumulative miles stay non-decreasing over time"
+    (isNonIncreasing (reverse (map yearlyCumulativeMilesDriven yearlyBreakdown)))
+  assertBool
     "yearly city and highway gallons stay aligned with total gallons"
     (all
        (\yearBreakdown -> abs ((yearlyCityFuelGallons yearBreakdown + yearlyHighwayFuelGallons yearBreakdown) - yearlyFuelGallons yearBreakdown) <= 1.0e-6)
+       yearlyBreakdown)
+  assertBool
+    "maintenance calibration multipliers stay at or above baseline"
+    (all (\yearBreakdown -> yearlyMaintenanceCalibrationMultiplier yearBreakdown >= 1) yearlyBreakdown)
+  assertBool
+    "repair shock probabilities stay bounded"
+    (all
+       (\yearBreakdown -> yearlyRepairShockProbabilityApplied yearBreakdown >= 0 && yearlyRepairShockProbabilityApplied yearBreakdown <= 1)
        yearlyBreakdown)
   assertClose "fuel totals stay aligned with the yearly timeline" (sum (map yearlyFuel yearlyBreakdown)) (costFuel exampleBreakdown)
   assertClose "maintenance totals stay aligned with the yearly timeline" (sum (map yearlyMaintenance yearlyBreakdown)) (costMaintenance exampleBreakdown)

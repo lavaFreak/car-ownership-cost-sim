@@ -150,6 +150,14 @@ The request body is JSON with this top-level shape:
   - it models home electricity price per kWh separately from gasoline
 - `simulationPublicChargingPrice` is only used for plug-in scenarios
   - it models away-from-home charging price per kWh
+- `simulationAnnualMaintenance` is now treated as a baseline annual
+  maintenance distribution
+  - the backend can scale it year by year using age and cumulative-mile wear
+    calibration
+- `simulationRepairShockProbability` and `simulationRepairShockCost` are also
+  baseline inputs
+  - the backend can raise repair risk and repair severity over time as wear
+    accumulates
 - `simulationMilesPerGallon` is the derived blended efficiency for the chosen
   city/highway split
   - for gasoline-like vehicles it is MPG
@@ -172,6 +180,8 @@ The success response includes:
   - each yearly row now includes explicit electric-mile, liquid-fuel-mile, and
     charging-flow fields so the frontend can render EV and plug-in-hybrid usage
     without inferring it from the original request
+  - each yearly row also includes cumulative-mile and wear-calibration fields
+    so the maintenance and repair model is explainable
 
 ### Important yearly powertrain fields
 
@@ -195,6 +205,14 @@ When `responseExampleYearlyBreakdown` is present, each row can include:
   - purchased energy that did not reach the battery because of charging losses
 - `yearlyFuelGallons`
   - liquid fuel consumed that year
+- `yearlyCumulativeMilesDriven`
+  - total miles accumulated by the end of that ownership year
+- `yearlyMaintenanceCalibrationMultiplier`
+  - the wear-based multiplier applied to the sampled annual maintenance value
+- `yearlyRepairShockProbabilityApplied`
+  - the calibrated repair-shock probability used for that year
+- `yearlyRepairShockCostCalibrationMultiplier`
+  - the wear-based multiplier applied if a repair shock occurs that year
 
 ## Error responses
 

@@ -148,6 +148,7 @@ instance ToJSON CostBreakdown
 data YearlyCostBreakdown = YearlyCostBreakdown
   { yearlyYear :: Int,
     yearlyMilesDriven :: Double,
+    yearlyCumulativeMilesDriven :: Double,
     yearlyCityMilesDriven :: Double,
     yearlyHighwayMilesDriven :: Double,
     yearlyElectricMilesDriven :: Double,
@@ -175,7 +176,10 @@ data YearlyCostBreakdown = YearlyCostBreakdown
     yearlyLoanInterest :: Double,
     yearlyFuel :: Double,
     yearlyMaintenance :: Double,
+    yearlyMaintenanceCalibrationMultiplier :: Double,
     yearlyRepairShocks :: Double,
+    yearlyRepairShockProbabilityApplied :: Double,
+    yearlyRepairShockCostCalibrationMultiplier :: Double,
     yearlyInsurance :: Double,
     yearlyRegistration :: Double,
     yearlyParking :: Double,

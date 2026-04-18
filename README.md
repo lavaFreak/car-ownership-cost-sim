@@ -177,6 +177,8 @@ The yearly model now also applies:
 - plug-in hybrid cost modeling that splits miles between electricity and gasoline using EV-mode MPGe plus a configurable electric-driving share
 - separate pricing for plug-in-hybrid gasoline, home charging, and public charging instead of forcing all energy through one price assumption
 - optional backend region calibration that can override sales tax, registration, fuel price, charging price, home-charging share, and charging-loss assumptions from the selected location profile
+- age- and mileage-aware maintenance calibration that ramps baseline upkeep costs over the ownership timeline
+- age- and mileage-aware repair-shock calibration that increases both expected repair frequency and repair severity as wear accumulates
 - loan amortization with interest tracked separately from principal in the yearly breakdown
 - a first-year resale hit on top of the sampled annual depreciation rate
 - a residual value floor so resale cannot fall below a configured minimum
@@ -193,7 +195,9 @@ before validation and sampling.
 The yearly response now also returns explicit electric miles, liquid-fuel
 miles, purchased charging energy, home/public charging splits, and charging
 loss overhead so the frontend does not have to infer those values from the
-original request.
+original request. It also now includes cumulative miles plus the applied
+maintenance and repair-shock calibration factors so one sampled path is easier
+to explain.
 
 ## Current API
 
