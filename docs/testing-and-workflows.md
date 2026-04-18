@@ -83,6 +83,12 @@ To generate roster-ready JSON rows for a specific model:
 cabal run discover-vehicle-roster -- 2024 Honda "Prologue FWD"
 ```
 
+To expand the lightweight roster from a larger curated batch of model queries:
+
+```bash
+bash scripts/expand-roster-batch.sh
+```
+
 This workflow depends on the curated source seeds in
 [catalog/vehicle-source-seeds.json](/Users/garion/Work/projects/car-ownership-cost-sim/catalog/vehicle-source-seeds.json),
 the lightweight roster in
@@ -110,9 +116,11 @@ When changing catalog or importer behavior:
 
 1. update the relevant catalog/import modules
 2. use `discover-vehicle-roster` if you need to expand the lightweight roster
-3. refresh or verify fixtures plus source-seed or roster expectations
-4. run `cabal test`
-5. rebuild the local catalog if the checked-in runtime data should change
+3. use `scripts/expand-roster-batch.sh` if you want to add a larger batch of
+   official models in one pass
+4. refresh or verify fixtures plus source-seed or roster expectations
+5. run `cabal test`
+6. rebuild the local catalog if the checked-in runtime data should change
 
 ## Current testing gaps
 

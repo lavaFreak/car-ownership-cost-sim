@@ -232,6 +232,12 @@ To generate paste-ready lightweight roster rows for a model:
 cabal run discover-vehicle-roster -- 2024 Toyota "Prius Prime"
 ```
 
+To expand the lightweight roster in a large batch using a curated model list:
+
+```bash
+bash scripts/expand-roster-batch.sh
+```
+
 ## Development Plan
 
 ### Phase 1: Core simulation
@@ -304,8 +310,8 @@ The catalog importer now supports two project-owned input files:
 That split is the first real scaling step toward broader `2020+` coverage,
 because not every vehicle now needs a fully hand-authored maintenance,
 depreciation, repair-risk, and insurance profile before it can appear in the
-app. The current checked-in runtime catalog now covers `24` vehicles built from
-`10` curated source seeds plus `14` lighter-weight roster rows.
+app. The current checked-in runtime catalog now covers `106` vehicles built
+from `10` curated source seeds plus `96` lighter-weight roster rows.
 
 The repository also includes a basic GitHub Actions workflow that runs the main
 build and test checks on pushes and pull requests.

@@ -43,6 +43,9 @@ The app is split into four layers:
 - [app/DiscoverVehicleRoster.hs](/Users/garion/Work/projects/car-ownership-cost-sim/app/DiscoverVehicleRoster.hs)
   CLI helper for discovering official model names and generating roster-ready
   JSON rows from FuelEconomy.gov menus.
+- [scripts/expand-roster-batch.sh](/Users/garion/Work/projects/car-ownership-cost-sim/scripts/expand-roster-batch.sh)
+  Batch helper for widening the lightweight roster from a curated list of
+  official model queries.
 - [static/index.html](/Users/garion/Work/projects/car-ownership-cost-sim/static/index.html)
   Form structure and results containers.
 - [static/app.js](/Users/garion/Work/projects/car-ownership-cost-sim/static/app.js)

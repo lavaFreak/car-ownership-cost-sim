@@ -43,9 +43,11 @@ module CarOwnershipCostSim.VehicleCatalogImport
     parseFuelEconomyMenuItems,
     parseFuelEconomyVehicleRecord,
     suggestVehicleCatalogRosterSeeds,
+    validateVehicleCatalogRosterSeed,
   )
 where
 
+import Control.Applicative ((<|>))
 import CarOwnershipCostSim.Types (BoundedNormal)
 import CarOwnershipCostSim.VehicleCatalogDefaults
   ( GeneratedCatalogAssumptions (..),
@@ -275,10 +277,13 @@ discoverVehicleRosterSeeds sourceUpdatedAt vehicleYear vehicleMake catalogModel 
       (\decodeError -> fail ("Unable to parse FuelEconomy.gov options menu: " <> decodeError))
       pure
       (parseFuelEconomyMenuItems payload)
-  either
-    (\decodeError -> fail ("Unable to build roster seeds from official menu items: " <> decodeError))
-    pure
-    (suggestVehicleCatalogRosterSeeds sourceUpdatedAt vehicleYear vehicleMake catalogModel menuItems)
+  vpicPayload <- fetchUrl (vpicModelsUrlForDiscovery vehicleYear vehicleMake)
+  vpicModels <-
+    either
+      (\decodeError -> fail ("Unable to decode vPIC payload for discovery: " <> decodeError))
+      pure
+      (decodeVpicModelResults vpicPayload)
+  mapM (discoverValidatedRosterSeed sourceUpdatedAt vehicleYear vehicleMake catalogModel vpicModels) menuItems
 
 -- | Combine one source seed with upstream records to produce a normalized
 -- catalog import seed.
@@ -458,6 +463,27 @@ buildVehicleCatalogEntryFromLiveRosterSeed rosterSeed = do
     (\decodeError -> fail ("Unable to build roster-based catalog entry for " <> rosterCatalogId rosterSeed <> ": " <> decodeError))
     pure
     (buildVehicleCatalogEntryFromRosterSeed rosterSeed vpicModels fuelEconomyVehicle)
+
+-- | Fill in canonical FuelEconomy base-model information plus any needed
+-- vPIC override so a roster seed can round-trip through the full importer.
+validateVehicleCatalogRosterSeed ::
+  VehicleCatalogRosterSeed ->
+  [VpicModelResult] ->
+  FuelEconomyVehicleRecord ->
+  Either String VehicleCatalogRosterSeed
+validateVehicleCatalogRosterSeed rosterSeed vpicModels fuelEconomyVehicle = do
+  ensureMatches "roster year" (show (rosterYear rosterSeed)) (show (fuelEconomyVehicleYear fuelEconomyVehicle))
+  ensureMatches "roster make" (rosterMake rosterSeed) (fuelEconomyVehicleMake fuelEconomyVehicle)
+  let canonicalBaseModel = canonicalFuelEconomyBaseModel fuelEconomyVehicle
+  matchedVpicBaseModel <- chooseVpicBaseModel canonicalBaseModel vpicModels
+  pure
+    rosterSeed
+      { rosterBaseModel = canonicalBaseModel,
+        rosterVpicBaseModel =
+          if matchesComparable canonicalBaseModel matchedVpicBaseModel
+            then Nothing
+            else Just matchedVpicBaseModel
+      }
 
 fuelEconomyProfileFromRecord :: FuelEconomyVehicleRecord -> FuelEconomyProfile
 fuelEconomyProfileFromRecord fuelEconomyVehicle =
@@ -659,6 +685,31 @@ occurrences :: Eq a => a -> [a] -> Int
 occurrences target =
   length . filter (== target)
 
+discoverValidatedRosterSeed ::
+  String ->
+  Int ->
+  String ->
+  String ->
+  [VpicModelResult] ->
+  FuelEconomyMenuItem ->
+  IO VehicleCatalogRosterSeed
+discoverValidatedRosterSeed sourceUpdatedAt vehicleYear vehicleMake catalogModel vpicModels menuItem = do
+  roughRosterSeed <-
+    either
+      (\decodeError -> fail ("Unable to build suggested roster seed: " <> decodeError))
+      pure
+      (rosterSeedFromMenuItem sourceUpdatedAt vehicleYear vehicleMake catalogModel menuItem)
+  fuelEconomyPayload <- fetchUrl ("https://www.fueleconomy.gov/ws/rest/vehicle/" <> fuelEconomyMenuValue menuItem)
+  fuelEconomyVehicle <-
+    either
+      (\decodeError -> fail ("Unable to parse FuelEconomy.gov vehicle details for discovery: " <> decodeError))
+      pure
+      (parseFuelEconomyVehicleRecord fuelEconomyPayload)
+  either
+    (\decodeError -> fail ("Unable to validate discovered roster seed: " <> decodeError))
+    pure
+    (validateVehicleCatalogRosterSeed roughRosterSeed vpicModels fuelEconomyVehicle)
+
 rosterSeedFromMenuItem ::
   String ->
   Int ->
@@ -721,6 +772,44 @@ trimWhitespace :: String -> String
 trimWhitespace =
   dropWhile (== ' ') . reverse . dropWhile (== ' ') . reverse
 
+canonicalFuelEconomyBaseModel :: FuelEconomyVehicleRecord -> String
+canonicalFuelEconomyBaseModel fuelEconomyVehicle =
+  trimWhitespace (maybe (fuelEconomyVehicleModel fuelEconomyVehicle) id (fuelEconomyVehicleBaseModel fuelEconomyVehicle))
+
+chooseVpicBaseModel :: String -> [VpicModelResult] -> Either String String
+chooseVpicBaseModel canonicalBaseModel vpicModels =
+  case exactMatch <|> fuzzyMatch of
+    Just matchedModel -> Right matchedModel
+    Nothing ->
+      Left
+        ( "Base model "
+            <> show canonicalBaseModel
+            <> " was not present in the vPIC year/make results."
+        )
+  where
+    exactMatch =
+      vpicResultModelName <$> find (matchesComparable canonicalBaseModel . vpicResultModelName) vpicModels
+    fuzzyMatch =
+      bestCandidateByLength
+        [ vpicResultModelName vpicModel
+          | vpicModel <- vpicModels,
+            let comparableCanonical = normalizeComparable canonicalBaseModel
+                comparableVpic = normalizeComparable (vpicResultModelName vpicModel),
+            comparableVpic `isPrefixOf` comparableCanonical
+              || comparableCanonical `isPrefixOf` comparableVpic
+              || comparableVpic `isInfixOf` comparableCanonical
+              || comparableCanonical `isInfixOf` comparableVpic
+        ]
+
+bestCandidateByLength :: [String] -> Maybe String
+bestCandidateByLength [] = Nothing
+bestCandidateByLength (firstValue : remainingValues) =
+  Just (foldl chooseLonger firstValue remainingValues)
+  where
+    chooseLonger currentBest candidate
+      | length candidate > length currentBest = candidate
+      | otherwise = currentBest
+
 fetchUrl :: String -> IO String
 fetchUrl url = do
   (exitCode, stdoutText, stderrText) <- readProcessWithExitCode "curl" ["-fsSL", url] ""
@@ -746,6 +835,14 @@ vpicModelsUrlForRosterSeed rosterSeed =
     <> rosterMake rosterSeed
     <> "/modelyear/"
     <> show (rosterYear rosterSeed)
+    <> "?format=json"
+
+vpicModelsUrlForDiscovery :: Int -> String -> String
+vpicModelsUrlForDiscovery vehicleYear vehicleMake =
+  "https://vpic.nhtsa.dot.gov/api/vehicles/GetModelsForMakeYear/make/"
+    <> vehicleMake
+    <> "/modelyear/"
+    <> show vehicleYear
     <> "?format=json"
 
 fuelEconomyVehicleUrlForRosterSeed :: VehicleCatalogRosterSeed -> String

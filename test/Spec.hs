@@ -42,6 +42,7 @@ import CarOwnershipCostSim.VehicleCatalogImport
     parseFuelEconomyMenuItems,
     parseFuelEconomyVehicleRecord,
     suggestVehicleCatalogRosterSeeds,
+    validateVehicleCatalogRosterSeed,
   )
 import CarOwnershipCostSim.VehiclePresets (VehiclePreset (..), vehiclePresetsFromCatalog)
 import CarOwnershipCostSim.WebApp (StaticAssetPaths (..), buildApplication)
@@ -89,6 +90,7 @@ tests =
       TestLabel "source seeds build catalog entries from official fixtures" sourceSeedCatalogBuildTest,
       TestLabel "roster seeds build catalog entries from official fixtures" rosterSeedCatalogBuildTest,
       TestLabel "FuelEconomy options can suggest roster seeds" fuelEconomyRosterSuggestionTest,
+      TestLabel "validated roster seeds infer canonical base models" validatedRosterSeedCanonicalizationTest,
       TestLabel "missing source assumptions fall back to generated defaults" generatedSourceDefaultsTest,
       TestLabel "source seed validation rejects wrong vPIC model matches" sourceSeedValidationFailureTest,
       TestLabel "API example route returns a valid simulation request" apiExampleRouteTest,
@@ -754,8 +756,8 @@ vehicleRosterSeedLoadTest =
   TestCase $ do
     sourceSeeds <- loadDefaultVehicleSourceSeeds
     rosterSeeds <- loadDefaultVehicleRosterSeeds
-    assertEqual "the lightweight roster stays at fourteen vehicles" 14 (length rosterSeeds)
-    assertEqual "source plus roster coverage stays at twenty-four vehicles" 24 (length sourceSeeds + length rosterSeeds)
+    assertEqual "the lightweight roster stays at ninety-six vehicles" 96 (length rosterSeeds)
+    assertEqual "source plus roster coverage stays at one-hundred-six vehicles" 106 (length sourceSeeds + length rosterSeeds)
     mapM_ assertVehicleRosterSeedLooksUsable rosterSeeds
 
 vpicFixtureDecodingTest :: Test
@@ -900,6 +902,49 @@ fuelEconomyRosterSuggestionTest =
     assertEqual "suggested trims come from the official menu labels" ["LE", "XLE AWD"] (map rosterTrim suggestedRosterSeeds)
     assertEqual "hybrid display models infer a gasoline base model" ["Corolla", "Corolla"] (map rosterBaseModel suggestedRosterSeeds)
     assertEqual "suggestions leave price anchors empty by default" [Nothing, Nothing] (map rosterPurchasePrice suggestedRosterSeeds)
+
+validatedRosterSeedCanonicalizationTest :: Test
+validatedRosterSeedCanonicalizationTest =
+  TestCase $ do
+    let roughRosterSeed =
+          VehicleCatalogRosterSeed
+            { rosterCatalogId = "prius-prime-validation-test",
+              rosterDescription = Nothing,
+              rosterYear = 2024,
+              rosterMake = "Toyota",
+              rosterCatalogModel = "Prius Prime",
+              rosterTrim = "Base",
+              rosterBaseModel = "Prius",
+              rosterVpicBaseModel = Nothing,
+              rosterFuelEconomyVehicleId = 47500,
+              rosterPurchasePrice = Nothing,
+              rosterSourceUpdatedAt = "2026-04-18"
+            }
+        vpicModels =
+          [ VpicModelResult {vpicResultMakeName = "Toyota", vpicResultModelName = "Prius"},
+            VpicModelResult {vpicResultMakeName = "Toyota", vpicResultModelName = "Corolla"}
+          ]
+        fuelEconomyVehicle =
+          FuelEconomyVehicleRecord
+            { fuelEconomyVehicleYear = 2024,
+              fuelEconomyVehicleMake = "Toyota",
+              fuelEconomyVehicleModel = "Prius Prime",
+              fuelEconomyVehicleBaseModel = Just "Prius Prime",
+              fuelEconomyVehicleFuelType = "Regular Gasoline",
+              fuelEconomyVehicleAtvType = Just "Plug-in Hybrid",
+              fuelEconomyVehicleDrive = Just "Front-Wheel Drive",
+              fuelEconomyVehicleClass = Just "Midsize Cars",
+              fuelEconomyVehicleCombinedMpg = 48,
+              fuelEconomyVehicleCityMpg = Just 52,
+              fuelEconomyVehicleHighwayMpg = Just 45
+            }
+    validatedRosterSeed <-
+      either
+        (\decodeError -> assertFailure ("Validated roster seed failed: " <> decodeError) >> pure roughRosterSeed)
+        pure
+        (validateVehicleCatalogRosterSeed roughRosterSeed vpicModels fuelEconomyVehicle)
+    assertEqual "validated roster seeds use the FuelEconomy base model" "Prius Prime" (rosterBaseModel validatedRosterSeed)
+    assertEqual "validated roster seeds keep a vPIC override when needed" (Just "Prius") (rosterVpicBaseModel validatedRosterSeed)
 
 generatedSourceDefaultsTest :: Test
 generatedSourceDefaultsTest =
