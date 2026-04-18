@@ -44,7 +44,11 @@ data FuelEconomyProfile = FuelEconomyProfile
   { fuelEconomyFuelType :: String,
     fuelEconomyCombinedMpg :: Double,
     fuelEconomyCityMpg :: Maybe Double,
-    fuelEconomyHighwayMpg :: Maybe Double
+    fuelEconomyHighwayMpg :: Maybe Double,
+    fuelEconomyElectricDrivingShare :: Maybe Double,
+    fuelEconomyElectricCombinedMpge :: Maybe Double,
+    fuelEconomyElectricCityMpge :: Maybe Double,
+    fuelEconomyElectricHighwayMpge :: Maybe Double
   }
   deriving (Eq, Show, Generic)
 
@@ -92,6 +96,10 @@ data VehicleCatalogEntry = VehicleCatalogEntry
     catalogCombinedMpg :: Double,
     catalogCityMpg :: Maybe Double,
     catalogHighwayMpg :: Maybe Double,
+    catalogElectricDrivingShare :: Maybe Double,
+    catalogElectricCombinedMpge :: Maybe Double,
+    catalogElectricCityMpge :: Maybe Double,
+    catalogElectricHighwayMpge :: Maybe Double,
     catalogPurchasePrice :: Double,
     catalogAnnualInsurance :: Double,
     catalogAnnualRegistration :: Double,
@@ -129,6 +137,10 @@ buildVehicleCatalogEntry importSeed =
           catalogCombinedMpg = fuelEconomyCombinedMpg fuelEconomy,
           catalogCityMpg = fuelEconomyCityMpg fuelEconomy,
           catalogHighwayMpg = fuelEconomyHighwayMpg fuelEconomy,
+          catalogElectricDrivingShare = fuelEconomyElectricDrivingShare fuelEconomy,
+          catalogElectricCombinedMpge = fuelEconomyElectricCombinedMpge fuelEconomy,
+          catalogElectricCityMpge = fuelEconomyElectricCityMpge fuelEconomy,
+          catalogElectricHighwayMpge = fuelEconomyElectricHighwayMpge fuelEconomy,
           catalogPurchasePrice = importPurchasePrice importSeed,
           catalogAnnualInsurance = importAnnualInsurance importSeed,
           catalogAnnualRegistration = importAnnualRegistration importSeed,

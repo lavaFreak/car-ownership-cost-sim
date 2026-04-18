@@ -145,6 +145,18 @@
               </label>
 
               <label>
+                Region profile
+                <select id="location-profile" name="locationProfile">
+                  <option value="national" selected>National average</option>
+                  <option value="mountain-west">Mountain West</option>
+                  <option value="west-coast">West Coast</option>
+                  <option value="texas-south">Texas / Gulf South</option>
+                  <option value="midwest">Midwest</option>
+                  <option value="northeast">Northeast</option>
+                </select>
+              </label>
+
+              <label>
                 <span id="city-efficiency-label">City MPG</span>
                 <input name="cityMilesPerGallon" type="number" min="1" step="0.1" value="28" required />
               </label>
@@ -155,11 +167,34 @@
               </label>
             </fieldset>
 
-            <fieldset id="ev-charging-fieldset" hidden>
-              <legend>EV charging mix</legend>
+            <fieldset id="plug-in-hybrid-fieldset" hidden>
+              <legend>Plug-in hybrid electric usage</legend>
 
               <p class="field-group-copy">
-                For EVs, the electricity price inputs below are treated as home charging rates. These fields model how much charging happens away from home and how much energy is lost during charging.
+                Plug-in hybrids can split miles between electricity and gasoline. These fields estimate what share of miles stay electric and how efficient the vehicle is in EV mode.
+              </p>
+
+              <label>
+                Electric driving share (%)
+                <input name="plugInElectricDrivingSharePercent" type="number" min="0" max="100" step="1" value="68" required />
+              </label>
+
+              <label>
+                City electric MPGe
+                <input name="plugInCityMilesPerGallonEquivalent" type="number" min="1" step="0.1" value="110" required />
+              </label>
+
+              <label>
+                Highway electric MPGe
+                <input name="plugInHighwayMilesPerGallonEquivalent" type="number" min="1" step="0.1" value="96" required />
+              </label>
+            </fieldset>
+
+            <fieldset id="charging-fieldset" hidden>
+              <legend>Plug-in charging mix</legend>
+
+              <p class="field-group-copy">
+                For EVs and plug-in hybrids, the electricity price inputs below are treated as home charging rates. These fields model how much charging happens away from home and how much energy is lost during charging.
               </p>
 
               <label>

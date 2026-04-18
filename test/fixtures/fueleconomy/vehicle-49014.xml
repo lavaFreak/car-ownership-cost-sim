@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<vehicle>
+  <year>2025</year>
+  <make>Toyota</make>
+  <model>Prius Prime</model>
+  <baseModel>Prius Prime</baseModel>
+  <fuelType1>Regular Gasoline</fuelType1>
+  <fuelType>Regular Gas and Electricity</fuelType>
+  <fuelType2>Electricity</fuelType2>
+  <atvType>Plug-in Hybrid</atvType>
+  <eng_dscr>PHEV</eng_dscr>
+  <drive>Front-Wheel Drive</drive>
+  <VClass>Midsize Cars</VClass>
+  <comb08>48</comb08>
+  <city08>50</city08>
+  <highway08>47</highway08>
+  <combA08>114</combA08>
+  <cityA08>125</cityA08>
+  <highwayA08>103</highwayA08>
+  <combinedUF>0.677</combinedUF>
+</vehicle>

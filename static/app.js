@@ -18,7 +18,9 @@ const vehicleLookupStatus = document.getElementById("vehicle-lookup-status");
 const vehicleMatchCount = document.getElementById("vehicle-match-count");
 const presetDescription = document.getElementById("preset-description");
 const fuelTypeSelect = document.getElementById("fuel-type");
-const evChargingFieldset = document.getElementById("ev-charging-fieldset");
+const locationProfileSelect = document.getElementById("location-profile");
+const plugInHybridFieldset = document.getElementById("plug-in-hybrid-fieldset");
+const chargingFieldset = document.getElementById("charging-fieldset");
 const cityEfficiencyLabel = document.getElementById("city-efficiency-label");
 const highwayEfficiencyLabel = document.getElementById("highway-efficiency-label");
 const energyPriceMeanLabel = document.getElementById("energy-price-mean-label");
@@ -83,10 +85,14 @@ const shareFieldNames = [
   "annualMileageChangePercent",
   "cityDrivingSharePercent",
   "fuelType",
+  "locationProfile",
   "homeChargingSharePercent",
   "chargingLossPercent",
+  "plugInElectricDrivingSharePercent",
   "cityMilesPerGallon",
   "highwayMilesPerGallon",
+  "plugInCityMilesPerGallonEquivalent",
+  "plugInHighwayMilesPerGallonEquivalent",
   "annualInsurance",
   "annualRegistration",
   "annualParking",
@@ -117,6 +123,62 @@ const shareFieldNames = [
 ];
 
 const knownFuelTypes = ["gasoline", "hybrid-gasoline", "plug-in-hybrid", "diesel", "electric"];
+const regionProfiles = {
+  national: {
+    label: "National average",
+    salesTaxPercent: 6.75,
+    annualRegistration: 220,
+    gasoline: { mean: 3.75, stdDev: 0.55 },
+    diesel: { mean: 4.15, stdDev: 0.6 },
+    homeElectricity: { mean: 0.16, stdDev: 0.04 },
+    publicCharging: { mean: 0.43, stdDev: 0.1 },
+  },
+  "mountain-west": {
+    label: "Mountain West",
+    salesTaxPercent: 6.2,
+    annualRegistration: 210,
+    gasoline: { mean: 3.48, stdDev: 0.42 },
+    diesel: { mean: 3.92, stdDev: 0.47 },
+    homeElectricity: { mean: 0.14, stdDev: 0.03 },
+    publicCharging: { mean: 0.4, stdDev: 0.09 },
+  },
+  "west-coast": {
+    label: "West Coast",
+    salesTaxPercent: 8.4,
+    annualRegistration: 320,
+    gasoline: { mean: 4.75, stdDev: 0.58 },
+    diesel: { mean: 5.15, stdDev: 0.62 },
+    homeElectricity: { mean: 0.26, stdDev: 0.05 },
+    publicCharging: { mean: 0.53, stdDev: 0.1 },
+  },
+  "texas-south": {
+    label: "Texas / Gulf South",
+    salesTaxPercent: 6.4,
+    annualRegistration: 120,
+    gasoline: { mean: 3.2, stdDev: 0.38 },
+    diesel: { mean: 3.7, stdDev: 0.43 },
+    homeElectricity: { mean: 0.13, stdDev: 0.03 },
+    publicCharging: { mean: 0.39, stdDev: 0.08 },
+  },
+  midwest: {
+    label: "Midwest",
+    salesTaxPercent: 7.1,
+    annualRegistration: 190,
+    gasoline: { mean: 3.42, stdDev: 0.4 },
+    diesel: { mean: 3.86, stdDev: 0.45 },
+    homeElectricity: { mean: 0.15, stdDev: 0.03 },
+    publicCharging: { mean: 0.41, stdDev: 0.09 },
+  },
+  northeast: {
+    label: "Northeast",
+    salesTaxPercent: 7.0,
+    annualRegistration: 260,
+    gasoline: { mean: 3.88, stdDev: 0.48 },
+    diesel: { mean: 4.28, stdDev: 0.53 },
+    homeElectricity: { mean: 0.22, stdDev: 0.05 },
+    publicCharging: { mean: 0.49, stdDev: 0.1 },
+  },
+};
 
 function fieldValue(name) {
   return form.elements[name].value.trim();
@@ -162,50 +224,96 @@ function isElectricFuelType(value) {
   return normalizedFuelType(value) === "electric";
 }
 
-function defaultEnergyPriceProfile(fuelType) {
+function isPlugInHybridFuelType(value) {
+  return normalizedFuelType(value) === "plug-in-hybrid";
+}
+
+function usesChargingFuelType(value) {
+  return isElectricFuelType(value) || isPlugInHybridFuelType(value);
+}
+
+function selectedRegionProfile() {
+  return regionProfiles[locationProfileSelect.value] || regionProfiles.national;
+}
+
+function defaultEnergyPriceProfile(fuelType, regionProfile = selectedRegionProfile()) {
   switch (normalizedFuelType(fuelType)) {
     case "electric":
-      return { mean: 0.16, stdDev: 0.04 };
+      return regionProfile.homeElectricity;
+    case "plug-in-hybrid":
+      return regionProfile.gasoline;
     case "diesel":
-      return { mean: 4.15, stdDev: 0.6 };
+      return regionProfile.diesel;
     default:
-      return { mean: 3.75, stdDev: 0.55 };
+      return regionProfile.gasoline;
   }
 }
 
-function defaultEvChargingProfile() {
+function defaultChargingProfile(regionProfile = selectedRegionProfile()) {
   return {
     homeSharePercent: 82,
     chargingLossPercent: 10,
-    publicMean: 0.43,
-    publicStdDev: 0.1,
+    publicMean: regionProfile.publicCharging.mean,
+    publicStdDev: regionProfile.publicCharging.stdDev,
+  };
+}
+
+function defaultPlugInHybridProfile() {
+  return {
+    electricDrivingSharePercent: 68,
+    cityMpge: 110,
+    highwayMpge: 96,
   };
 }
 
 function energyCostLabel(fuelType) {
-  return isElectricFuelType(fuelType) ? "Charging" : "Fuel";
+  if (isElectricFuelType(fuelType)) {
+    return "Charging";
+  }
+
+  if (isPlugInHybridFuelType(fuelType)) {
+    return "Fuel + charging";
+  }
+
+  return "Fuel";
 }
 
 function energyUnitLabel(fuelType) {
-  return isElectricFuelType(fuelType) ? "kWh" : "gal";
+  return usesChargingFuelType(fuelType) ? "kWh" : "gal";
 }
 
 function efficiencyLabelPrefix(fuelType) {
-  return isElectricFuelType(fuelType) ? "MPGe" : "MPG";
+  if (isElectricFuelType(fuelType)) {
+    return "MPGe";
+  }
+
+  if (isPlugInHybridFuelType(fuelType)) {
+    return "Gasoline MPG";
+  }
+
+  return "MPG";
 }
 
 function applyFuelTypeLabels(fuelType = fuelTypeSelect.value) {
   const normalized = normalizedFuelType(fuelType);
   const efficiencyLabel = efficiencyLabelPrefix(normalized);
   const isElectric = isElectricFuelType(normalized);
+  const isPlugInHybrid = isPlugInHybridFuelType(normalized);
 
   cityEfficiencyLabel.textContent = `City ${efficiencyLabel}`;
   highwayEfficiencyLabel.textContent = `Highway ${efficiencyLabel}`;
-  evChargingFieldset.hidden = !isElectric;
+  plugInHybridFieldset.hidden = !isPlugInHybrid;
+  chargingFieldset.hidden = !usesChargingFuelType(normalized);
 
   if (isElectric) {
     energyPriceMeanLabel.textContent = "Home electricity price mean ($/kWh)";
     energyPriceStdDevLabel.textContent = "Home electricity price std dev";
+    return;
+  }
+
+  if (isPlugInHybrid) {
+    energyPriceMeanLabel.textContent = "Gasoline price mean ($/gal)";
+    energyPriceStdDevLabel.textContent = "Gasoline price std dev";
     return;
   }
 
@@ -214,19 +322,33 @@ function applyFuelTypeLabels(fuelType = fuelTypeSelect.value) {
 }
 
 function applyEnergyDefaultsForFuelType(fuelType) {
-  const defaults = defaultEnergyPriceProfile(fuelType);
+  const regionProfile = selectedRegionProfile();
+  const defaults = defaultEnergyPriceProfile(fuelType, regionProfile);
   setNumericField("fuelMean", defaults.mean.toFixed(2));
   setNumericField("fuelStdDev", defaults.stdDev.toFixed(2));
 
-  if (!isElectricFuelType(fuelType)) {
-    return;
+  if (usesChargingFuelType(fuelType)) {
+    const chargingDefaults = defaultChargingProfile(regionProfile);
+    setNumericField("homeChargingSharePercent", chargingDefaults.homeSharePercent);
+    setNumericField("chargingLossPercent", chargingDefaults.chargingLossPercent);
+    setNumericField("publicChargingMean", chargingDefaults.publicMean.toFixed(2));
+    setNumericField("publicChargingStdDev", chargingDefaults.publicStdDev.toFixed(2));
   }
 
-  const chargingDefaults = defaultEvChargingProfile();
-  setNumericField("homeChargingSharePercent", chargingDefaults.homeSharePercent);
-  setNumericField("chargingLossPercent", chargingDefaults.chargingLossPercent);
-  setNumericField("publicChargingMean", chargingDefaults.publicMean.toFixed(2));
-  setNumericField("publicChargingStdDev", chargingDefaults.publicStdDev.toFixed(2));
+  if (isPlugInHybridFuelType(fuelType)) {
+    const plugInDefaults = defaultPlugInHybridProfile();
+    setNumericField("plugInElectricDrivingSharePercent", plugInDefaults.electricDrivingSharePercent);
+    setNumericField("plugInCityMilesPerGallonEquivalent", plugInDefaults.cityMpge.toFixed(1));
+    setNumericField("plugInHighwayMilesPerGallonEquivalent", plugInDefaults.highwayMpge.toFixed(1));
+  }
+}
+
+function applyLocationProfileDefaults() {
+  const regionProfile = selectedRegionProfile();
+  setNumericField("salesTaxPercent", regionProfile.salesTaxPercent.toFixed(1));
+  setNumericField("annualRegistration", Math.round(regionProfile.annualRegistration));
+  applyEnergyDefaultsForFuelType(fuelTypeSelect.value);
+  statusLine.textContent = `${regionProfile.label} defaults applied. You can still edit every assumption manually.`;
 }
 
 function showToolFeedback(message, isError = false) {
@@ -572,10 +694,14 @@ function collectFormValues() {
     annualMileageChangePercent: numericValue("annualMileageChangePercent"),
     cityDrivingSharePercent: numericValue("cityDrivingSharePercent"),
     fuelType: normalizedFuelType(fieldValue("fuelType")),
+    locationProfile: fieldValue("locationProfile") || "national",
     homeChargingSharePercent: numericValue("homeChargingSharePercent"),
     chargingLossPercent: numericValue("chargingLossPercent"),
+    plugInElectricDrivingSharePercent: numericValue("plugInElectricDrivingSharePercent"),
     cityMilesPerGallon: numericValue("cityMilesPerGallon"),
     highwayMilesPerGallon: numericValue("highwayMilesPerGallon"),
+    plugInCityMilesPerGallonEquivalent: numericValue("plugInCityMilesPerGallonEquivalent"),
+    plugInHighwayMilesPerGallonEquivalent: numericValue("plugInHighwayMilesPerGallonEquivalent"),
     annualInsurance: numericValue("annualInsurance"),
     annualRegistration: numericValue("annualRegistration"),
     annualParking: numericValue("annualParking"),
@@ -627,7 +753,7 @@ function calculateCombinedMpg(cityShare, cityMpg, highwayMpg) {
 }
 
 function presetDescriptionText(preset) {
-  return `${preset.presetDescription} Prefills purchase price, city/highway MPG, insurance, registration, maintenance, depreciation, resale, and repair-risk assumptions. You can still edit any field manually afterward.`;
+  return `${preset.presetDescription} Prefills purchase price, efficiency, insurance, registration, maintenance, depreciation, resale, and repair-risk assumptions. Plug-in vehicles also preload their electric-driving defaults when available. You can still edit any field manually afterward.`;
 }
 
 function presetLikeFromCatalogEntry(catalogEntry) {
@@ -640,6 +766,9 @@ function presetLikeFromCatalogEntry(catalogEntry) {
     presetCityMilesPerGallon: catalogEntry.catalogCityMpg ?? catalogEntry.catalogCombinedMpg,
     presetHighwayMilesPerGallon: catalogEntry.catalogHighwayMpg ?? catalogEntry.catalogCombinedMpg,
     presetMilesPerGallon: catalogEntry.catalogCombinedMpg,
+    presetElectricDrivingShare: catalogEntry.catalogElectricDrivingShare,
+    presetElectricCityMilesPerGallonEquivalent: catalogEntry.catalogElectricCityMpge,
+    presetElectricHighwayMilesPerGallonEquivalent: catalogEntry.catalogElectricHighwayMpge,
     presetAnnualInsurance: catalogEntry.catalogAnnualInsurance,
     presetAnnualRegistration: catalogEntry.catalogAnnualRegistration,
     presetAnnualMaintenance: catalogEntry.catalogAnnualMaintenance,
@@ -659,6 +788,27 @@ function applyVehiclePreset(preset) {
   setNumericField("purchasePrice", Math.round(preset.presetPurchasePrice));
   setNumericField("cityMilesPerGallon", preset.presetCityMilesPerGallon.toFixed(1));
   setNumericField("highwayMilesPerGallon", preset.presetHighwayMilesPerGallon.toFixed(1));
+  if (preset.presetElectricDrivingShare !== null && preset.presetElectricDrivingShare !== undefined) {
+    setNumericField("plugInElectricDrivingSharePercent", (preset.presetElectricDrivingShare * 100).toFixed(1));
+  }
+  if (
+    preset.presetElectricCityMilesPerGallonEquivalent !== null &&
+    preset.presetElectricCityMilesPerGallonEquivalent !== undefined
+  ) {
+    setNumericField(
+      "plugInCityMilesPerGallonEquivalent",
+      preset.presetElectricCityMilesPerGallonEquivalent.toFixed(1)
+    );
+  }
+  if (
+    preset.presetElectricHighwayMilesPerGallonEquivalent !== null &&
+    preset.presetElectricHighwayMilesPerGallonEquivalent !== undefined
+  ) {
+    setNumericField(
+      "plugInHighwayMilesPerGallonEquivalent",
+      preset.presetElectricHighwayMilesPerGallonEquivalent.toFixed(1)
+    );
+  }
   setNumericField("annualInsurance", Math.round(preset.presetAnnualInsurance));
   setNumericField("annualRegistration", Math.round(preset.presetAnnualRegistration));
   setNumericField("maintenanceMean", Math.round(preset.presetAnnualMaintenance.boundedNormalMean));
@@ -880,6 +1030,9 @@ function buildRequestPayload(values) {
       simulationFuelType: values.fuelType,
       simulationHomeChargingShare: values.homeChargingSharePercent / 100,
       simulationChargingLossRate: values.chargingLossPercent / 100,
+      simulationPlugInElectricDrivingShare: values.plugInElectricDrivingSharePercent / 100,
+      simulationPlugInCityMilesPerGallonEquivalent: values.plugInCityMilesPerGallonEquivalent,
+      simulationPlugInHighwayMilesPerGallonEquivalent: values.plugInHighwayMilesPerGallonEquivalent,
       simulationMilesPerGallon: combinedMilesPerGallon,
       simulationCityMilesPerGallon: values.cityMilesPerGallon,
       simulationHighwayMilesPerGallon: values.highwayMilesPerGallon,
@@ -1359,6 +1512,7 @@ function validateRequiredInteger(errors, values, field, label) {
 
 function validateFormValues(values) {
   const errors = [];
+  const fuelType = normalizedFuelType(values.fuelType);
 
   if (validateRequiredNumber(errors, values, "purchasePrice", "Purchase price") && values.purchasePrice <= 0) {
     pushValidationError(errors, "purchasePrice", "Purchase price must be greater than 0.");
@@ -1414,7 +1568,7 @@ function validateFormValues(values) {
     pushValidationError(errors, "cityDrivingSharePercent", "City driving share must be between 0% and 100%.");
   }
 
-  if (!knownFuelTypes.includes(normalizedFuelType(values.fuelType))) {
+  if (!knownFuelTypes.includes(fuelType)) {
     pushValidationError(
       errors,
       "fuelType",
@@ -1442,6 +1596,56 @@ function validateFormValues(values) {
       "chargingLossPercent",
       "Charging loss must be between 0% and less than 100%."
     );
+  }
+
+  if (isPlugInHybridFuelType(fuelType)) {
+    if (
+      validateRequiredNumber(
+        errors,
+        values,
+        "plugInElectricDrivingSharePercent",
+        "Plug-in electric driving share"
+      ) &&
+      (values.plugInElectricDrivingSharePercent < 0 || values.plugInElectricDrivingSharePercent > 100)
+    ) {
+      pushValidationError(
+        errors,
+        "plugInElectricDrivingSharePercent",
+        "Plug-in electric driving share must be between 0% and 100%."
+      );
+    }
+
+    if (
+      validateRequiredNumber(
+        errors,
+        values,
+        "plugInCityMilesPerGallonEquivalent",
+        "Plug-in city electric efficiency"
+      ) &&
+      values.plugInCityMilesPerGallonEquivalent <= 0
+    ) {
+      pushValidationError(
+        errors,
+        "plugInCityMilesPerGallonEquivalent",
+        "Plug-in city electric efficiency must be greater than 0."
+      );
+    }
+
+    if (
+      validateRequiredNumber(
+        errors,
+        values,
+        "plugInHighwayMilesPerGallonEquivalent",
+        "Plug-in highway electric efficiency"
+      ) &&
+      values.plugInHighwayMilesPerGallonEquivalent <= 0
+    ) {
+      pushValidationError(
+        errors,
+        "plugInHighwayMilesPerGallonEquivalent",
+        "Plug-in highway electric efficiency must be greater than 0."
+      );
+    }
   }
 
   if (
@@ -1806,6 +2010,42 @@ function electricChargingBreakdown(deliveredEnergyUnits, values) {
   };
 }
 
+function plugInElectricDrivingShare(values) {
+  const electricDrivingSharePercent = Number.isFinite(values?.plugInElectricDrivingSharePercent)
+    ? values.plugInElectricDrivingSharePercent
+    : 0;
+  return Math.max(0, Math.min(1, electricDrivingSharePercent / 100));
+}
+
+function plugInDrivingBreakdown(totalMiles, values) {
+  const electricShare = plugInElectricDrivingShare(values);
+  const electricMiles = totalMiles * electricShare;
+  const gasolineMiles = Math.max(0, totalMiles - electricMiles);
+
+  return {
+    electricMiles,
+    gasolineMiles,
+  };
+}
+
+function plugInHybridUsageMetrics(yearlyBreakdown, values) {
+  const totalMiles = yearlyBreakdown.reduce((sum, year) => sum + year.yearlyMilesDriven, 0);
+  const totalFuelGallons = yearlyBreakdown.reduce((sum, year) => sum + year.yearlyFuelGallons, 0);
+  const totalEnergyUnits = yearlyBreakdown.reduce((sum, year) => sum + year.yearlyEnergyUnitsConsumed, 0);
+  const drivingBreakdown = plugInDrivingBreakdown(totalMiles, values);
+
+  return {
+    electricMiles: drivingBreakdown.electricMiles,
+    gasolineMiles: drivingBreakdown.gasolineMiles,
+    totalFuelGallons,
+    totalEnergyUnits,
+    gasolineMilesPerGallon:
+      totalFuelGallons > 0 ? drivingBreakdown.gasolineMiles / totalFuelGallons : null,
+    electricMilesPerKilowattHour:
+      totalEnergyUnits > 0 ? drivingBreakdown.electricMiles / totalEnergyUnits : null,
+  };
+}
+
 function renderSummary(response) {
   const summary = response.responseSummary;
   renderCards(summaryGrid, [
@@ -1856,10 +2096,26 @@ function renderInsights(response) {
   const endingEquity = yearlyBreakdown.length
     ? yearlyBreakdown[yearlyBreakdown.length - 1].yearlyEstimatedEquity
     : 0;
+  const totalFuelGallons = yearlyBreakdown.reduce((sum, year) => sum + year.yearlyFuelGallons, 0);
   const totalEnergyUnits = yearlyBreakdown.reduce((sum, year) => sum + year.yearlyEnergyUnitsConsumed, 0);
-  const blendedEfficiency =
-    totalEnergyUnits > 0 ? summary.summaryTotalMilesDriven / totalEnergyUnits : null;
-  const chargingProfile = isElectricFuelType(fuelType)
+  const plugInMetrics = isPlugInHybridFuelType(fuelType)
+    ? plugInHybridUsageMetrics(yearlyBreakdown, scenarioValues)
+    : null;
+  const efficiencyLabel = isElectricFuelType(fuelType)
+    ? "Delivered sample mi/kWh"
+    : isPlugInHybridFuelType(fuelType)
+      ? "Gas-only sample MPG"
+      : "Blended sample MPG";
+  const efficiencyValue = isElectricFuelType(fuelType)
+    ? totalEnergyUnits > 0
+      ? (summary.summaryTotalMilesDriven / totalEnergyUnits).toFixed(1)
+      : "N/A"
+    : isPlugInHybridFuelType(fuelType)
+      ? plugInMetrics?.gasolineMilesPerGallon?.toFixed(1) || "N/A"
+      : totalFuelGallons > 0
+        ? (summary.summaryTotalMilesDriven / totalFuelGallons).toFixed(1)
+        : "N/A";
+  const chargingProfile = usesChargingFuelType(fuelType)
     ? electricChargingBreakdown(totalEnergyUnits, scenarioValues)
     : null;
   const repairShockShare =
@@ -1881,8 +2137,8 @@ function renderInsights(response) {
       value: formatMiles(summary.summaryTotalMilesDriven),
     },
     {
-      label: isElectricFuelType(fuelType) ? "Delivered sample mi/kWh" : "Blended sample MPG",
-      value: blendedEfficiency === null ? "N/A" : blendedEfficiency.toFixed(1),
+      label: efficiencyLabel,
+      value: efficiencyValue,
     },
     {
       label: "Sampled end equity",
@@ -1897,6 +2153,20 @@ function renderInsights(response) {
       value: repairShockShare === null ? "N/A" : `${Math.round(repairShockShare * 100)}%`,
     },
   ];
+
+  if (plugInMetrics) {
+    insightCards.push({
+      label: "Electric sample mi/kWh",
+      value:
+        plugInMetrics.electricMilesPerKilowattHour === null
+          ? "N/A"
+          : plugInMetrics.electricMilesPerKilowattHour.toFixed(1),
+    });
+    insightCards.push({
+      label: "Sample gas used",
+      value: formatGallons(plugInMetrics.totalFuelGallons),
+    });
+  }
 
   if (chargingProfile) {
     insightCards.push({
@@ -1923,10 +2193,13 @@ function renderYearlyBreakdown(response) {
 
   yearlyGrid.innerHTML = yearlyBreakdown
     .map((year) => {
-      const chargingProfile = isElectricFuelType(fuelType)
+      const chargingProfile = usesChargingFuelType(fuelType)
         ? electricChargingBreakdown(year.yearlyEnergyUnitsConsumed, scenarioValues)
         : null;
-      const energySection = chargingProfile
+      const plugInDriving = isPlugInHybridFuelType(fuelType)
+        ? plugInDrivingBreakdown(year.yearlyMilesDriven, scenarioValues)
+        : null;
+      const energySection = isElectricFuelType(fuelType)
         ? `
             <div><dt>Battery energy used</dt><dd>${formatEnergyUnits(year.yearlyEnergyUnitsConsumed, fuelType)}</dd></div>
             <div><dt>Purchased from grid</dt><dd>${formatEnergyUnits(
@@ -1943,14 +2216,30 @@ function renderYearlyBreakdown(response) {
             )} / ${formatEnergyUnits(year.yearlyHighwayEnergyUnitsConsumed, fuelType)}</dd></div>
             <div><dt>Charging loss</dt><dd>${formatPercentage(chargingProfile.chargingLossPercent)}</dd></div>
           `
+        : isPlugInHybridFuelType(fuelType)
+          ? `
+            <div><dt>Electric + gasoline miles</dt><dd>${formatMiles(
+              plugInDriving.electricMiles
+            )} / ${formatMiles(plugInDriving.gasolineMiles)}</dd></div>
+            <div><dt>Battery energy used</dt><dd>${formatEnergyUnits(year.yearlyEnergyUnitsConsumed, fuelType)}</dd></div>
+            <div><dt>Purchased from grid</dt><dd>${formatEnergyUnits(
+              chargingProfile.purchasedEnergyUnits,
+              fuelType
+            )}</dd></div>
+            <div><dt>Home + public charging</dt><dd>${formatEnergyUnits(
+              chargingProfile.homeEnergyUnits,
+              fuelType
+            )} / ${formatEnergyUnits(chargingProfile.publicEnergyUnits, fuelType)}</dd></div>
+            <div><dt>Gasoline burned</dt><dd>${formatGallons(year.yearlyFuelGallons)}</dd></div>
+            <div><dt>City + highway gas gallons</dt><dd>${formatGallons(
+              year.yearlyCityFuelGallons
+            )} / ${formatGallons(year.yearlyHighwayFuelGallons)}</dd></div>
+            <div><dt>Charging loss</dt><dd>${formatPercentage(chargingProfile.chargingLossPercent)}</dd></div>
+          `
         : `
-            <div><dt>Fuel burned</dt><dd>${formatEnergyUnits(year.yearlyEnergyUnitsConsumed, fuelType)}</dd></div>
-            <div><dt>City + highway ${energyUnitLabel(fuelType)}</dt><dd>${formatEnergyUnits(
-              year.yearlyCityEnergyUnitsConsumed,
-              fuelType
-            )} / ${formatEnergyUnits(
-              year.yearlyHighwayEnergyUnitsConsumed,
-              fuelType
+            <div><dt>Fuel burned</dt><dd>${formatGallons(year.yearlyFuelGallons)}</dd></div>
+            <div><dt>City + highway gallons</dt><dd>${formatGallons(year.yearlyCityFuelGallons)} / ${formatGallons(
+              year.yearlyHighwayFuelGallons
             )}</dd></div>
           `;
 
@@ -2434,6 +2723,10 @@ vehicleTrimSelect.addEventListener("change", () => {
 fuelTypeSelect.addEventListener("change", () => {
   applyFuelTypeLabels(fuelTypeSelect.value);
   applyEnergyDefaultsForFuelType(fuelTypeSelect.value);
+});
+
+locationProfileSelect.addEventListener("change", () => {
+  applyLocationProfileDefaults();
 });
 
 vehicleSearchInput.addEventListener("input", () => {

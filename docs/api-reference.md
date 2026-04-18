@@ -45,6 +45,9 @@ The request body is JSON with this top-level shape:
     "simulationFuelType": "gasoline",
     "simulationHomeChargingShare": 0.82,
     "simulationChargingLossRate": 0.1,
+    "simulationPlugInElectricDrivingShare": 0.65,
+    "simulationPlugInCityMilesPerGallonEquivalent": 90,
+    "simulationPlugInHighwayMilesPerGallonEquivalent": 80,
     "simulationMilesPerGallon": 32,
     "simulationCityMilesPerGallon": 28,
     "simulationHighwayMilesPerGallon": 38,
@@ -105,13 +108,23 @@ The request body is JSON with this top-level shape:
 - `simulationFuelType` controls whether the energy-price distribution is
   interpreted as dollars per gallon or dollars per kWh
 - `simulationHomeChargingShare` and `simulationChargingLossRate` only affect
-  EV scenarios
+  plug-in scenarios
   - they model how much charging happens at home and how much purchased
     electricity is lost before it reaches the battery
+- `simulationPlugInElectricDrivingShare` is only used for plug-in hybrids
+  - it estimates what share of modeled miles stay on electricity before the
+    gasoline engine is needed
+- `simulationPlugInCityMilesPerGallonEquivalent` and
+  `simulationPlugInHighwayMilesPerGallonEquivalent` are only used for plug-in
+  hybrids
+  - they represent EV-mode efficiency, while
+    `simulationCityMilesPerGallon` and `simulationHighwayMilesPerGallon`
+    remain the gasoline-mode efficiency inputs
 - `simulationFuelPrice` is the main energy-price distribution
   - for gasoline-like vehicles it is fuel price per gallon
   - for EVs it is home electricity price per kWh
-- `simulationPublicChargingPrice` is only used for EVs
+  - for plug-in hybrids it remains the gasoline price per gallon
+- `simulationPublicChargingPrice` is only used for plug-in scenarios
   - it models away-from-home charging price per kWh
 - `simulationMilesPerGallon` is the derived blended efficiency for the chosen
   city/highway split

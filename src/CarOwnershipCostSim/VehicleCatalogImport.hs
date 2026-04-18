@@ -162,12 +162,19 @@ data FuelEconomyVehicleRecord = FuelEconomyVehicleRecord
     fuelEconomyVehicleModel :: String,
     fuelEconomyVehicleBaseModel :: Maybe String,
     fuelEconomyVehicleFuelType :: String,
+    fuelEconomyVehicleReportedFuelType :: Maybe String,
+    fuelEconomyVehicleSecondaryFuelType :: Maybe String,
     fuelEconomyVehicleAtvType :: Maybe String,
+    fuelEconomyVehicleEngineDescriptor :: Maybe String,
     fuelEconomyVehicleDrive :: Maybe String,
     fuelEconomyVehicleClass :: Maybe String,
     fuelEconomyVehicleCombinedMpg :: Double,
     fuelEconomyVehicleCityMpg :: Maybe Double,
-    fuelEconomyVehicleHighwayMpg :: Maybe Double
+    fuelEconomyVehicleHighwayMpg :: Maybe Double,
+    fuelEconomyVehicleElectricCombinedMpge :: Maybe Double,
+    fuelEconomyVehicleElectricCityMpge :: Maybe Double,
+    fuelEconomyVehicleElectricHighwayMpge :: Maybe Double,
+    fuelEconomyVehicleElectricDrivingShare :: Maybe Double
   }
   deriving (Eq, Show, Generic)
 
@@ -220,10 +227,17 @@ parseFuelEconomyVehicleRecord rawXml = do
   combinedMpg <- parseRequiredDoubleTag "comb08" rawXml
   let cityMpg = parseOptionalDoubleTag "city08" rawXml
       highwayMpg = parseOptionalDoubleTag "highway08" rawXml
+      reportedFuelType = emptyToNothing =<< findLastTagValue "fuelType" rawXml
+      secondaryFuelType = emptyToNothing =<< findLastTagValue "fuelType2" rawXml
       baseModel = emptyToNothing =<< findLastTagValue "baseModel" rawXml
       atvType = emptyToNothing =<< findLastTagValue "atvType" rawXml
+      engineDescriptor = emptyToNothing =<< findLastTagValue "eng_dscr" rawXml
       driveType = emptyToNothing =<< findLastTagValue "drive" rawXml
       vehicleClass = emptyToNothing =<< findLastTagValue "VClass" rawXml
+      electricCombinedMpge = parsePositiveOptionalDoubleTag "combA08" rawXml
+      electricCityMpge = parsePositiveOptionalDoubleTag "cityA08" rawXml
+      electricHighwayMpge = parsePositiveOptionalDoubleTag "highwayA08" rawXml
+      electricDrivingShare = parsePositiveOptionalDoubleTag "combinedUF" rawXml
   pure
     FuelEconomyVehicleRecord
       { fuelEconomyVehicleYear = vehicleYear,
@@ -231,12 +245,19 @@ parseFuelEconomyVehicleRecord rawXml = do
         fuelEconomyVehicleModel = vehicleModel,
         fuelEconomyVehicleBaseModel = baseModel,
         fuelEconomyVehicleFuelType = fuelType,
+        fuelEconomyVehicleReportedFuelType = reportedFuelType,
+        fuelEconomyVehicleSecondaryFuelType = secondaryFuelType,
         fuelEconomyVehicleAtvType = atvType,
+        fuelEconomyVehicleEngineDescriptor = engineDescriptor,
         fuelEconomyVehicleDrive = driveType,
         fuelEconomyVehicleClass = vehicleClass,
         fuelEconomyVehicleCombinedMpg = combinedMpg,
         fuelEconomyVehicleCityMpg = cityMpg,
-        fuelEconomyVehicleHighwayMpg = highwayMpg
+        fuelEconomyVehicleHighwayMpg = highwayMpg,
+        fuelEconomyVehicleElectricCombinedMpge = electricCombinedMpge,
+        fuelEconomyVehicleElectricCityMpge = electricCityMpge,
+        fuelEconomyVehicleElectricHighwayMpge = electricHighwayMpge,
+        fuelEconomyVehicleElectricDrivingShare = electricDrivingShare
       }
 
 -- | Parse the subset of FuelEconomy.gov menu XML used by the discovery helper.
@@ -494,28 +515,65 @@ fuelEconomyProfileFromRecord fuelEconomyVehicle =
     { fuelEconomyFuelType = normalizedFuelType fuelEconomyVehicle,
       fuelEconomyCombinedMpg = fuelEconomyVehicleCombinedMpg fuelEconomyVehicle,
       fuelEconomyCityMpg = fuelEconomyVehicleCityMpg fuelEconomyVehicle,
-      fuelEconomyHighwayMpg = fuelEconomyVehicleHighwayMpg fuelEconomyVehicle
+      fuelEconomyHighwayMpg = fuelEconomyVehicleHighwayMpg fuelEconomyVehicle,
+      fuelEconomyElectricDrivingShare = fuelEconomyVehicleElectricDrivingShare fuelEconomyVehicle,
+      fuelEconomyElectricCombinedMpge = fuelEconomyVehicleElectricCombinedMpge fuelEconomyVehicle,
+      fuelEconomyElectricCityMpge = fuelEconomyVehicleElectricCityMpge fuelEconomyVehicle,
+      fuelEconomyElectricHighwayMpge = fuelEconomyVehicleElectricHighwayMpge fuelEconomyVehicle
     }
 
 normalizedFuelType :: FuelEconomyVehicleRecord -> String
 normalizedFuelType fuelEconomyVehicle =
-  normalizeFuelType (fuelEconomyVehicleFuelType fuelEconomyVehicle) (fuelEconomyVehicleAtvType fuelEconomyVehicle)
+  normalizeFuelType
+    (fuelEconomyVehicleFuelType fuelEconomyVehicle)
+    (fuelEconomyVehicleReportedFuelType fuelEconomyVehicle)
+    (fuelEconomyVehicleSecondaryFuelType fuelEconomyVehicle)
+    (fuelEconomyVehicleAtvType fuelEconomyVehicle)
+    (Just (fuelEconomyVehicleModel fuelEconomyVehicle))
+    (fuelEconomyVehicleEngineDescriptor fuelEconomyVehicle)
 
-normalizeFuelType :: String -> Maybe String -> String
-normalizeFuelType rawFuelType rawAtvType
-  | "plug-in" `isInfixOf` atvType = "plug-in-hybrid"
-  | "phev" `isInfixOf` atvType = "plug-in-hybrid"
-  | "electric" `isInfixOf` fuelType = "electric"
-  | "ev" `isInfixOf` atvType = "electric"
+normalizeFuelType :: String -> Maybe String -> Maybe String -> Maybe String -> Maybe String -> Maybe String -> String
+normalizeFuelType rawFuelType rawReportedFuelType rawSecondaryFuelType rawAtvType rawModel rawEngineDescriptor
+  | mentionsPlugIn = "plug-in-hybrid"
+  | mentionsElectric && mentionsLiquidFuel = "plug-in-hybrid"
+  | mentionsElectric = "electric"
   | "hybrid" `isInfixOf` atvType = "hybrid-gasoline"
-  | "diesel" `isInfixOf` fuelType = "diesel"
-  | "gasoline" `isInfixOf` fuelType = "gasoline"
-  | "regular" `isInfixOf` fuelType = "gasoline"
-  | "premium" `isInfixOf` fuelType = "gasoline"
+  | "hybrid" `isInfixOf` engineDescriptor = "hybrid-gasoline"
+  | "diesel" `isInfixOf` fuelSignals = "diesel"
+  | "gasoline" `isInfixOf` fuelSignals = "gasoline"
+  | "regular" `isInfixOf` fuelSignals = "gasoline"
+  | "premium" `isInfixOf` fuelSignals = "gasoline"
   | otherwise = kebabCase rawFuelType
   where
-    fuelType = normalizeComparable rawFuelType
+    fuelSignals =
+      normalizeComparable rawFuelType
+        <> maybe "" normalizeComparable rawReportedFuelType
+        <> maybe "" normalizeComparable rawSecondaryFuelType
     atvType = maybe "" normalizeComparable rawAtvType
+    modelName = maybe "" normalizeComparable rawModel
+    engineDescriptor = maybe "" normalizeComparable rawEngineDescriptor
+    mentionsPlugIn =
+      or
+        [ "plugin" `isInfixOf` atvType,
+          "phev" `isInfixOf` atvType,
+          "plugin" `isInfixOf` modelName,
+          "phev" `isInfixOf` modelName,
+          "plugin" `isInfixOf` engineDescriptor,
+          "phev" `isInfixOf` engineDescriptor
+        ]
+    mentionsElectric =
+      or
+        [ "electric" `isInfixOf` fuelSignals,
+          "electric" `isInfixOf` atvType,
+          "ev" `isInfixOf` atvType
+        ]
+    mentionsLiquidFuel =
+      or
+        [ "gasoline" `isInfixOf` fuelSignals,
+          "regular" `isInfixOf` fuelSignals,
+          "premium" `isInfixOf` fuelSignals,
+          "diesel" `isInfixOf` fuelSignals
+        ]
 
 assertVpicBaseModelFound :: String -> [VpicModelResult] -> Either String ()
 assertVpicBaseModelFound expectedBaseModel vpicModels =
@@ -605,6 +663,11 @@ parseOptionalDoubleTag tagName rawXml = do
   case reads rawValue of
     [(numericValue, "")] -> Just numericValue
     _ -> Nothing
+
+parsePositiveOptionalDoubleTag :: String -> String -> Maybe Double
+parsePositiveOptionalDoubleTag tagName rawXml = do
+  numericValue <- parseOptionalDoubleTag tagName rawXml
+  if numericValue > 0 then Just numericValue else Nothing
 
 parseIntValue :: String -> String -> Either String Int
 parseIntValue label rawValue =

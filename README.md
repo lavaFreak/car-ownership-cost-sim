@@ -22,7 +22,10 @@ The app asks for values such as:
 - miles driven per year
 - annual mileage change over time
 - city-driving share plus city and highway efficiency
-- EV charging mix, home/public electricity pricing, and charging loss
+- fuel / powertrain type
+- plug-in hybrid electric-driving share plus EV-mode efficiency when relevant
+- plug-in charging mix, home/public electricity pricing, and charging loss
+- region-aware starter defaults for tax, registration, and energy pricing
 - yearly insurance, registration, parking, tolls, and inspection
 - tire replacement assumptions
 - assumptions about energy price, maintenance, and depreciation
@@ -166,6 +169,7 @@ The yearly model now also applies:
 - annual mileage change so fuel use and tire wear can grow or shrink over time
 - city/highway energy use using a configurable city-driving share instead of one flat efficiency assumption
 - EV charging cost modeling that uses electricity price per kWh instead of gasoline price, including home/public charging mix and charging-loss overhead
+- plug-in hybrid cost modeling that splits miles between electricity and gasoline using EV-mode MPGe plus a configurable electric-driving share
 - loan amortization with interest tracked separately from principal in the yearly breakdown
 - a first-year resale hit on top of the sampled annual depreciation rate
 - a residual value floor so resale cannot fall below a configured minimum
@@ -174,6 +178,9 @@ The yearly model now also applies:
 
 This is still intentionally compact, but it now captures more of the front
 loaded and tail-risk behavior that matters in real ownership decisions.
+The browser also now offers region profiles that prefill sales tax,
+registration, gasoline, diesel, and electricity assumptions while still
+leaving every field editable.
 
 ## Current API
 

@@ -137,9 +137,14 @@ simulateDetailedCostBreakdown simulationInput initialGen =
       fuelType = normalizeFuelType (simulationFuelType simulationInput)
       homeChargingShare = clampUnitInterval (simulationHomeChargingShare simulationInput)
       chargingLossRate = clampChargingLossRate (simulationChargingLossRate simulationInput)
+      plugInElectricDrivingShare = clampUnitInterval (simulationPlugInElectricDrivingShare simulationInput)
       combinedMilesPerGallon = max 0 (simulationMilesPerGallon simulationInput)
       cityMilesPerGallon = positiveOrFallback (simulationCityMilesPerGallon simulationInput) combinedMilesPerGallon
       highwayMilesPerGallon = positiveOrFallback (simulationHighwayMilesPerGallon simulationInput) combinedMilesPerGallon
+      plugInElectricCityMilesPerGallonEquivalent =
+        positiveOrFallback (simulationPlugInCityMilesPerGallonEquivalent simulationInput) cityMilesPerGallon
+      plugInElectricHighwayMilesPerGallonEquivalent =
+        positiveOrFallback (simulationPlugInHighwayMilesPerGallonEquivalent simulationInput) highwayMilesPerGallon
       annualInsuranceCost = max 0 (simulationAnnualInsurance simulationInput)
       annualRegistrationCost = max 0 (simulationAnnualRegistration simulationInput)
       annualParkingCost = max 0 (simulationAnnualParking simulationInput)
@@ -162,8 +167,11 @@ simulateDetailedCostBreakdown simulationInput initialGen =
           fuelType
           homeChargingShare
           chargingLossRate
+          plugInElectricDrivingShare
           cityMilesPerGallon
           highwayMilesPerGallon
+          plugInElectricCityMilesPerGallonEquivalent
+          plugInElectricHighwayMilesPerGallonEquivalent
           (simulationFuelPrice simulationInput)
           (simulationPublicChargingPrice simulationInput)
           (simulationAnnualMaintenance simulationInput)
@@ -275,6 +283,9 @@ simulateYears ::
   Double ->
   Double ->
   Double ->
+  Double ->
+  Double ->
+  Double ->
   BoundedNormal ->
   BoundedNormal ->
   BoundedNormal ->
@@ -289,7 +300,7 @@ simulateYears ::
   Double ->
   StdGen ->
   ([SampledYear], StdGen)
-simulateYears yearsRemaining carValue baseAnnualMiles annualMileageChangeRate cityDrivingShare fuelType homeChargingShare chargingLossRate cityMilesPerGallon highwayMilesPerGallon fuelModel publicChargingPriceModel maintenanceModel repairShockProbability repairShockModel depreciationModel tireReplacementCost tireLifeMiles firstYearDepreciationBonus residualValueFloorPercent expectedAnnualMilesForResale extraMileageDepreciationPerMile initialGen =
+simulateYears yearsRemaining carValue baseAnnualMiles annualMileageChangeRate cityDrivingShare fuelType homeChargingShare chargingLossRate plugInElectricDrivingShare cityMilesPerGallon highwayMilesPerGallon plugInElectricCityMilesPerGallonEquivalent plugInElectricHighwayMilesPerGallonEquivalent fuelModel publicChargingPriceModel maintenanceModel repairShockProbability repairShockModel depreciationModel tireReplacementCost tireLifeMiles firstYearDepreciationBonus residualValueFloorPercent expectedAnnualMilesForResale extraMileageDepreciationPerMile initialGen =
   go yearsRemaining 1 carValue 0 [] initialGen
   where
     go 0 _ _ _ acc gen = (reverse acc, gen)
@@ -297,19 +308,26 @@ simulateYears yearsRemaining carValue baseAnnualMiles annualMileageChangeRate ci
       let yearlyMiles = annualMilesForYear baseAnnualMiles annualMileageChangeRate yearIndex
           cityMiles = yearlyMiles * cityDrivingShare
           highwayMiles = max 0 (yearlyMiles - cityMiles)
-          cityEnergyUnits = energyUnitsDrivenForYear fuelType cityMiles cityMilesPerGallon
-          highwayEnergyUnits = energyUnitsDrivenForYear fuelType highwayMiles highwayMilesPerGallon
+          electricDrivingShare = effectiveElectricDrivingShare fuelType plugInElectricDrivingShare
+          cityElectricMiles = cityMiles * electricDrivingShare
+          highwayElectricMiles = highwayMiles * electricDrivingShare
+          cityLiquidFuelMiles = max 0 (cityMiles - cityElectricMiles)
+          highwayLiquidFuelMiles = max 0 (highwayMiles - highwayElectricMiles)
+          electricCityEfficiency = electricEfficiencyForFuelType fuelType plugInElectricCityMilesPerGallonEquivalent cityMilesPerGallon
+          electricHighwayEfficiency = electricEfficiencyForFuelType fuelType plugInElectricHighwayMilesPerGallonEquivalent highwayMilesPerGallon
+          cityEnergyUnits = deliveredElectricEnergyForMiles fuelType cityElectricMiles electricCityEfficiency
+          highwayEnergyUnits = deliveredElectricEnergyForMiles fuelType highwayElectricMiles electricHighwayEfficiency
           annualEnergyUnits = cityEnergyUnits + highwayEnergyUnits
-          cityGallons = liquidFuelGallonsForYear fuelType cityMiles cityMilesPerGallon
-          highwayGallons = liquidFuelGallonsForYear fuelType highwayMiles highwayMilesPerGallon
+          cityGallons = liquidFuelGallonsForYear fuelType cityLiquidFuelMiles cityMilesPerGallon
+          highwayGallons = liquidFuelGallonsForYear fuelType highwayLiquidFuelMiles highwayMilesPerGallon
           annualGallons = cityGallons + highwayGallons
           annualPurchasedEnergyUnits = purchasedEnergyUnitsForYear fuelType annualEnergyUnits chargingLossRate
           homePurchasedEnergyUnits =
-            if isElectricFuelType fuelType
+            if usesGridCharging fuelType
               then annualPurchasedEnergyUnits * homeChargingShare
-              else annualPurchasedEnergyUnits
+              else 0
           publicPurchasedEnergyUnits =
-            if isElectricFuelType fuelType
+            if usesGridCharging fuelType
               then max 0 (annualPurchasedEnergyUnits - homePurchasedEnergyUnits)
               else 0
           tireCost =
@@ -326,13 +344,13 @@ simulateYears yearsRemaining carValue baseAnnualMiles annualMileageChangeRate ci
               actualCumulativeMiles
           (fuelPrice, gen1) = sampleBoundedNormal fuelModel gen0
           (publicChargingPrice, gen2) =
-            if isElectricFuelType fuelType
+            if usesGridCharging fuelType
               then sampleBoundedNormal publicChargingPriceModel gen1
               else (0, gen1)
           annualEnergyCost =
-            if isElectricFuelType fuelType
-              then homePurchasedEnergyUnits * fuelPrice + publicPurchasedEnergyUnits * publicChargingPrice
-              else annualEnergyUnits * fuelPrice
+            annualGallons * fuelPrice
+              + homePurchasedEnergyUnits * fuelPrice
+              + publicPurchasedEnergyUnits * publicChargingPrice
           (maintenanceCost, gen3) = sampleBoundedNormal maintenanceModel gen2
           (repairShockRoll, gen4) = randomR (0.0, 1.0 :: Double) gen3
           (repairShockCost, gen5) =
@@ -605,15 +623,15 @@ gallonsDrivenForYear yearlyMiles milesPerGallon
   | milesPerGallon <= 0 = 0
   | otherwise = yearlyMiles / milesPerGallon
 
-energyUnitsDrivenForYear :: String -> Double -> Double -> Double
-energyUnitsDrivenForYear fuelType yearlyMiles efficiency
-  | isElectricFuelType fuelType = electricKilowattHoursForYear yearlyMiles efficiency
-  | otherwise = gallonsDrivenForYear yearlyMiles efficiency
+deliveredElectricEnergyForMiles :: String -> Double -> Double -> Double
+deliveredElectricEnergyForMiles fuelType yearlyMiles efficiency
+  | usesGridCharging fuelType = electricKilowattHoursForYear yearlyMiles efficiency
+  | otherwise = 0
 
 liquidFuelGallonsForYear :: String -> Double -> Double -> Double
 liquidFuelGallonsForYear fuelType yearlyMiles efficiency
-  | isElectricFuelType fuelType = 0
-  | otherwise = gallonsDrivenForYear yearlyMiles efficiency
+  | usesLiquidFuel fuelType = gallonsDrivenForYear yearlyMiles efficiency
+  | otherwise = 0
 
 electricKilowattHoursForYear :: Double -> Double -> Double
 electricKilowattHoursForYear yearlyMiles milesPerGallonEquivalent
@@ -622,8 +640,8 @@ electricKilowattHoursForYear yearlyMiles milesPerGallonEquivalent
 
 purchasedEnergyUnitsForYear :: String -> Double -> Double -> Double
 purchasedEnergyUnitsForYear fuelType energyUnits chargingLossRate
-  | isElectricFuelType fuelType = purchasedElectricKilowattHours energyUnits chargingLossRate
-  | otherwise = energyUnits
+  | usesGridCharging fuelType = purchasedElectricKilowattHours energyUnits chargingLossRate
+  | otherwise = 0
 
 purchasedElectricKilowattHours :: Double -> Double -> Double
 purchasedElectricKilowattHours deliveredKilowattHours chargingLossRate
@@ -643,6 +661,29 @@ normalizeFuelType rawFuelType
 isElectricFuelType :: String -> Bool
 isElectricFuelType fuelType =
   normalizeFuelType fuelType == "electric"
+
+isPlugInHybridFuelType :: String -> Bool
+isPlugInHybridFuelType fuelType =
+  normalizeFuelType fuelType == "plug-in-hybrid"
+
+usesGridCharging :: String -> Bool
+usesGridCharging fuelType =
+  isElectricFuelType fuelType || isPlugInHybridFuelType fuelType
+
+usesLiquidFuel :: String -> Bool
+usesLiquidFuel fuelType =
+  not (isElectricFuelType fuelType)
+
+effectiveElectricDrivingShare :: String -> Double -> Double
+effectiveElectricDrivingShare fuelType plugInElectricDrivingShare
+  | isElectricFuelType fuelType = 1
+  | isPlugInHybridFuelType fuelType = clampUnitInterval plugInElectricDrivingShare
+  | otherwise = 0
+
+electricEfficiencyForFuelType :: String -> Double -> Double -> Double
+electricEfficiencyForFuelType fuelType plugInEfficiency fallbackEfficiency
+  | isPlugInHybridFuelType fuelType = positiveOrFallback plugInEfficiency fallbackEfficiency
+  | otherwise = fallbackEfficiency
 
 clampChargingLossRate :: Double -> Double
 clampChargingLossRate =
@@ -717,9 +758,18 @@ validateSimulationInput simulationInput =
       require (simulationHomeChargingShare simulationInput <= 1) "Home charging share should be expressed as a decimal between 0 and 1.",
       require (simulationChargingLossRate simulationInput >= 0) "Charging loss rate cannot be negative.",
       require (simulationChargingLossRate simulationInput < 1) "Charging loss rate should be expressed as a decimal between 0 and less than 1.",
+      require (simulationPlugInElectricDrivingShare simulationInput >= 0) "Plug-in electric driving share cannot be negative.",
+      require (simulationPlugInElectricDrivingShare simulationInput <= 1) "Plug-in electric driving share should be expressed as a decimal between 0 and 1.",
       require (simulationMilesPerGallon simulationInput > 0) "Combined efficiency must be greater than 0.",
       require (simulationCityMilesPerGallon simulationInput > 0) "City efficiency must be greater than 0.",
       require (simulationHighwayMilesPerGallon simulationInput > 0) "Highway efficiency must be greater than 0.",
+      if isPlugInHybridFuelType (simulationFuelType simulationInput)
+        then
+          concat
+            [ require (simulationPlugInCityMilesPerGallonEquivalent simulationInput > 0) "Plug-in city electric efficiency must be greater than 0.",
+              require (simulationPlugInHighwayMilesPerGallonEquivalent simulationInput > 0) "Plug-in highway electric efficiency must be greater than 0."
+            ]
+        else [],
       require (simulationAnnualInsurance simulationInput >= 0) "Insurance cost cannot be negative.",
       require (simulationAnnualRegistration simulationInput >= 0) "Registration cost cannot be negative.",
       require (simulationAnnualParking simulationInput >= 0) "Parking cost cannot be negative.",

@@ -30,7 +30,8 @@ The frontend controller currently does six jobs:
 The scenario form is grouped into these sections:
 
 - vehicle and usage
-- EV charging mix
+- plug-in hybrid electric usage
+- plug-in charging mix
 - fixed annual costs
 - wear items
 - financing
@@ -53,7 +54,7 @@ Those lookup controls intentionally:
 - autofill car-specific defaults such as city/highway efficiency, fuel type,
   and maintenance
   assumptions
-- switch the EV-specific charging controls on automatically for electric
+- switch the charging controls on automatically for electric and plug-in hybrid
   catalog entries while still leaving every value editable
 - keep the exact-match dropdown in sync with the current filters and search
   text
@@ -68,7 +69,10 @@ Presets intentionally:
 - prefill vehicle-specific defaults such as city/highway efficiency, fuel type,
   energy-price assumptions, and maintenance
   assumptions
-- apply EV-friendly charging defaults when the selected vehicle is electric
+- apply plug-in-friendly charging defaults when the selected vehicle is
+  electric or plug-in hybrid
+- prefill plug-in hybrid electric-driving share and EV-mode MPGe when the
+  catalog has that data
 - leave scenario-specific choices like mileage and financing under user control
 - come from the local catalog so they stay reproducible
 
@@ -91,6 +95,7 @@ The frontend maintains a URL-backed scenario state:
 - form fields are serialized into the query string
 - opening a shared link restores the scenario fields
 - presets can be part of that shared state as well
+- region profile defaults can be part of that shared state as well
 
 This is useful for debugging, demos, and comparing scenarios without requiring
 accounts or persistence.
@@ -121,8 +126,8 @@ The frontend currently renders five views of the simulation response:
 - one sampled scenario
   - category-level breakdown for a single path
 - yearly snapshot
-  - annual timeline for that sampled path, including city/highway energy split
-    and EV charging-overhead details when relevant
+  - annual timeline for that sampled path, including gasoline gallons,
+    electricity use, and charging-overhead details when relevant
 
 Two simple canvas charts complement those cards:
 

@@ -89,6 +89,7 @@ tests =
       TestLabel "vPIC fixtures decode model listings" vpicFixtureDecodingTest,
       TestLabel "FuelEconomy menus decode cleanly" fuelEconomyMenuDecodingTest,
       TestLabel "FuelEconomy fixtures decode vehicle details" fuelEconomyFixtureDecodingTest,
+      TestLabel "plug-in hybrid imports preserve mixed fuel data" plugInHybridImportTest,
       TestLabel "source seeds build catalog entries from official fixtures" sourceSeedCatalogBuildTest,
       TestLabel "roster seeds build catalog entries from official fixtures" rosterSeedCatalogBuildTest,
       TestLabel "FuelEconomy options can suggest roster seeds" fuelEconomyRosterSuggestionTest,
@@ -129,6 +130,9 @@ deterministicCashPurchaseTest =
                     simulationFuelType = "gasoline",
                     simulationHomeChargingShare = 0,
                     simulationChargingLossRate = 0,
+                    simulationPlugInElectricDrivingShare = 0,
+                    simulationPlugInCityMilesPerGallonEquivalent = 0,
+                    simulationPlugInHighwayMilesPerGallonEquivalent = 0,
                     simulationMilesPerGallon = 30,
                     simulationCityMilesPerGallon = 30,
                     simulationHighwayMilesPerGallon = 30,
@@ -220,6 +224,9 @@ purchaseTaxAndFeesTest =
                     simulationFuelType = "gasoline",
                     simulationHomeChargingShare = 0,
                     simulationChargingLossRate = 0,
+                    simulationPlugInElectricDrivingShare = 0,
+                    simulationPlugInCityMilesPerGallonEquivalent = 0,
+                    simulationPlugInHighwayMilesPerGallonEquivalent = 0,
                     simulationMilesPerGallon = 30,
                     simulationCityMilesPerGallon = 30,
                     simulationHighwayMilesPerGallon = 30,
@@ -302,6 +309,9 @@ inflationTest =
                     simulationFuelType = "gasoline",
                     simulationHomeChargingShare = 0,
                     simulationChargingLossRate = 0,
+                    simulationPlugInElectricDrivingShare = 0,
+                    simulationPlugInCityMilesPerGallonEquivalent = 0,
+                    simulationPlugInHighwayMilesPerGallonEquivalent = 0,
                     simulationMilesPerGallon = 30,
                     simulationCityMilesPerGallon = 30,
                     simulationHighwayMilesPerGallon = 30,
@@ -389,6 +399,9 @@ repairShockTest =
                     simulationFuelType = "gasoline",
                     simulationHomeChargingShare = 0,
                     simulationChargingLossRate = 0,
+                    simulationPlugInElectricDrivingShare = 0,
+                    simulationPlugInCityMilesPerGallonEquivalent = 0,
+                    simulationPlugInHighwayMilesPerGallonEquivalent = 0,
                     simulationMilesPerGallon = 30,
                     simulationCityMilesPerGallon = 30,
                     simulationHighwayMilesPerGallon = 30,
@@ -782,7 +795,11 @@ catalogImportSeedTest =
                     { fuelEconomyFuelType = "hybrid-gasoline",
                       fuelEconomyCombinedMpg = 57,
                       fuelEconomyCityMpg = Just 57,
-                      fuelEconomyHighwayMpg = Just 56
+                      fuelEconomyHighwayMpg = Just 56,
+                      fuelEconomyElectricDrivingShare = Nothing,
+                      fuelEconomyElectricCombinedMpge = Nothing,
+                      fuelEconomyElectricCityMpge = Nothing,
+                      fuelEconomyElectricHighwayMpge = Nothing
                     },
                 importPurchasePrice = 28900,
                 importAnnualInsurance = 1700,
@@ -882,6 +899,7 @@ fuelEconomyFixtureDecodingTest =
   TestCase $ do
     corollaFixture <- loadFixture "test/fixtures/fueleconomy/vehicle-47339.xml"
     civicFixture <- loadFixture "test/fixtures/fueleconomy/vehicle-47097.xml"
+    priusPrimeFixture <- loadFixture "test/fixtures/fueleconomy/vehicle-49014.xml"
     corollaVehicle <-
       either
         (\decodeError -> assertFailure ("Corolla FuelEconomy fixture did not decode: " <> decodeError) >> pure fallbackFuelEconomyVehicleRecord)
@@ -892,12 +910,56 @@ fuelEconomyFixtureDecodingTest =
         (\decodeError -> assertFailure ("Civic FuelEconomy fixture did not decode: " <> decodeError) >> pure fallbackFuelEconomyVehicleRecord)
         pure
         (parseFuelEconomyVehicleRecord civicFixture)
+    priusPrimeVehicle <-
+      either
+        (\decodeError -> assertFailure ("Prius Prime FuelEconomy fixture did not decode: " <> decodeError) >> pure fallbackFuelEconomyVehicleRecord)
+        pure
+        (parseFuelEconomyVehicleRecord priusPrimeFixture)
     assertEqual "Corolla base model is preserved" (Just "Corolla") (fuelEconomyVehicleBaseModel corollaVehicle)
     assertClose "Corolla combined MPG comes from official data" 50 (fuelEconomyVehicleCombinedMpg corollaVehicle)
     assertEqual "Civic make is preserved" "Honda" (fuelEconomyVehicleMake civicVehicle)
     assertClose "Civic city MPG comes from official data" 31 (maybe 0 id (fuelEconomyVehicleCityMpg civicVehicle))
     assertEqual "Corolla drive type is preserved" (Just "Front-Wheel Drive") (fuelEconomyVehicleDrive corollaVehicle)
     assertEqual "Corolla vehicle class is preserved" (Just "Compact Cars") (fuelEconomyVehicleClass corollaVehicle)
+    assertEqual "Prius Prime keeps its combined fuel-type label" (Just "Regular Gas and Electricity") (fuelEconomyVehicleReportedFuelType priusPrimeVehicle)
+    assertEqual "Prius Prime keeps its secondary electric fuel type" (Just "Electricity") (fuelEconomyVehicleSecondaryFuelType priusPrimeVehicle)
+    assertEqual "Prius Prime keeps its plug-in ATV type" (Just "Plug-in Hybrid") (fuelEconomyVehicleAtvType priusPrimeVehicle)
+    assertEqual "Prius Prime keeps its electric driving share" (Just 0.677) (fuelEconomyVehicleElectricDrivingShare priusPrimeVehicle)
+    assertEqual "Prius Prime keeps its electric combined MPGe" (Just 114) (fuelEconomyVehicleElectricCombinedMpge priusPrimeVehicle)
+    assertEqual "Prius Prime keeps its electric city MPGe" (Just 125) (fuelEconomyVehicleElectricCityMpge priusPrimeVehicle)
+    assertEqual "Prius Prime keeps its electric highway MPGe" (Just 103) (fuelEconomyVehicleElectricHighwayMpge priusPrimeVehicle)
+
+plugInHybridImportTest :: Test
+plugInHybridImportTest =
+  TestCase $ do
+    priusPrimeFuelEconomyVehicle <- decodeFuelEconomyFixture "test/fixtures/fueleconomy/vehicle-49014.xml"
+    let rosterSeed =
+          VehicleCatalogRosterSeed
+            { rosterCatalogId = "prius-prime-se-2025",
+              rosterDescription = Nothing,
+              rosterYear = 2025,
+              rosterMake = "Toyota",
+              rosterCatalogModel = "Prius Prime",
+              rosterTrim = "SE",
+              rosterBaseModel = "Prius Prime",
+              rosterVpicBaseModel = Just "Prius",
+              rosterFuelEconomyVehicleId = 49014,
+              rosterPurchasePrice = Nothing,
+              rosterSourceUpdatedAt = "2026-04-18"
+            }
+        vpicModels =
+          [ VpicModelResult {vpicResultMakeName = "Toyota", vpicResultModelName = "Prius"},
+            VpicModelResult {vpicResultMakeName = "Toyota", vpicResultModelName = "Corolla"}
+          ]
+    importSeed <-
+      either
+        (\decodeError -> assertFailure ("Plug-in hybrid roster import did not build: " <> decodeError) >> pure fallbackCatalogImportSeed)
+        pure
+        (buildCatalogImportSeedFromRosterSeed rosterSeed vpicModels priusPrimeFuelEconomyVehicle)
+    assertEqual "plug-in hybrid imports normalize the mixed fuel type" "plug-in-hybrid" (fuelEconomyFuelType (importFuelEconomy importSeed))
+    assertEqual "plug-in hybrid imports keep the electric-driving share" (Just 0.677) (fuelEconomyElectricDrivingShare (importFuelEconomy importSeed))
+    assertEqual "plug-in hybrid imports keep electric city MPGe" (Just 125) (fuelEconomyElectricCityMpge (importFuelEconomy importSeed))
+    assertEqual "plug-in hybrid imports keep electric highway MPGe" (Just 103) (fuelEconomyElectricHighwayMpge (importFuelEconomy importSeed))
 
 sourceSeedCatalogBuildTest :: Test
 sourceSeedCatalogBuildTest =
@@ -1017,12 +1079,19 @@ validatedRosterSeedCanonicalizationTest =
               fuelEconomyVehicleModel = "Prius Prime",
               fuelEconomyVehicleBaseModel = Just "Prius Prime",
               fuelEconomyVehicleFuelType = "Regular Gasoline",
+              fuelEconomyVehicleReportedFuelType = Just "Regular Gas and Electricity",
+              fuelEconomyVehicleSecondaryFuelType = Just "Electricity",
               fuelEconomyVehicleAtvType = Just "Plug-in Hybrid",
+              fuelEconomyVehicleEngineDescriptor = Just "PHEV",
               fuelEconomyVehicleDrive = Just "Front-Wheel Drive",
               fuelEconomyVehicleClass = Just "Midsize Cars",
               fuelEconomyVehicleCombinedMpg = 48,
               fuelEconomyVehicleCityMpg = Just 52,
-              fuelEconomyVehicleHighwayMpg = Just 45
+              fuelEconomyVehicleHighwayMpg = Just 45,
+              fuelEconomyVehicleElectricCombinedMpge = Just 114,
+              fuelEconomyVehicleElectricCityMpge = Just 125,
+              fuelEconomyVehicleElectricHighwayMpge = Just 103,
+              fuelEconomyVehicleElectricDrivingShare = Just 0.677
             }
     validatedRosterSeed <-
       either
@@ -1248,6 +1317,9 @@ invalidInputValidationTest =
                     simulationFuelType = "gasoline",
                     simulationHomeChargingShare = 1.2,
                     simulationChargingLossRate = 1.1,
+                    simulationPlugInElectricDrivingShare = 1.2,
+                    simulationPlugInCityMilesPerGallonEquivalent = 0,
+                    simulationPlugInHighwayMilesPerGallonEquivalent = 0,
                     simulationMilesPerGallon = 0,
                     simulationCityMilesPerGallon = 0,
                     simulationHighwayMilesPerGallon = 0,
@@ -1618,6 +1690,9 @@ invalidSimulationRequest =
             simulationFuelType = "gasoline",
             simulationHomeChargingShare = 1.2,
             simulationChargingLossRate = 1.1,
+            simulationPlugInElectricDrivingShare = 1.2,
+            simulationPlugInCityMilesPerGallonEquivalent = 0,
+            simulationPlugInHighwayMilesPerGallonEquivalent = 0,
             simulationMilesPerGallon = 0,
             simulationCityMilesPerGallon = 0,
             simulationHighwayMilesPerGallon = 0,
@@ -1706,6 +1781,9 @@ baselineSimulationInput =
       simulationFuelType = "gasoline",
       simulationHomeChargingShare = 0,
       simulationChargingLossRate = 0,
+      simulationPlugInElectricDrivingShare = 0,
+      simulationPlugInCityMilesPerGallonEquivalent = 0,
+      simulationPlugInHighwayMilesPerGallonEquivalent = 0,
       simulationMilesPerGallon = 30,
       simulationCityMilesPerGallon = 30,
       simulationHighwayMilesPerGallon = 30,
@@ -1786,12 +1864,19 @@ fallbackFuelEconomyVehicleRecord =
       fuelEconomyVehicleModel = "Fallback",
       fuelEconomyVehicleBaseModel = Just "Fallback",
       fuelEconomyVehicleFuelType = "Regular Gasoline",
+      fuelEconomyVehicleReportedFuelType = Nothing,
+      fuelEconomyVehicleSecondaryFuelType = Nothing,
       fuelEconomyVehicleAtvType = Nothing,
+      fuelEconomyVehicleEngineDescriptor = Nothing,
       fuelEconomyVehicleDrive = Just "Front-Wheel Drive",
       fuelEconomyVehicleClass = Just "Compact Cars",
       fuelEconomyVehicleCombinedMpg = 1,
       fuelEconomyVehicleCityMpg = Just 1,
-      fuelEconomyVehicleHighwayMpg = Just 1
+      fuelEconomyVehicleHighwayMpg = Just 1,
+      fuelEconomyVehicleElectricCombinedMpge = Nothing,
+      fuelEconomyVehicleElectricCityMpge = Nothing,
+      fuelEconomyVehicleElectricHighwayMpge = Nothing,
+      fuelEconomyVehicleElectricDrivingShare = Nothing
     }
 
 fallbackCatalogImportSeed :: CatalogImportSeed
@@ -1811,7 +1896,11 @@ fallbackCatalogImportSeed =
           { fuelEconomyFuelType = "gasoline",
             fuelEconomyCombinedMpg = 1,
             fuelEconomyCityMpg = Just 1,
-            fuelEconomyHighwayMpg = Just 1
+            fuelEconomyHighwayMpg = Just 1,
+            fuelEconomyElectricDrivingShare = Nothing,
+            fuelEconomyElectricCombinedMpge = Nothing,
+            fuelEconomyElectricCityMpge = Nothing,
+            fuelEconomyElectricHighwayMpge = Nothing
           },
       importPurchasePrice = 1,
       importAnnualInsurance = 1,

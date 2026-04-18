@@ -35,8 +35,10 @@ The following pieces are deterministic once a scenario input is fixed:
 - city efficiency
 - highway efficiency
 - fuel or powertrain type
-- home charging share for EVs
-- charging loss rate for EVs
+- home charging share for plug-in vehicles
+- charging loss rate for plug-in vehicles
+- plug-in hybrid electric-driving share
+- plug-in hybrid city and highway EV-mode efficiency
 - annual insurance
 - annual registration
 - annual parking
@@ -55,7 +57,9 @@ These inputs determine:
 - yearly inflation multipliers
 - miles driven by year
 - city and highway gallons consumed by year
-- EV purchased-from-grid kWh after charging losses and home/public split
+- EV or plug-in-hybrid purchased-from-grid kWh after charging losses and
+  home/public split
+- plug-in-hybrid gasoline gallons after the electric-driving share is applied
 - tire replacement timing from cumulative miles
 - recurring local ownership costs
 - the floor-limited part of the resale path
@@ -66,7 +70,7 @@ These inputs determine:
 The following inputs are sampled during each run:
 
 - fuel price
-- public charging price for EVs
+- public charging price for plug-in vehicles
 - annual maintenance
 - annual depreciation rate
 - repair shock event occurrence
@@ -92,7 +96,8 @@ For each modeled year, the simulator currently computes:
 - miles driven for the year
 - city and highway miles for the year
 - city and highway energy consumed for the year
-- EV purchased-from-grid energy after charging losses
+- gasoline gallons for the year when the powertrain uses liquid fuel
+- purchased-from-grid energy after charging losses for plug-in vehicles
 - sampled fuel or charging cost
 - sampled maintenance cost
 - sampled repair shock cost, if triggered
@@ -163,15 +168,17 @@ important simplifications:
 - depreciation and resale are still heuristic rather than market-comparable,
   even though the model now includes first-year loss, mileage penalties, and a
   floor on residual value
-- energy use now distinguishes city and highway efficiency, and EVs now switch
-  to charging-cost math with separate home and public electricity pricing plus
-  charging-loss overhead, but the model still assumes one fixed city-driving
+- energy use now distinguishes city and highway efficiency, EVs switch to
+  charging-cost math, and plug-in hybrids split miles between gasoline and
+  electricity with separate EV-mode efficiency inputs, but the model still
+  assumes one fixed city-driving share and one fixed plug-in electric-driving
   share across the full ownership horizon
 - maintenance and repair shocks are independent draws rather than age- or
   mileage-conditioned processes
 - financing assumes a standard amortizing loan and does not model refinancing,
   late payments, or early payoff decisions
-- taxes and fees are generic inputs, not yet state-specific rules
+- taxes and fees are still driven by scenario inputs; region profiles currently
+  provide browser-side defaults rather than backend rule tables
 
 ## Best next modeling upgrades
 
