@@ -173,6 +173,7 @@ simulateDetailedCostBreakdown simulationInput initialGen =
           plugInElectricCityMilesPerGallonEquivalent
           plugInElectricHighwayMilesPerGallonEquivalent
           (simulationFuelPrice simulationInput)
+          (simulationHomeChargingPrice simulationInput)
           (simulationPublicChargingPrice simulationInput)
           (simulationAnnualMaintenance simulationInput)
           repairShockProbability
@@ -254,9 +255,19 @@ data SampledYear = SampledYear
   { sampledYearMilesDriven :: Double,
     sampledYearCityMilesDriven :: Double,
     sampledYearHighwayMilesDriven :: Double,
+    sampledYearElectricMilesDriven :: Double,
+    sampledYearCityElectricMilesDriven :: Double,
+    sampledYearHighwayElectricMilesDriven :: Double,
+    sampledYearLiquidFuelMilesDriven :: Double,
+    sampledYearCityLiquidFuelMilesDriven :: Double,
+    sampledYearHighwayLiquidFuelMilesDriven :: Double,
     sampledYearEnergyUnitsConsumed :: Double,
     sampledYearCityEnergyUnitsConsumed :: Double,
     sampledYearHighwayEnergyUnitsConsumed :: Double,
+    sampledYearPurchasedEnergyUnits :: Double,
+    sampledYearHomePurchasedEnergyUnits :: Double,
+    sampledYearPublicPurchasedEnergyUnits :: Double,
+    sampledYearChargingLossUnits :: Double,
     sampledYearFuelGallons :: Double,
     sampledYearCityFuelGallons :: Double,
     sampledYearHighwayFuelGallons :: Double,
@@ -289,6 +300,7 @@ simulateYears ::
   BoundedNormal ->
   BoundedNormal ->
   BoundedNormal ->
+  BoundedNormal ->
   Double ->
   BoundedNormal ->
   BoundedNormal ->
@@ -300,7 +312,7 @@ simulateYears ::
   Double ->
   StdGen ->
   ([SampledYear], StdGen)
-simulateYears yearsRemaining carValue baseAnnualMiles annualMileageChangeRate cityDrivingShare fuelType homeChargingShare chargingLossRate plugInElectricDrivingShare cityMilesPerGallon highwayMilesPerGallon plugInElectricCityMilesPerGallonEquivalent plugInElectricHighwayMilesPerGallonEquivalent fuelModel publicChargingPriceModel maintenanceModel repairShockProbability repairShockModel depreciationModel tireReplacementCost tireLifeMiles firstYearDepreciationBonus residualValueFloorPercent expectedAnnualMilesForResale extraMileageDepreciationPerMile initialGen =
+simulateYears yearsRemaining carValue baseAnnualMiles annualMileageChangeRate cityDrivingShare fuelType homeChargingShare chargingLossRate plugInElectricDrivingShare cityMilesPerGallon highwayMilesPerGallon plugInElectricCityMilesPerGallonEquivalent plugInElectricHighwayMilesPerGallonEquivalent fuelModel homeChargingPriceModel publicChargingPriceModel maintenanceModel repairShockProbability repairShockModel depreciationModel tireReplacementCost tireLifeMiles firstYearDepreciationBonus residualValueFloorPercent expectedAnnualMilesForResale extraMileageDepreciationPerMile initialGen =
   go yearsRemaining 1 carValue 0 [] initialGen
   where
     go 0 _ _ _ acc gen = (reverse acc, gen)
@@ -342,22 +354,29 @@ simulateYears yearsRemaining carValue baseAnnualMiles annualMileageChangeRate ci
               yearIndex
               priorMilesDriven
               actualCumulativeMiles
-          (fuelPrice, gen1) = sampleBoundedNormal fuelModel gen0
-          (publicChargingPrice, gen2) =
+          (fuelPrice, gen1) =
+            if usesLiquidFuel fuelType
+              then sampleBoundedNormal fuelModel gen0
+              else (0, gen0)
+          (homeChargingPrice, gen2) =
             if usesGridCharging fuelType
-              then sampleBoundedNormal publicChargingPriceModel gen1
+              then sampleBoundedNormal homeChargingPriceModel gen1
               else (0, gen1)
+          (publicChargingPrice, gen3) =
+            if usesGridCharging fuelType
+              then sampleBoundedNormal publicChargingPriceModel gen2
+              else (0, gen2)
           annualEnergyCost =
             annualGallons * fuelPrice
-              + homePurchasedEnergyUnits * fuelPrice
+              + homePurchasedEnergyUnits * homeChargingPrice
               + publicPurchasedEnergyUnits * publicChargingPrice
-          (maintenanceCost, gen3) = sampleBoundedNormal maintenanceModel gen2
-          (repairShockRoll, gen4) = randomR (0.0, 1.0 :: Double) gen3
-          (repairShockCost, gen5) =
+          (maintenanceCost, gen4) = sampleBoundedNormal maintenanceModel gen3
+          (repairShockRoll, gen5) = randomR (0.0, 1.0 :: Double) gen4
+          (repairShockCost, gen6) =
             if repairShockRoll < repairShockProbability
-              then sampleBoundedNormal repairShockModel gen4
-              else (0, gen4)
-          (sampledDepreciationRate, gen6) = sampleBoundedNormal depreciationModel gen5
+              then sampleBoundedNormal repairShockModel gen5
+              else (0, gen5)
+          (sampledDepreciationRate, gen7) = sampleBoundedNormal depreciationModel gen6
           depreciationRate =
             effectiveDepreciationRate sampledDepreciationRate firstYearDepreciationBonus yearIndex
           residualFloorValue = carValue * residualValueFloorPercent
@@ -368,9 +387,19 @@ simulateYears yearsRemaining carValue baseAnnualMiles annualMileageChangeRate ci
               { sampledYearMilesDriven = yearlyMiles,
                 sampledYearCityMilesDriven = cityMiles,
                 sampledYearHighwayMilesDriven = highwayMiles,
+                sampledYearElectricMilesDriven = cityElectricMiles + highwayElectricMiles,
+                sampledYearCityElectricMilesDriven = cityElectricMiles,
+                sampledYearHighwayElectricMilesDriven = highwayElectricMiles,
+                sampledYearLiquidFuelMilesDriven = cityLiquidFuelMiles + highwayLiquidFuelMiles,
+                sampledYearCityLiquidFuelMilesDriven = cityLiquidFuelMiles,
+                sampledYearHighwayLiquidFuelMilesDriven = highwayLiquidFuelMiles,
                 sampledYearEnergyUnitsConsumed = annualEnergyUnits,
                 sampledYearCityEnergyUnitsConsumed = cityEnergyUnits,
                 sampledYearHighwayEnergyUnitsConsumed = highwayEnergyUnits,
+                sampledYearPurchasedEnergyUnits = annualPurchasedEnergyUnits,
+                sampledYearHomePurchasedEnergyUnits = homePurchasedEnergyUnits,
+                sampledYearPublicPurchasedEnergyUnits = publicPurchasedEnergyUnits,
+                sampledYearChargingLossUnits = max 0 (annualPurchasedEnergyUnits - annualEnergyUnits),
                 sampledYearFuelGallons = annualGallons,
                 sampledYearCityFuelGallons = cityGallons,
                 sampledYearHighwayFuelGallons = highwayGallons,
@@ -385,7 +414,7 @@ simulateYears yearsRemaining carValue baseAnnualMiles annualMileageChangeRate ci
                 sampledYearDepreciationLoss = max 0 (currentValue - nextValue),
                 sampledYearEndingVehicleValue = nextValue
               }
-       in go (remaining - 1) (yearIndex + 1) nextValue (priorMilesDriven + yearlyMiles) (sampledYear : acc) gen6
+       in go (remaining - 1) (yearIndex + 1) nextValue (priorMilesDriven + yearlyMiles) (sampledYear : acc) gen7
 
 data FinancingSnapshot = FinancingSnapshot
   { financingUpfrontPayment :: Double,
@@ -493,9 +522,19 @@ buildYearlyCostBreakdown financing purchaseTax upfrontFees annualInflationRate a
           yearlyMilesDriven = sampledYearMilesDriven sampledYear,
           yearlyCityMilesDriven = sampledYearCityMilesDriven sampledYear,
           yearlyHighwayMilesDriven = sampledYearHighwayMilesDriven sampledYear,
+          yearlyElectricMilesDriven = sampledYearElectricMilesDriven sampledYear,
+          yearlyCityElectricMilesDriven = sampledYearCityElectricMilesDriven sampledYear,
+          yearlyHighwayElectricMilesDriven = sampledYearHighwayElectricMilesDriven sampledYear,
+          yearlyLiquidFuelMilesDriven = sampledYearLiquidFuelMilesDriven sampledYear,
+          yearlyCityLiquidFuelMilesDriven = sampledYearCityLiquidFuelMilesDriven sampledYear,
+          yearlyHighwayLiquidFuelMilesDriven = sampledYearHighwayLiquidFuelMilesDriven sampledYear,
           yearlyEnergyUnitsConsumed = sampledYearEnergyUnitsConsumed sampledYear,
           yearlyCityEnergyUnitsConsumed = sampledYearCityEnergyUnitsConsumed sampledYear,
           yearlyHighwayEnergyUnitsConsumed = sampledYearHighwayEnergyUnitsConsumed sampledYear,
+          yearlyPurchasedEnergyUnits = sampledYearPurchasedEnergyUnits sampledYear,
+          yearlyHomePurchasedEnergyUnits = sampledYearHomePurchasedEnergyUnits sampledYear,
+          yearlyPublicPurchasedEnergyUnits = sampledYearPublicPurchasedEnergyUnits sampledYear,
+          yearlyChargingLossUnits = sampledYearChargingLossUnits sampledYear,
           yearlyFuelGallons = sampledYearFuelGallons sampledYear,
           yearlyCityFuelGallons = sampledYearCityFuelGallons sampledYear,
           yearlyHighwayFuelGallons = sampledYearHighwayFuelGallons sampledYear,
@@ -790,6 +829,7 @@ validateSimulationInput simulationInput =
       require (simulationRepairShockProbability simulationInput <= 1) "Repair shock probability should be expressed as a decimal between 0 and 1.",
       validateBoundedNormal "Repair shock cost" False (simulationRepairShockCost simulationInput),
       validateBoundedNormal "Energy price" False (simulationFuelPrice simulationInput),
+      validateBoundedNormal "Home charging price" False (simulationHomeChargingPrice simulationInput),
       validateBoundedNormal "Public charging price" False (simulationPublicChargingPrice simulationInput),
       validateBoundedNormal "Annual maintenance" False (simulationAnnualMaintenance simulationInput),
       validateBoundedNormal "Annual depreciation rate" True (simulationAnnualDepreciationRate simulationInput)

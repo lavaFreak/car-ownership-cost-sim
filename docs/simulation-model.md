@@ -37,6 +37,7 @@ The following pieces are deterministic once a scenario input is fixed:
 - fuel or powertrain type
 - home charging share for plug-in vehicles
 - charging loss rate for plug-in vehicles
+- home charging price distribution for plug-in hybrids
 - plug-in hybrid electric-driving share
 - plug-in hybrid city and highway EV-mode efficiency
 - annual insurance
@@ -70,6 +71,7 @@ These inputs determine:
 The following inputs are sampled during each run:
 
 - fuel price
+- home charging price for plug-in hybrids
 - public charging price for plug-in vehicles
 - annual maintenance
 - annual depreciation rate
@@ -98,7 +100,10 @@ For each modeled year, the simulator currently computes:
 - city and highway energy consumed for the year
 - gasoline gallons for the year when the powertrain uses liquid fuel
 - purchased-from-grid energy after charging losses for plug-in vehicles
-- sampled fuel or charging cost
+- home and public charging splits for purchased energy
+- charging-loss overhead that never reaches the battery
+- sampled gasoline, diesel, home-charging, and public-charging costs as
+  applicable to the current powertrain
 - sampled maintenance cost
 - sampled repair shock cost, if triggered
 - tire replacement cost if cumulative miles cross a tire-life threshold
@@ -111,7 +116,10 @@ For each modeled year, the simulator currently computes:
 - a residual value floor applied to the ending vehicle value
 
 The yearly breakdown is returned to the frontend so the UI can explain how one
-sampled path evolves over time.
+sampled path evolves over time. That response now includes explicit electric
+miles, liquid-fuel miles, purchased energy, home/public charging energy, and
+charging-loss units instead of leaving the frontend to infer them from the
+request.
 
 ## Total cost formula
 
@@ -170,7 +178,8 @@ important simplifications:
   floor on residual value
 - energy use now distinguishes city and highway efficiency, EVs switch to
   charging-cost math, and plug-in hybrids split miles between gasoline and
-  electricity with separate EV-mode efficiency inputs, but the model still
+  electricity with separate EV-mode efficiency inputs plus separate gasoline
+  and home/public charging price assumptions, but the model still
   assumes one fixed city-driving share and one fixed plug-in electric-driving
   share across the full ownership horizon
 - maintenance and repair shocks are independent draws rather than age- or

@@ -40,6 +40,9 @@ The scenario form is grouped into these sections:
 
 This grouping is mirrored in the payload-building code so users can reason
 about the model in categories rather than one flat list of fields.
+For plug-in hybrids, the charging section now includes a separate home
+electricity-price distribution so gasoline and home charging are not forced to
+share one price assumption.
 
 ## Vehicle lookup and presets
 
@@ -71,6 +74,8 @@ Presets intentionally:
   assumptions
 - apply plug-in-friendly charging defaults when the selected vehicle is
   electric or plug-in hybrid
+- keep EV and plug-in-hybrid charging price assumptions aligned with the
+  selected region profile while still leaving them editable
 - prefill plug-in hybrid electric-driving share and EV-mode MPGe when the
   catalog has that data
 - leave scenario-specific choices like mileage and financing under user control
@@ -127,7 +132,8 @@ The frontend currently renders five views of the simulation response:
   - category-level breakdown for a single path
 - yearly snapshot
   - annual timeline for that sampled path, including gasoline gallons,
-    electricity use, and charging-overhead details when relevant
+    electricity use, home/public charging splits, electric-vs-liquid miles, and
+    charging-overhead details when relevant
 
 Two simple canvas charts complement those cards:
 

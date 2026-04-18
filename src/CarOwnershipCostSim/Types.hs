@@ -83,6 +83,7 @@ data SimulationInput = SimulationInput
     simulationRepairShockProbability :: Double,
     simulationRepairShockCost :: BoundedNormal,
     simulationFuelPrice :: BoundedNormal,
+    simulationHomeChargingPrice :: BoundedNormal,
     simulationPublicChargingPrice :: BoundedNormal,
     simulationAnnualMaintenance :: BoundedNormal,
     simulationAnnualDepreciationRate :: BoundedNormal
@@ -147,9 +148,19 @@ data YearlyCostBreakdown = YearlyCostBreakdown
     yearlyMilesDriven :: Double,
     yearlyCityMilesDriven :: Double,
     yearlyHighwayMilesDriven :: Double,
+    yearlyElectricMilesDriven :: Double,
+    yearlyCityElectricMilesDriven :: Double,
+    yearlyHighwayElectricMilesDriven :: Double,
+    yearlyLiquidFuelMilesDriven :: Double,
+    yearlyCityLiquidFuelMilesDriven :: Double,
+    yearlyHighwayLiquidFuelMilesDriven :: Double,
     yearlyEnergyUnitsConsumed :: Double,
     yearlyCityEnergyUnitsConsumed :: Double,
     yearlyHighwayEnergyUnitsConsumed :: Double,
+    yearlyPurchasedEnergyUnits :: Double,
+    yearlyHomePurchasedEnergyUnits :: Double,
+    yearlyPublicPurchasedEnergyUnits :: Double,
+    yearlyChargingLossUnits :: Double,
     yearlyFuelGallons :: Double,
     yearlyCityFuelGallons :: Double,
     yearlyHighwayFuelGallons :: Double,
@@ -276,6 +287,13 @@ exampleSimulationRequest =
                   boundedNormalStdDev = 0.55,
                   boundedNormalLowerBound = 2.4,
                   boundedNormalUpperBound = Just 6.5
+                },
+            simulationHomeChargingPrice =
+              BoundedNormal
+                { boundedNormalMean = 0.16,
+                  boundedNormalStdDev = 0.04,
+                  boundedNormalLowerBound = 0.08,
+                  boundedNormalUpperBound = Just 0.35
                 },
             simulationPublicChargingPrice =
               BoundedNormal

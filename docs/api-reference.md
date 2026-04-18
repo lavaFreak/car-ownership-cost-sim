@@ -73,6 +73,12 @@ The request body is JSON with this top-level shape:
       "boundedNormalLowerBound": 2.4,
       "boundedNormalUpperBound": 6.5
     },
+    "simulationHomeChargingPrice": {
+      "boundedNormalMean": 0.16,
+      "boundedNormalStdDev": 0.04,
+      "boundedNormalLowerBound": 0.08,
+      "boundedNormalUpperBound": 0.35
+    },
     "simulationPublicChargingPrice": {
       "boundedNormalMean": 0.43,
       "boundedNormalStdDev": 0.1,
@@ -105,8 +111,11 @@ The request body is JSON with this top-level shape:
   - when absent, the server picks a random seed
 - `requestIterations` controls Monte Carlo sample count
 - bounded-normal inputs are used for uncertain variables
-- `simulationFuelType` controls whether the energy-price distribution is
-  interpreted as dollars per gallon or dollars per kWh
+- `simulationFuelType` controls which efficiency and energy-price fields are
+  active for the scenario
+  - gasoline and diesel scenarios only use liquid-fuel pricing
+  - EV scenarios only use charging pricing
+  - plug-in hybrids can use both gasoline and charging pricing in the same run
 - `simulationHomeChargingShare` and `simulationChargingLossRate` only affect
   plug-in scenarios
   - they model how much charging happens at home and how much purchased
@@ -123,7 +132,9 @@ The request body is JSON with this top-level shape:
 - `simulationFuelPrice` is the main energy-price distribution
   - for gasoline-like vehicles it is fuel price per gallon
   - for EVs it is home electricity price per kWh
-  - for plug-in hybrids it remains the gasoline price per gallon
+  - for plug-in hybrids it is gasoline price per gallon
+- `simulationHomeChargingPrice` is used by plug-in hybrids
+  - it models home electricity price per kWh separately from gasoline
 - `simulationPublicChargingPrice` is only used for plug-in scenarios
   - it models away-from-home charging price per kWh
 - `simulationMilesPerGallon` is the derived blended efficiency for the chosen
@@ -145,6 +156,32 @@ The success response includes:
   - one sampled path summarized by category
 - `responseExampleYearlyBreakdown`
   - the yearly timeline for that sampled path
+  - each yearly row now includes explicit electric-mile, liquid-fuel-mile, and
+    charging-flow fields so the frontend can render EV and plug-in-hybrid usage
+    without inferring it from the original request
+
+### Important yearly powertrain fields
+
+When `responseExampleYearlyBreakdown` is present, each row can include:
+
+- `yearlyElectricMilesDriven`
+  - miles covered on electricity that year
+- `yearlyCityElectricMilesDriven` and `yearlyHighwayElectricMilesDriven`
+  - the city/highway split of electric miles
+- `yearlyLiquidFuelMilesDriven`
+  - miles covered using gasoline or diesel that year
+- `yearlyCityLiquidFuelMilesDriven` and `yearlyHighwayLiquidFuelMilesDriven`
+  - the city/highway split of liquid-fuel miles
+- `yearlyPurchasedEnergyUnits`
+  - total grid energy purchased for charging after losses
+- `yearlyHomePurchasedEnergyUnits`
+  - the home-charging share of purchased energy
+- `yearlyPublicPurchasedEnergyUnits`
+  - the away-from-home charging share of purchased energy
+- `yearlyChargingLossUnits`
+  - purchased energy that did not reach the battery because of charging losses
+- `yearlyFuelGallons`
+  - liquid fuel consumed that year
 
 ## Error responses
 

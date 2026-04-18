@@ -81,6 +81,7 @@ tests =
       TestLabel "city and highway MPG split shapes fuel costs" cityHighwayFuelSplitTest,
       TestLabel "electric vehicles use charging costs instead of gas prices" electricChargingCostTest,
       TestLabel "EV charging mix and losses change purchased energy cost" electricChargingMixAndLossTest,
+      TestLabel "plug-in hybrids price gasoline and charging separately" plugInHybridEnergySplitTest,
       TestLabel "local recurring costs inflate over time" localRecurringCostsInflationTest,
       TestLabel "vehicle catalog loads and drives presets" vehicleCatalogTest,
       TestLabel "catalog import seeds build normalized entries" catalogImportSeedTest,
@@ -164,6 +165,7 @@ deterministicCashPurchaseTest =
                           boundedNormalLowerBound = 4,
                           boundedNormalUpperBound = Just 4
                         },
+                    simulationHomeChargingPrice = deterministicBoundedNormal 0,
                     simulationPublicChargingPrice = deterministicBoundedNormal 0,
                     simulationAnnualMaintenance =
                       BoundedNormal
@@ -258,6 +260,7 @@ purchaseTaxAndFeesTest =
                           boundedNormalLowerBound = 4,
                           boundedNormalUpperBound = Just 4
                         },
+                    simulationHomeChargingPrice = deterministicBoundedNormal 0,
                     simulationPublicChargingPrice = deterministicBoundedNormal 0,
                     simulationAnnualMaintenance =
                       BoundedNormal
@@ -343,6 +346,7 @@ inflationTest =
                           boundedNormalLowerBound = 1,
                           boundedNormalUpperBound = Just 1
                         },
+                    simulationHomeChargingPrice = deterministicBoundedNormal 0,
                     simulationPublicChargingPrice = deterministicBoundedNormal 0,
                     simulationAnnualMaintenance =
                       BoundedNormal
@@ -433,6 +437,7 @@ repairShockTest =
                           boundedNormalLowerBound = 0,
                           boundedNormalUpperBound = Just 0
                         },
+                    simulationHomeChargingPrice = deterministicBoundedNormal 0,
                     simulationPublicChargingPrice = deterministicBoundedNormal 0,
                     simulationAnnualMaintenance =
                       BoundedNormal
@@ -687,6 +692,7 @@ electricChargingCostTest =
                 simulationCityMilesPerGallon = 100,
                 simulationHighwayMilesPerGallon = 100,
                 simulationFuelPrice = deterministicBoundedNormal 0.15,
+                simulationHomeChargingPrice = deterministicBoundedNormal 0.15,
                 simulationPublicChargingPrice = deterministicBoundedNormal 0.45
               }
         response = simulateRequestWithSeed 46 request
@@ -721,6 +727,7 @@ electricChargingMixAndLossTest =
                 simulationCityMilesPerGallon = 100,
                 simulationHighwayMilesPerGallon = 100,
                 simulationFuelPrice = deterministicBoundedNormal 0.12,
+                simulationHomeChargingPrice = deterministicBoundedNormal 0.12,
                 simulationPublicChargingPrice = deterministicBoundedNormal 0.36
               }
         response = simulateRequestWithSeed 47 request
@@ -734,6 +741,50 @@ electricChargingMixAndLossTest =
     assertBool
       "public charging plus losses cost more than the ideal home-only case"
       (costFuel breakdown > deliveredKilowattHours * 0.12)
+
+plugInHybridEnergySplitTest :: Test
+plugInHybridEnergySplitTest =
+  TestCase $ do
+    let request =
+          deterministicRequest
+            48
+            baselineSimulationInput
+              { simulationPurchasePrice = 10000,
+                simulationYearsOwned = 1,
+                simulationAnnualMiles = 10000,
+                simulationFuelType = "plug-in-hybrid",
+                simulationHomeChargingShare = 1,
+                simulationChargingLossRate = 0,
+                simulationPlugInElectricDrivingShare = 0.6,
+                simulationMilesPerGallon = 57.142857142857146,
+                simulationCityMilesPerGallon = 40,
+                simulationHighwayMilesPerGallon = 40,
+                simulationPlugInCityMilesPerGallonEquivalent = 100,
+                simulationPlugInHighwayMilesPerGallonEquivalent = 100,
+                simulationFuelPrice = deterministicBoundedNormal 4,
+                simulationHomeChargingPrice = deterministicBoundedNormal 0.15,
+                simulationPublicChargingPrice = deterministicBoundedNormal 0.45
+              }
+        response = simulateRequestWithSeed 48 request
+        breakdown = responseExampleBreakdown response
+        yearlyBreakdown = responseExampleYearlyBreakdown response
+        expectedElectricKilowattHours = 6000 * 33.7 / 100
+        expectedGasolineCost = 4000 / 40 * 4
+        expectedChargingCost = expectedElectricKilowattHours * 0.15
+    assertClose
+      "plug-in hybrids combine gasoline and charging cost correctly"
+      (expectedGasolineCost + expectedChargingCost)
+      (costFuel breakdown)
+    case yearlyBreakdown of
+      [yearOne] -> do
+        assertClose "plug-in hybrid electric miles are tracked" 6000 (yearlyElectricMilesDriven yearOne)
+        assertClose "plug-in hybrid liquid-fuel miles are tracked" 4000 (yearlyLiquidFuelMilesDriven yearOne)
+        assertClose "plug-in hybrid battery energy is tracked" expectedElectricKilowattHours (yearlyEnergyUnitsConsumed yearOne)
+        assertClose "plug-in hybrid purchased energy stays aligned without charging loss" expectedElectricKilowattHours (yearlyPurchasedEnergyUnits yearOne)
+        assertClose "plug-in hybrid home charging stays aligned" expectedElectricKilowattHours (yearlyHomePurchasedEnergyUnits yearOne)
+        assertClose "plug-in hybrid public charging stays zero" 0 (yearlyPublicPurchasedEnergyUnits yearOne)
+        assertClose "plug-in hybrid fuel gallons are tracked" 100 (yearlyFuelGallons yearOne)
+      _ -> assertFailure "Expected exactly one yearly breakdown row."
 
 localRecurringCostsInflationTest :: Test
 localRecurringCostsInflationTest =
@@ -1351,6 +1402,13 @@ invalidInputValidationTest =
                           boundedNormalLowerBound = 2,
                           boundedNormalUpperBound = Just 5
                         },
+                    simulationHomeChargingPrice =
+                      BoundedNormal
+                        { boundedNormalMean = 0.16,
+                          boundedNormalStdDev = 0.04,
+                          boundedNormalLowerBound = 0.08,
+                          boundedNormalUpperBound = Just 0.35
+                        },
                     simulationPublicChargingPrice =
                       BoundedNormal
                         { boundedNormalMean = 0.4,
@@ -1724,6 +1782,13 @@ invalidSimulationRequest =
                   boundedNormalLowerBound = 2,
                   boundedNormalUpperBound = Just 5
                 },
+            simulationHomeChargingPrice =
+              BoundedNormal
+                { boundedNormalMean = 0.16,
+                  boundedNormalStdDev = 0.04,
+                  boundedNormalLowerBound = 0.08,
+                  boundedNormalUpperBound = Just 0.35
+                },
             simulationPublicChargingPrice =
               BoundedNormal
                 { boundedNormalMean = 0.4,
@@ -1803,6 +1868,7 @@ baselineSimulationInput =
       simulationRepairShockProbability = 0,
       simulationRepairShockCost = deterministicBoundedNormal 0,
       simulationFuelPrice = deterministicBoundedNormal 0,
+      simulationHomeChargingPrice = deterministicBoundedNormal 0,
       simulationPublicChargingPrice = deterministicBoundedNormal 0,
       simulationAnnualMaintenance = deterministicBoundedNormal 0,
       simulationAnnualDepreciationRate = deterministicBoundedNormal 0

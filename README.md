@@ -24,7 +24,7 @@ The app asks for values such as:
 - city-driving share plus city and highway efficiency
 - fuel / powertrain type
 - plug-in hybrid electric-driving share plus EV-mode efficiency when relevant
-- plug-in charging mix, home/public electricity pricing, and charging loss
+- plug-in charging mix, separate home/public electricity pricing, and charging loss
 - region-aware starter defaults for tax, registration, and energy pricing
 - yearly insurance, registration, parking, tolls, and inspection
 - tire replacement assumptions
@@ -129,7 +129,9 @@ for deeper context:
 
 The current MVP models uncertainty with bounded normal distributions for:
 
-- energy price
+- liquid-fuel price
+- home charging price for plug-in vehicles
+- public charging price for plug-in vehicles
 - annual maintenance
 - annual depreciation rate
 - annual repair shock cost when a repair shock occurs
@@ -170,6 +172,7 @@ The yearly model now also applies:
 - city/highway energy use using a configurable city-driving share instead of one flat efficiency assumption
 - EV charging cost modeling that uses electricity price per kWh instead of gasoline price, including home/public charging mix and charging-loss overhead
 - plug-in hybrid cost modeling that splits miles between electricity and gasoline using EV-mode MPGe plus a configurable electric-driving share
+- separate pricing for plug-in-hybrid gasoline, home charging, and public charging instead of forcing all energy through one price assumption
 - loan amortization with interest tracked separately from principal in the yearly breakdown
 - a first-year resale hit on top of the sampled annual depreciation rate
 - a residual value floor so resale cannot fall below a configured minimum
@@ -181,6 +184,10 @@ loaded and tail-risk behavior that matters in real ownership decisions.
 The browser also now offers region profiles that prefill sales tax,
 registration, gasoline, diesel, and electricity assumptions while still
 leaving every field editable.
+The yearly response now also returns explicit electric miles, liquid-fuel
+miles, purchased charging energy, home/public charging splits, and charging
+loss overhead so the frontend does not have to infer those values from the
+original request.
 
 ## Current API
 

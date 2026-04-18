@@ -194,8 +194,18 @@
               <legend>Plug-in charging mix</legend>
 
               <p class="field-group-copy">
-                For EVs and plug-in hybrids, the electricity price inputs below are treated as home charging rates. These fields model how much charging happens away from home and how much energy is lost during charging.
+                These fields model how much charging happens away from home and how much energy is lost during charging. Plug-in hybrids also use this section for a separate home-electricity price assumption on top of gasoline.
               </p>
+
+              <label id="home-charging-mean-field" hidden>
+                <span id="home-charging-mean-label">Home electricity price mean ($/kWh)</span>
+                <input name="homeChargingMean" type="number" min="0" step="0.01" value="0.16" required />
+              </label>
+
+              <label id="home-charging-stddev-field" hidden>
+                <span id="home-charging-stddev-label">Home electricity price std dev</span>
+                <input name="homeChargingStdDev" type="number" min="0" step="0.01" value="0.04" required />
+              </label>
 
               <label>
                 Home charging share (%)
