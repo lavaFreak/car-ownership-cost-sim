@@ -119,6 +119,16 @@
               </label>
 
               <label>
+                Starting vehicle age (years)
+                <input name="startingVehicleAgeYears" type="number" min="0" step="0.1" value="0" required />
+              </label>
+
+              <label>
+                Starting odometer (miles)
+                <input name="startingOdometerMiles" type="number" min="0" step="100" value="0" required />
+              </label>
+
+              <label>
                 Annual miles
                 <input name="annualMiles" type="number" min="0" step="500" value="12000" required />
               </label>
@@ -163,6 +173,10 @@
 
               <p class="field-group-copy">
                 When enabled, the simulator uses the selected region for sales tax, registration, fuel or electricity pricing, and charging defaults. Turn it off to customize those assumptions manually.
+              </p>
+
+              <p class="field-group-copy">
+                Starting age and odometer let the wear, repair, and resale model behave more like a used-car scenario instead of assuming every purchase begins at zero miles.
               </p>
 
               <label>

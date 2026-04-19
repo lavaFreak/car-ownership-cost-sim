@@ -19,6 +19,7 @@ The app asks for values such as:
 
 - purchase price
 - down payment and loan details
+- starting vehicle age and starting odometer for used-car scenarios
 - miles driven per year
 - annual mileage change over time
 - city-driving share plus city and highway efficiency
@@ -179,6 +180,7 @@ The yearly model now also applies:
 - optional backend region calibration that can override sales tax, registration, fuel price, charging price, home-charging share, and charging-loss assumptions from the selected location profile
 - age- and mileage-aware maintenance calibration that ramps baseline upkeep costs over the ownership timeline
 - age- and mileage-aware repair-shock calibration that increases both expected repair frequency and repair severity as wear accumulates
+- starting vehicle age and odometer inputs so wear, tires, and mileage-sensitive resale can begin from a used-car state instead of always assuming a fresh purchase
 - loan amortization with interest tracked separately from principal in the yearly breakdown
 - a first-year resale hit on top of the sampled annual depreciation rate
 - a residual value floor so resale cannot fall below a configured minimum
@@ -197,7 +199,10 @@ miles, purchased charging energy, home/public charging splits, and charging
 loss overhead so the frontend does not have to infer those values from the
 original request. It also now includes cumulative miles plus the applied
 maintenance and repair-shock calibration factors so one sampled path is easier
-to explain.
+to explain. The response also now echoes the fully resolved input after backend
+region defaults are applied, and the yearly timeline distinguishes between cash
+spent during the year and the net contribution to the final total after sale
+adjustments.
 
 ## Current API
 
@@ -215,7 +220,8 @@ The backend currently exposes:
 - `GET /api/presets`
   Returns vehicle presets derived from the local vehicle catalog.
 - `POST /api/simulate`
-  Runs the simulation and returns summary statistics plus sample totals.
+  Runs the simulation and returns summary statistics, the resolved input used by
+  the backend, sample totals, and a yearly example path.
 
 ## Getting Started
 

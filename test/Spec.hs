@@ -18,6 +18,7 @@ import CarOwnershipCostSim.RegionProfiles
   ( RegionProfile (..),
     applyRegionProfileDefaults,
     lookupRegionProfile,
+    resolveRegionAdjustedInput,
   )
 import CarOwnershipCostSim.Simulation (simulateRequestWithSeed, validateSimulationRequest)
 import CarOwnershipCostSim.Types
@@ -77,6 +78,7 @@ tests =
       TestLabel "purchase taxes and fees are included" purchaseTaxAndFeesTest,
       TestLabel "inflation raises later-year recurring costs" inflationTest,
       TestLabel "maintenance calibration grows with age and mileage" maintenanceCalibrationTest,
+      TestLabel "starting vehicle state affects wear without double-charging past mileage" startingVehicleStateTest,
       TestLabel "repair shocks add tail-risk costs" repairShockTest,
       TestLabel "repair shock calibration grows probability and cost over time" repairShockCalibrationTest,
       TestLabel "zero APR financing tracks partial payoff correctly" zeroAprFinancingTest,
@@ -131,10 +133,12 @@ deterministicCashPurchaseTest =
                   { simulationPurchasePrice = 10000,
                     simulationDownPayment = 0,
                     simulationSalesTaxRate = 0,
-                    simulationUpfrontFees = 0,
-                    simulationAnnualInflationRate = 0,
-                    simulationYearsOwned = 1,
-                    simulationAnnualMiles = 12000,
+                      simulationUpfrontFees = 0,
+                      simulationAnnualInflationRate = 0,
+                      simulationYearsOwned = 1,
+                      simulationStartingVehicleAgeYears = 0,
+                      simulationStartingOdometerMiles = 0,
+                      simulationAnnualMiles = 12000,
                     simulationAnnualMileageChangeRate = 0,
                     simulationCityDrivingShare = 0.5,
                     simulationFuelType = "gasoline",
@@ -202,7 +206,7 @@ deterministicCashPurchaseTest =
             value : _ -> value
             [] -> 0
         expectedCost = 12000 / 30 * 4 + 500 + 1000 + 200
-        expectedYearOneTotal = 10000 + expectedCost
+        expectedYearOneCashOutflow = 10000 + expectedCost
     assertClose "deterministic operating cost" expectedCost totalCost
     assertEqual "total miles driven is tracked" 12000 (summaryTotalMilesDriven summary)
     assertMaybeClose "deterministic cost per mile" (expectedCost / 12000) (summaryMeanCostPerMile summary)
@@ -213,7 +217,8 @@ deterministicCashPurchaseTest =
         assertClose "year one upfront payment is tracked" 10000 (yearlyUpfrontPayment yearOne)
         assertClose "year one purchase tax stays zero" 0 (yearlyPurchaseTax yearOne)
         assertClose "year one upfront fees stay zero" 0 (yearlyUpfrontFees yearOne)
-        assertClose "year one total includes upfront and annual costs" expectedYearOneTotal (yearlyTotalCost yearOne)
+        assertClose "year one cash outflow includes upfront and annual costs" expectedYearOneCashOutflow (yearlyCashOutflow yearOne)
+        assertClose "year one net contribution matches the final total" expectedCost (yearlyTotalCost yearOne)
       _ -> assertFailure "Expected exactly one yearly breakdown row."
 
 purchaseTaxAndFeesTest :: Test
@@ -228,10 +233,12 @@ purchaseTaxAndFeesTest =
                   { simulationPurchasePrice = 20000,
                     simulationDownPayment = 4000,
                     simulationSalesTaxRate = 0.05,
-                    simulationUpfrontFees = 300,
-                    simulationAnnualInflationRate = 0,
-                    simulationYearsOwned = 1,
-                    simulationAnnualMiles = 0,
+                      simulationUpfrontFees = 300,
+                      simulationAnnualInflationRate = 0,
+                      simulationYearsOwned = 1,
+                      simulationStartingVehicleAgeYears = 0,
+                      simulationStartingOdometerMiles = 0,
+                      simulationAnnualMiles = 0,
                     simulationAnnualMileageChangeRate = 0,
                     simulationCityDrivingShare = 0.5,
                     simulationFuelType = "gasoline",
@@ -301,7 +308,8 @@ purchaseTaxAndFeesTest =
       [yearOne] -> do
         assertClose "year one purchase tax is tracked" 1000 (yearlyPurchaseTax yearOne)
         assertClose "year one upfront fees are tracked" 300 (yearlyUpfrontFees yearOne)
-        assertClose "year one total includes tax and fees" 21300 (yearlyTotalCost yearOne)
+        assertClose "year one cash outflow includes tax and fees" 21300 (yearlyCashOutflow yearOne)
+        assertClose "year one net contribution matches the final total" 1300 (yearlyTotalCost yearOne)
       _ -> assertFailure "Expected exactly one yearly breakdown row."
 
 inflationTest :: Test
@@ -316,10 +324,12 @@ inflationTest =
                   { simulationPurchasePrice = 10000,
                     simulationDownPayment = 0,
                     simulationSalesTaxRate = 0,
-                    simulationUpfrontFees = 0,
-                    simulationAnnualInflationRate = 0.1,
-                    simulationYearsOwned = 2,
-                    simulationAnnualMiles = 12000,
+                      simulationUpfrontFees = 0,
+                      simulationAnnualInflationRate = 0.1,
+                      simulationYearsOwned = 2,
+                      simulationStartingVehicleAgeYears = 0,
+                      simulationStartingOdometerMiles = 0,
+                      simulationAnnualMiles = 12000,
                     simulationAnnualMileageChangeRate = 0,
                     simulationCityDrivingShare = 0.5,
                     simulationFuelType = "gasoline",
@@ -395,8 +405,9 @@ inflationTest =
         assertClose "year two fuel is inflated" 440 (yearlyFuel yearTwo)
         assertClose "year one maintenance calibration starts at baseline" 1.0 (yearlyMaintenanceCalibrationMultiplier yearOne)
         assertClose "year two maintenance calibration grows with age" 1.055 (yearlyMaintenanceCalibrationMultiplier yearTwo)
-        assertClose "year one total includes upfront purchase" 10750 (yearlyTotalCost yearOne)
-        assertClose "year two total reflects inflation plus wear calibration" 837.1 (yearlyTotalCost yearTwo)
+        assertClose "year one cash outflow includes upfront purchase" 10750 (yearlyCashOutflow yearOne)
+        assertClose "year two cash outflow reflects inflation plus wear calibration" 837.1 (yearlyCashOutflow yearTwo)
+        assertClose "year two net contribution reflects the resale credit" (-9162.9) (yearlyTotalCost yearTwo)
       _ -> assertFailure "Expected exactly two yearly breakdown rows."
 
 maintenanceCalibrationTest :: Test
@@ -432,6 +443,34 @@ maintenanceCalibrationTest =
         assertClose "year four maintenance uses the calibrated amount" (expectedMaintenanceCosts !! 3) (yearlyMaintenance yearFour)
       _ -> assertFailure "Expected exactly four yearly breakdown rows."
 
+startingVehicleStateTest :: Test
+startingVehicleStateTest =
+  TestCase $ do
+    let request =
+          deterministicRequest
+            141
+            baselineSimulationInput
+              { simulationPurchasePrice = 20000,
+                simulationYearsOwned = 1,
+                simulationStartingVehicleAgeYears = 3,
+                simulationStartingOdometerMiles = 60000,
+                simulationAnnualMiles = 12000,
+                simulationExpectedAnnualMilesForResale = 12000,
+                simulationExtraMileageDepreciationPerMile = 0.2,
+                simulationAnnualMaintenance = deterministicBoundedNormal 500
+              }
+        response = simulateRequestWithSeed 141 request
+        breakdown = responseExampleBreakdown response
+    case responseExampleYearlyBreakdown response of
+      [yearOne] -> do
+        assertClose "vehicle age entering year reflects the starting used-car state" 3.0 (yearlyVehicleAgeYears yearOne)
+        assertClose "owned miles stay separate from odometer miles" 12000 (yearlyCumulativeMilesDriven yearOne)
+        assertClose "odometer includes starting mileage" 72000 (yearlyOdometerMiles yearOne)
+        assertClose "existing high mileage does not trigger a new resale penalty by itself" 0 (yearlyMileageDepreciationPenalty yearOne)
+        assertClose "maintenance calibration reflects both starting age and odometer wear" 1.252375 (yearlyMaintenanceCalibrationMultiplier yearOne)
+        assertClose "net contribution still matches the scenario total" (costTotal breakdown) (yearlyTotalCost yearOne)
+      _ -> assertFailure "Expected exactly one yearly breakdown row."
+
 repairShockTest :: Test
 repairShockTest =
   TestCase $ do
@@ -444,10 +483,12 @@ repairShockTest =
                   { simulationPurchasePrice = 12000,
                     simulationDownPayment = 0,
                     simulationSalesTaxRate = 0,
-                    simulationUpfrontFees = 0,
-                    simulationAnnualInflationRate = 0,
-                    simulationYearsOwned = 1,
-                    simulationAnnualMiles = 0,
+                      simulationUpfrontFees = 0,
+                      simulationAnnualInflationRate = 0,
+                      simulationYearsOwned = 1,
+                      simulationStartingVehicleAgeYears = 0,
+                      simulationStartingOdometerMiles = 0,
+                      simulationAnnualMiles = 0,
                     simulationAnnualMileageChangeRate = 0,
                     simulationCityDrivingShare = 0.5,
                     simulationFuelType = "gasoline",
@@ -515,7 +556,8 @@ repairShockTest =
     case yearlyBreakdown of
       [yearOne] -> do
         assertClose "year one repair shock is tracked" 1500 (yearlyRepairShocks yearOne)
-        assertClose "year one total includes repair shock" 13500 (yearlyTotalCost yearOne)
+        assertClose "year one cash outflow includes repair shock" 13500 (yearlyCashOutflow yearOne)
+        assertClose "year one net contribution matches the final total" 1500 (yearlyTotalCost yearOne)
       _ -> assertFailure "Expected exactly one yearly breakdown row."
 
 repairShockCalibrationTest :: Test
@@ -1400,6 +1442,10 @@ apiSimulateRouteTest =
         pure
         (eitherDecode (simpleBody response))
     assertEqual "simulate route uses the provided seed" 20260416 (responseSeedUsed decodedResponse)
+    assertEqual
+      "simulate route echoes the resolved simulation input"
+      (resolveRegionAdjustedInput (requestInput exampleSimulationRequest))
+      (responseResolvedInput decodedResponse)
     assertEqual "simulate route preserves iteration count" (requestIterations exampleSimulationRequest) (summaryIterations (responseSummary decodedResponse))
     assertEqual "simulate route returns one yearly row per modeled year" (simulationYearsOwned (requestInput exampleSimulationRequest)) (length (responseExampleYearlyBreakdown decodedResponse))
 
@@ -1454,11 +1500,10 @@ regionCalibrationOverrideTest =
               simulationFuelPrice = deterministicBoundedNormal 0.25
             }
         expectedResolvedInput =
-          (applyRegionProfileDefaults westCoastProfile manuallyMismatchedInput)
-            { simulationApplyRegionDefaults = False
-            }
+          applyRegionProfileDefaults westCoastProfile manuallyMismatchedInput
         calibratedResponse = simulateRequestWithSeed 20260418 (deterministicRequest 20260418 manuallyMismatchedInput)
         manuallyResolvedResponse = simulateRequestWithSeed 20260418 (deterministicRequest 20260418 expectedResolvedInput)
+    assertEqual "resolved input is surfaced in the response" expectedResolvedInput (responseResolvedInput calibratedResponse)
     assertEqual "backend region calibration resolves to the same simulation as the explicit equivalent input" manuallyResolvedResponse calibratedResponse
 
 simulationInvariantsAcrossSeedsTest :: Test
@@ -1500,10 +1545,12 @@ invalidInputValidationTest =
                   { simulationPurchasePrice = 20000,
                     simulationDownPayment = 25000,
                     simulationSalesTaxRate = 1.2,
-                    simulationUpfrontFees = -1,
-                    simulationAnnualInflationRate = 1.2,
-                    simulationYearsOwned = 0,
-                    simulationAnnualMiles = 12000,
+                      simulationUpfrontFees = -1,
+                      simulationAnnualInflationRate = 1.2,
+                      simulationYearsOwned = 0,
+                      simulationStartingVehicleAgeYears = -1,
+                      simulationStartingOdometerMiles = -10,
+                      simulationAnnualMiles = 12000,
                     simulationAnnualMileageChangeRate = 1.2,
                     simulationCityDrivingShare = 1.2,
                     simulationFuelType = "gasoline",
@@ -1582,6 +1629,8 @@ invalidInputValidationTest =
     assertBool "sales tax is validated" ("Sales tax rate should be expressed as a decimal between 0 and 1." `elem` validationErrors)
     assertBool "upfront fees are validated" ("Upfront fees cannot be negative." `elem` validationErrors)
     assertBool "inflation is validated" ("Annual inflation rate should be expressed as a decimal between 0 and 1." `elem` validationErrors)
+    assertBool "starting vehicle age is validated" ("Starting vehicle age cannot be negative." `elem` validationErrors)
+    assertBool "starting odometer is validated" ("Starting odometer cannot be negative." `elem` validationErrors)
     assertBool "mileage change is validated" ("Annual mileage change rate should be less than or equal to 1." `elem` validationErrors)
     assertBool "repair shock probability is validated" ("Repair shock probability should be expressed as a decimal between 0 and 1." `elem` validationErrors)
     assertBool "repair shock bounds are validated" ("Repair shock cost standard deviation cannot be negative." `elem` validationErrors)
@@ -1770,7 +1819,9 @@ assertResponseInvariants seed = do
   assertBool "totals stay ordered from min to max" (summaryMinTotalCost summary <= summaryMeanTotalCost summary && summaryMeanTotalCost summary <= summaryMaxTotalCost summary)
   assertBool "percentiles stay ordered" (summaryP10TotalCost summary <= summaryMedianTotalCost summary && summaryMedianTotalCost summary <= summaryP90TotalCost summary)
   assertMaybeClose "mean cost per mile stays consistent with mean total cost" (summaryMeanTotalCost summary / totalMiles) (summaryMeanCostPerMile summary)
-  assertBool "all yearly totals stay non-negative" (all (\yearBreakdown -> yearlyTotalCost yearBreakdown >= 0) yearlyBreakdown)
+  assertClose "resolved input is surfaced alongside the response" (simulationAnnualMiles (responseResolvedInput response)) (simulationAnnualMiles (requestInput exampleSimulationRequest))
+  assertClose "yearly net contributions sum to the final total" (sum (map yearlyTotalCost yearlyBreakdown)) (costTotal exampleBreakdown)
+  assertClose "yearly cash outflow sums to the explicit cash categories" (sum (map yearlyCashOutflow yearlyBreakdown)) (costUpfrontPayment exampleBreakdown + costPurchaseTax exampleBreakdown + costUpfrontFees exampleBreakdown + costLoanPaymentsMade exampleBreakdown + costFuel exampleBreakdown + costMaintenance exampleBreakdown + costRepairShocks exampleBreakdown + costInsurance exampleBreakdown + costRegistration exampleBreakdown + costParking exampleBreakdown + costTolls exampleBreakdown + costInspection exampleBreakdown + costTires exampleBreakdown)
   assertBool
     "yearly city and highway miles stay aligned with total miles"
     (all
@@ -1779,6 +1830,14 @@ assertResponseInvariants seed = do
   assertBool
     "cumulative miles stay non-decreasing over time"
     (isNonIncreasing (reverse (map yearlyCumulativeMilesDriven yearlyBreakdown)))
+  assertBool
+    "odometer miles stay non-decreasing over time"
+    (isNonIncreasing (reverse (map yearlyOdometerMiles yearlyBreakdown)))
+  assertBool
+    "odometer miles stay aligned with owned miles plus the starting state"
+    (all
+       (\yearBreakdown -> abs (yearlyOdometerMiles yearBreakdown - (simulationStartingOdometerMiles (responseResolvedInput response) + yearlyCumulativeMilesDriven yearBreakdown)) <= 1.0e-6)
+       yearlyBreakdown)
   assertBool
     "yearly city and highway gallons stay aligned with total gallons"
     (all
@@ -1894,10 +1953,12 @@ invalidSimulationRequest =
           { simulationPurchasePrice = 20000,
             simulationDownPayment = 25000,
             simulationSalesTaxRate = 1.2,
-            simulationUpfrontFees = -1,
-            simulationAnnualInflationRate = 1.2,
-            simulationYearsOwned = 0,
-            simulationAnnualMiles = 12000,
+              simulationUpfrontFees = -1,
+              simulationAnnualInflationRate = 1.2,
+              simulationYearsOwned = 0,
+              simulationStartingVehicleAgeYears = -1,
+              simulationStartingOdometerMiles = -10,
+              simulationAnnualMiles = 12000,
             simulationAnnualMileageChangeRate = 1.2,
             simulationCityDrivingShare = 1.2,
             simulationFuelType = "gasoline",
@@ -2009,10 +2070,12 @@ baselineSimulationInput =
     { simulationPurchasePrice = 10000,
       simulationDownPayment = 0,
       simulationSalesTaxRate = 0,
-      simulationUpfrontFees = 0,
-      simulationAnnualInflationRate = 0,
-      simulationYearsOwned = 1,
-      simulationAnnualMiles = 0,
+        simulationUpfrontFees = 0,
+        simulationAnnualInflationRate = 0,
+        simulationYearsOwned = 1,
+        simulationStartingVehicleAgeYears = 0,
+        simulationStartingOdometerMiles = 0,
+        simulationAnnualMiles = 0,
       simulationAnnualMileageChangeRate = 0,
       simulationCityDrivingShare = 0.5,
       simulationFuelType = "gasoline",

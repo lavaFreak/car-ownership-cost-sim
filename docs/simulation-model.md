@@ -30,6 +30,8 @@ The following pieces are deterministic once a scenario input is fixed:
 - sales tax
 - upfront fees
 - annual inflation rate
+- starting vehicle age at purchase
+- starting odometer at purchase
 - annual miles at year 1
 - annual mileage change rate
 - city-driving share
@@ -102,7 +104,9 @@ resolved from the selected region profile before simulation starts.
 
 For each modeled year, the simulator currently computes:
 
+- vehicle age entering the year
 - miles driven for the year
+- odometer miles by the end of the year
 - city and highway miles for the year
 - city and highway energy consumed for the year
 - gasoline gallons for the year when the powertrain uses liquid fuel
@@ -116,6 +120,8 @@ For each modeled year, the simulator currently computes:
 - tire replacement cost if cumulative miles cross a tire-life threshold
 - inflated insurance, registration, parking, toll, and inspection costs
 - loan payment, principal, interest, and remaining balance
+- cash outflow for the year before sale adjustments
+- final-year loan settlement and resale credit when ownership ends
 - depreciation loss and ending vehicle value
 - first-year depreciation bonus on top of the sampled annual rate
 - mileage-driven resale penalties when actual cumulative miles exceed the
@@ -126,8 +132,9 @@ The yearly breakdown is returned to the frontend so the UI can explain how one
 sampled path evolves over time. That response now includes explicit electric
 miles, liquid-fuel miles, purchased energy, home/public charging energy, and
 charging-loss units instead of leaving the frontend to infer them from the
-request. It also returns cumulative miles plus the applied maintenance and
-repair calibration fields so the wear model is explainable year by year.
+request. It also returns starting-state-aware odometer tracking plus the
+applied maintenance and repair calibration fields so the wear model is
+explainable year by year.
 
 ## Wear calibration
 
@@ -142,8 +149,8 @@ For each modeled year, the backend derives:
 
 Those values are driven by:
 
-- ownership year within the scenario
-- cumulative miles driven so far
+- the starting vehicle age plus ownership year within the scenario
+- the starting odometer plus cumulative miles driven so far
 - the selected fuel or powertrain type
 
 The current calibration is heuristic rather than market-trained, but it now
@@ -208,6 +215,8 @@ The API returns three complementary views of the same run:
 
 - distribution summary
   - mean, median, p10, p90, min, max, and cost-per-mile metrics
+- resolved input
+  - the exact backend-adjusted assumptions used after optional region defaults
 - sample totals
   - the raw total cost from every Monte Carlo iteration
 - one example path
@@ -215,6 +224,13 @@ The API returns three complementary views of the same run:
 
 The example path is not "the average case." It is one sampled scenario that is
 useful for explanation.
+
+Important yearly-accounting note:
+
+- `yearlyCashOutflow` is the amount actually spent during that year
+- `yearlyTotalCost` is the net contribution to the final ownership total
+- in the final year, `yearlyTotalCost` also incorporates any remaining loan
+  settlement and the resale credit from selling the vehicle
 
 ## Current assumptions and limits
 

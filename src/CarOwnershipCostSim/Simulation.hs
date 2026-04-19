@@ -65,6 +65,7 @@ simulateRequestWithSeed seed request =
       totalMilesDriven = totalMilesDrivenForInput simulationInput
    in SimulationResponse
         { responseSeedUsed = seed,
+          responseResolvedInput = simulationInput,
           responseSummary = summarizeTotals iterations totalMilesDriven totals,
           responseSampleTotals = totals,
           responseExampleBreakdown = exampleBreakdown,
@@ -134,6 +135,8 @@ simulateDetailedCostBreakdown simulationInput initialGen =
       annualInflationRate = max 0 (simulationAnnualInflationRate simulationInput)
       annualMileageChangeRate = max (-1) (simulationAnnualMileageChangeRate simulationInput)
       baseAnnualMiles = max 0 (simulationAnnualMiles simulationInput)
+      startingVehicleAgeYears = max 0 (simulationStartingVehicleAgeYears simulationInput)
+      startingOdometerMiles = max 0 (simulationStartingOdometerMiles simulationInput)
       cityDrivingShare = clampUnitInterval (simulationCityDrivingShare simulationInput)
       fuelType = normalizeFuelType (simulationFuelType simulationInput)
       homeChargingShare = clampUnitInterval (simulationHomeChargingShare simulationInput)
@@ -162,6 +165,8 @@ simulateDetailedCostBreakdown simulationInput initialGen =
         simulateYears
           yearsOwned
           purchasePrice
+          startingVehicleAgeYears
+          startingOdometerMiles
           baseAnnualMiles
           annualMileageChangeRate
           cityDrivingShare
@@ -190,7 +195,7 @@ simulateDetailedCostBreakdown simulationInput initialGen =
       financing = buildFinancingSnapshot simulationInput
       yearlyBreakdowns =
         zipWith
-          (buildYearlyCostBreakdown financing purchaseTax upfrontFees annualInflationRate annualInsuranceCost annualRegistrationCost annualParkingCost annualTollsCost annualInspectionCost)
+          (buildYearlyCostBreakdown yearsOwned startingVehicleAgeYears startingOdometerMiles financing purchaseTax upfrontFees annualInflationRate annualInsuranceCost annualRegistrationCost annualParkingCost annualTollsCost annualInspectionCost)
           [1 ..]
           sampledYears
       fuelCost = sum (map yearlyFuel yearlyBreakdowns)
@@ -294,6 +299,8 @@ simulateYears ::
   Double ->
   Double ->
   Double ->
+  Double ->
+  Double ->
   String ->
   Double ->
   Double ->
@@ -317,7 +324,7 @@ simulateYears ::
   Double ->
   StdGen ->
   ([SampledYear], StdGen)
-simulateYears yearsRemaining carValue baseAnnualMiles annualMileageChangeRate cityDrivingShare fuelType homeChargingShare chargingLossRate plugInElectricDrivingShare cityMilesPerGallon highwayMilesPerGallon plugInElectricCityMilesPerGallonEquivalent plugInElectricHighwayMilesPerGallonEquivalent fuelModel homeChargingPriceModel publicChargingPriceModel maintenanceModel repairShockProbability repairShockModel depreciationModel tireReplacementCost tireLifeMiles firstYearDepreciationBonus residualValueFloorPercent expectedAnnualMilesForResale extraMileageDepreciationPerMile initialGen =
+simulateYears yearsRemaining carValue startingVehicleAgeYears startingOdometerMiles baseAnnualMiles annualMileageChangeRate cityDrivingShare fuelType homeChargingShare chargingLossRate plugInElectricDrivingShare cityMilesPerGallon highwayMilesPerGallon plugInElectricCityMilesPerGallonEquivalent plugInElectricHighwayMilesPerGallonEquivalent fuelModel homeChargingPriceModel publicChargingPriceModel maintenanceModel repairShockProbability repairShockModel depreciationModel tireReplacementCost tireLifeMiles firstYearDepreciationBonus residualValueFloorPercent expectedAnnualMilesForResale extraMileageDepreciationPerMile initialGen =
   go yearsRemaining 1 carValue 0 [] initialGen
   where
     go 0 _ _ _ acc gen = (reverse acc, gen)
@@ -349,22 +356,25 @@ simulateYears yearsRemaining carValue baseAnnualMiles annualMileageChangeRate ci
               else 0
           tireCost =
             tireReplacementCost
-              * fromIntegral (tireReplacementCount tireLifeMiles priorMilesDriven (priorMilesDriven + yearlyMiles))
-          actualCumulativeMiles = priorMilesDriven + yearlyMiles
+              * fromIntegral (tireReplacementCount tireLifeMiles (startingOdometerMiles + priorMilesDriven) (startingOdometerMiles + priorMilesDriven + yearlyMiles))
+          ownedCumulativeMiles = priorMilesDriven + yearlyMiles
+          actualCumulativeMiles = startingOdometerMiles + ownedCumulativeMiles
           maintenanceMultiplier =
-            maintenanceCalibrationMultiplier fuelType yearIndex actualCumulativeMiles
+            maintenanceCalibrationMultiplier fuelType startingVehicleAgeYears yearIndex actualCumulativeMiles
           repairShockProbabilityApplied =
-            calibratedRepairShockProbability fuelType repairShockProbability yearIndex actualCumulativeMiles
+            calibratedRepairShockProbability fuelType repairShockProbability startingVehicleAgeYears yearIndex actualCumulativeMiles
           repairShockCostMultiplier =
-            repairShockCostCalibrationMultiplier fuelType yearIndex actualCumulativeMiles
-          expectedCumulativeMiles = expectedCumulativeMilesForYear expectedAnnualMilesForResale yearIndex
+            repairShockCostCalibrationMultiplier fuelType startingVehicleAgeYears yearIndex actualCumulativeMiles
+          expectedCumulativeMiles = expectedCumulativeMilesForYear expectedAnnualMilesForResale startingVehicleAgeYears yearIndex
           mileagePenalty =
             incrementalMileageDepreciationPenalty
               expectedAnnualMilesForResale
               extraMileageDepreciationPerMile
+              startingVehicleAgeYears
+              startingOdometerMiles
               yearIndex
               priorMilesDriven
-              actualCumulativeMiles
+              (priorMilesDriven + yearlyMiles)
           (fuelPrice, gen1) =
             if usesLiquidFuel fuelType
               then sampleBoundedNormal fuelModel gen0
@@ -399,7 +409,7 @@ simulateYears yearsRemaining carValue baseAnnualMiles annualMileageChangeRate ci
           sampledYear =
             SampledYear
               { sampledYearMilesDriven = yearlyMiles,
-                sampledYearCumulativeMilesDriven = actualCumulativeMiles,
+                sampledYearCumulativeMilesDriven = ownedCumulativeMiles,
                 sampledYearCityMilesDriven = cityMiles,
                 sampledYearHighwayMilesDriven = highwayMiles,
                 sampledYearElectricMilesDriven = cityElectricMiles + highwayElectricMiles,
@@ -432,7 +442,7 @@ simulateYears yearsRemaining carValue baseAnnualMiles annualMileageChangeRate ci
                 sampledYearDepreciationLoss = max 0 (currentValue - nextValue),
                 sampledYearEndingVehicleValue = nextValue
               }
-       in go (remaining - 1) (yearIndex + 1) nextValue (priorMilesDriven + yearlyMiles) (sampledYear : acc) gen7
+       in go (remaining - 1) (yearIndex + 1) nextValue ownedCumulativeMiles (sampledYear : acc) gen7
 
 data FinancingSnapshot = FinancingSnapshot
   { financingUpfrontPayment :: Double,
@@ -481,6 +491,9 @@ buildFinancingSnapshot simulationInput =
         }
 
 buildYearlyCostBreakdown ::
+  Int ->
+  Double ->
+  Double ->
   FinancingSnapshot ->
   Double ->
   Double ->
@@ -493,7 +506,7 @@ buildYearlyCostBreakdown ::
   Int ->
   SampledYear ->
   YearlyCostBreakdown
-buildYearlyCostBreakdown financing purchaseTax upfrontFees annualInflationRate annualInsuranceCost annualRegistrationCost annualParkingCost annualTollsCost annualInspectionCost yearIndex sampledYear =
+buildYearlyCostBreakdown yearsOwned startingVehicleAgeYears startingOdometerMiles financing purchaseTax upfrontFees annualInflationRate annualInsuranceCost annualRegistrationCost annualParkingCost annualTollsCost annualInspectionCost yearIndex sampledYear =
   let upfrontPayment =
         if yearIndex == 1
           then financingUpfrontPayment financing
@@ -520,7 +533,7 @@ buildYearlyCostBreakdown financing purchaseTax upfrontFees annualInflationRate a
       loanPayments = yearlyLoanPaymentTotal loanBreakdown
       yearEndLoanBalance = yearlyLoanBalanceEnd loanBreakdown
       endingVehicleValue = sampledYearEndingVehicleValue sampledYear
-      totalCost =
+      cashOutflow =
         upfrontPayment
           + yearOnePurchaseTax
           + yearOneUpfrontFees
@@ -534,11 +547,28 @@ buildYearlyCostBreakdown financing purchaseTax upfrontFees annualInflationRate a
           + inflatedTollsCost
           + inflatedInspectionCost
           + inflatedTireCost
-          + sampledYearDepreciationLoss sampledYear
+      loanSettlementApplied =
+        if yearIndex == yearsOwned
+          then yearEndLoanBalance
+          else 0
+      resaleCreditApplied =
+        if yearIndex == yearsOwned
+          then endingVehicleValue
+          else 0
+      totalCost =
+        cashOutflow
+          + loanSettlementApplied
+          - resaleCreditApplied
+      vehicleAgeYears =
+        startingVehicleAgeYears + fromIntegral (max 0 (yearIndex - 1))
+      odometerMiles =
+        startingOdometerMiles + sampledYearCumulativeMilesDriven sampledYear
    in YearlyCostBreakdown
         { yearlyYear = yearIndex,
+          yearlyVehicleAgeYears = vehicleAgeYears,
           yearlyMilesDriven = sampledYearMilesDriven sampledYear,
           yearlyCumulativeMilesDriven = sampledYearCumulativeMilesDriven sampledYear,
+          yearlyOdometerMiles = odometerMiles,
           yearlyCityMilesDriven = sampledYearCityMilesDriven sampledYear,
           yearlyHighwayMilesDriven = sampledYearHighwayMilesDriven sampledYear,
           yearlyElectricMilesDriven = sampledYearElectricMilesDriven sampledYear,
@@ -576,6 +606,9 @@ buildYearlyCostBreakdown financing purchaseTax upfrontFees annualInflationRate a
           yearlyTolls = inflatedTollsCost,
           yearlyInspection = inflatedInspectionCost,
           yearlyTires = inflatedTireCost,
+          yearlyCashOutflow = cashOutflow,
+          yearlyLoanSettlementApplied = loanSettlementApplied,
+          yearlyResaleCreditApplied = resaleCreditApplied,
           yearlyExpectedCumulativeMiles = sampledYearExpectedCumulativeMiles sampledYear,
           yearlyMileageDepreciationPenalty = sampledYearMileageDepreciationPenalty sampledYear,
           yearlyDepreciationRateApplied = sampledYearDepreciationRateApplied sampledYear,
@@ -596,27 +629,27 @@ data WearCalibrationProfile = WearCalibrationProfile
     wearRepairCostMileageRate :: Double
   }
 
-maintenanceCalibrationMultiplier :: String -> Int -> Double -> Double
-maintenanceCalibrationMultiplier fuelType yearIndex cumulativeMilesDriven =
+maintenanceCalibrationMultiplier :: String -> Double -> Int -> Double -> Double
+maintenanceCalibrationMultiplier fuelType startingVehicleAgeYears yearIndex cumulativeMilesDriven =
   min 2.6 $
-    (1 + fromIntegral (wearAgeYears yearIndex) * wearMaintenanceAgeRate wearProfile)
+    (1 + wearAgeYears startingVehicleAgeYears yearIndex * wearMaintenanceAgeRate wearProfile)
       * (1 + wearMileageSteps cumulativeMilesDriven * wearMaintenanceMileageRate wearProfile)
   where
     wearProfile = wearCalibrationProfileForFuelType fuelType
 
-calibratedRepairShockProbability :: String -> Double -> Int -> Double -> Double
-calibratedRepairShockProbability fuelType baseProbability yearIndex cumulativeMilesDriven =
+calibratedRepairShockProbability :: String -> Double -> Double -> Int -> Double -> Double
+calibratedRepairShockProbability fuelType baseProbability startingVehicleAgeYears yearIndex cumulativeMilesDriven =
   clampUnitInterval $
     baseProbability
-      * (1 + fromIntegral (wearAgeYears yearIndex) * wearRepairProbabilityAgeRate wearProfile)
+      * (1 + wearAgeYears startingVehicleAgeYears yearIndex * wearRepairProbabilityAgeRate wearProfile)
       * (1 + wearMileageSteps cumulativeMilesDriven * wearRepairProbabilityMileageRate wearProfile)
   where
     wearProfile = wearCalibrationProfileForFuelType fuelType
 
-repairShockCostCalibrationMultiplier :: String -> Int -> Double -> Double
-repairShockCostCalibrationMultiplier fuelType yearIndex cumulativeMilesDriven =
+repairShockCostCalibrationMultiplier :: String -> Double -> Int -> Double -> Double
+repairShockCostCalibrationMultiplier fuelType startingVehicleAgeYears yearIndex cumulativeMilesDriven =
   min 2.8 $
-    (1 + fromIntegral (wearAgeYears yearIndex) * wearRepairCostAgeRate wearProfile)
+    (1 + wearAgeYears startingVehicleAgeYears yearIndex * wearRepairCostAgeRate wearProfile)
       * (1 + wearMileageSteps cumulativeMilesDriven * wearRepairCostMileageRate wearProfile)
   where
     wearProfile = wearCalibrationProfileForFuelType fuelType
@@ -670,9 +703,9 @@ wearCalibrationProfileForFuelType fuelType =
           wearRepairCostMileageRate = 0.03
         }
 
-wearAgeYears :: Int -> Int
-wearAgeYears yearIndex =
-  max 0 (yearIndex - 1)
+wearAgeYears :: Double -> Int -> Double
+wearAgeYears startingVehicleAgeYears yearIndex =
+  max 0 (startingVehicleAgeYears + fromIntegral (max 0 (yearIndex - 1)))
 
 wearMileageSteps :: Double -> Double
 wearMileageSteps cumulativeMilesDriven =
@@ -841,16 +874,19 @@ clampChargingLossRate :: Double -> Double
 clampChargingLossRate =
   max 0 . min 0.99
 
-expectedCumulativeMilesForYear :: Double -> Int -> Double
-expectedCumulativeMilesForYear expectedAnnualMiles yearIndex =
-  max 0 expectedAnnualMiles * fromIntegral (max 0 yearIndex)
+expectedCumulativeMilesForYear :: Double -> Double -> Int -> Double
+expectedCumulativeMilesForYear expectedAnnualMiles startingVehicleAgeYears yearIndex =
+  let expectedStartingMiles = max 0 expectedAnnualMiles * max 0 startingVehicleAgeYears
+   in expectedStartingMiles + max 0 expectedAnnualMiles * fromIntegral (max 0 yearIndex)
 
-incrementalMileageDepreciationPenalty :: Double -> Double -> Int -> Double -> Double -> Double
-incrementalMileageDepreciationPenalty expectedAnnualMiles penaltyPerMile yearIndex milesBeforeYear milesAfterYear =
-  let expectedMilesBeforeYear = expectedCumulativeMilesForYear expectedAnnualMiles (yearIndex - 1)
-      expectedMilesAfterYear = expectedCumulativeMilesForYear expectedAnnualMiles yearIndex
-      overageBeforeYear = max 0 (milesBeforeYear - expectedMilesBeforeYear)
-      overageAfterYear = max 0 (milesAfterYear - expectedMilesAfterYear)
+incrementalMileageDepreciationPenalty :: Double -> Double -> Double -> Double -> Int -> Double -> Double -> Double
+incrementalMileageDepreciationPenalty expectedAnnualMiles penaltyPerMile startingVehicleAgeYears startingOdometerMiles yearIndex ownedMilesBeforeYear ownedMilesAfterYear =
+  let actualMilesBeforeYear = max 0 startingOdometerMiles + max 0 ownedMilesBeforeYear
+      actualMilesAfterYear = max 0 startingOdometerMiles + max 0 ownedMilesAfterYear
+      expectedMilesBeforeYear = expectedCumulativeMilesForYear expectedAnnualMiles startingVehicleAgeYears (yearIndex - 1)
+      expectedMilesAfterYear = expectedCumulativeMilesForYear expectedAnnualMiles startingVehicleAgeYears yearIndex
+      overageBeforeYear = max 0 (actualMilesBeforeYear - expectedMilesBeforeYear)
+      overageAfterYear = max 0 (actualMilesAfterYear - expectedMilesAfterYear)
       incrementalOverage = max 0 (overageAfterYear - overageBeforeYear)
    in incrementalOverage * max 0 penaltyPerMile
 
@@ -920,6 +956,8 @@ validateResolvedSimulationInput simulationInput =
       require (simulationAnnualInflationRate simulationInput >= 0) "Annual inflation rate cannot be negative.",
       require (simulationAnnualInflationRate simulationInput <= 1) "Annual inflation rate should be expressed as a decimal between 0 and 1.",
       require (simulationYearsOwned simulationInput >= 1) "Years owned must be at least 1.",
+      require (simulationStartingVehicleAgeYears simulationInput >= 0) "Starting vehicle age cannot be negative.",
+      require (simulationStartingOdometerMiles simulationInput >= 0) "Starting odometer cannot be negative.",
       require (simulationAnnualMiles simulationInput >= 0) "Annual miles cannot be negative.",
       require (simulationAnnualMileageChangeRate simulationInput >= (-1)) "Annual mileage change rate should be greater than or equal to -1.",
       require (simulationAnnualMileageChangeRate simulationInput <= 1) "Annual mileage change rate should be less than or equal to 1.",

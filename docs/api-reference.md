@@ -41,6 +41,8 @@ The request body is JSON with this top-level shape:
     "simulationUpfrontFees": 650,
     "simulationAnnualInflationRate": 0.03,
     "simulationYearsOwned": 5,
+    "simulationStartingVehicleAgeYears": 0,
+    "simulationStartingOdometerMiles": 0,
     "simulationAnnualMiles": 12000,
     "simulationAnnualMileageChangeRate": 0.02,
     "simulationCityDrivingShare": 0.58,
@@ -115,6 +117,10 @@ The request body is JSON with this top-level shape:
   - when absent, the server picks a random seed
 - `requestIterations` controls Monte Carlo sample count
 - bounded-normal inputs are used for uncertain variables
+- `simulationStartingVehicleAgeYears` and `simulationStartingOdometerMiles`
+  describe the vehicle state at purchase time
+  - they let the simulator treat used-car wear and resale differently from a
+    fresh purchase
 - `simulationFuelType` controls which efficiency and energy-price fields are
   active for the scenario
   - gasoline and diesel scenarios only use liquid-fuel pricing
@@ -169,6 +175,9 @@ The success response includes:
 
 - `responseSeedUsed`
   - the actual seed used for the run
+- `responseResolvedInput`
+  - the exact input the backend actually used after optional region-default
+    overrides were applied
 - `responseSummary`
   - aggregate metrics across all iterations
 - `responseSampleTotals`
@@ -206,13 +215,26 @@ When `responseExampleYearlyBreakdown` is present, each row can include:
 - `yearlyFuelGallons`
   - liquid fuel consumed that year
 - `yearlyCumulativeMilesDriven`
-  - total miles accumulated by the end of that ownership year
+  - miles accumulated during the simulated ownership horizon by the end of that
+    year
+- `yearlyOdometerMiles`
+  - vehicle odometer miles by the end of that year, including the starting
+    odometer
 - `yearlyMaintenanceCalibrationMultiplier`
   - the wear-based multiplier applied to the sampled annual maintenance value
 - `yearlyRepairShockProbabilityApplied`
   - the calibrated repair-shock probability used for that year
 - `yearlyRepairShockCostCalibrationMultiplier`
   - the wear-based multiplier applied if a repair shock occurs that year
+- `yearlyCashOutflow`
+  - the amount actually spent during that year before sale adjustments
+- `yearlyLoanSettlementApplied`
+  - any remaining loan balance applied in the final year when the vehicle is
+    sold
+- `yearlyResaleCreditApplied`
+  - the resale offset applied in the final year
+- `yearlyTotalCost`
+  - that year's net contribution to the final ownership total
 
 ## Error responses
 

@@ -55,6 +55,8 @@ data SimulationInput = SimulationInput
     simulationUpfrontFees :: Double,
     simulationAnnualInflationRate :: Double,
     simulationYearsOwned :: Int,
+    simulationStartingVehicleAgeYears :: Double,
+    simulationStartingOdometerMiles :: Double,
     simulationAnnualMiles :: Double,
     simulationAnnualMileageChangeRate :: Double,
     simulationCityDrivingShare :: Double,
@@ -147,8 +149,10 @@ instance ToJSON CostBreakdown
 -- including financing, recurring costs, mileage-driven wear, and vehicle value.
 data YearlyCostBreakdown = YearlyCostBreakdown
   { yearlyYear :: Int,
+    yearlyVehicleAgeYears :: Double,
     yearlyMilesDriven :: Double,
     yearlyCumulativeMilesDriven :: Double,
+    yearlyOdometerMiles :: Double,
     yearlyCityMilesDriven :: Double,
     yearlyHighwayMilesDriven :: Double,
     yearlyElectricMilesDriven :: Double,
@@ -186,6 +190,9 @@ data YearlyCostBreakdown = YearlyCostBreakdown
     yearlyTolls :: Double,
     yearlyInspection :: Double,
     yearlyTires :: Double,
+    yearlyCashOutflow :: Double,
+    yearlyLoanSettlementApplied :: Double,
+    yearlyResaleCreditApplied :: Double,
     yearlyExpectedCumulativeMiles :: Double,
     yearlyMileageDepreciationPenalty :: Double,
     yearlyDepreciationRateApplied :: Double,
@@ -229,6 +236,7 @@ instance ToJSON SimulationSummary
 -- example path that can be used to explain the modeled timeline in the UI.
 data SimulationResponse = SimulationResponse
   { responseSeedUsed :: Int,
+    responseResolvedInput :: SimulationInput,
     responseSummary :: SimulationSummary,
     responseSampleTotals :: [Double],
     responseExampleBreakdown :: CostBreakdown,
@@ -254,6 +262,8 @@ exampleSimulationRequest =
             simulationUpfrontFees = 650,
             simulationAnnualInflationRate = 0.03,
             simulationYearsOwned = 5,
+            simulationStartingVehicleAgeYears = 0,
+            simulationStartingOdometerMiles = 0,
             simulationAnnualMiles = 12000,
             simulationAnnualMileageChangeRate = 0.02,
             simulationCityDrivingShare = 0.58,

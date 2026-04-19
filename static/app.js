@@ -80,12 +80,16 @@ const defaultVehicleLookupStatus =
 const defaultPresetDescription =
   "Or choose an exact catalog match directly. Any autofilled values can still be edited manually.";
 
+const currentCalendarYear = new Date().getFullYear();
+
 const shareFieldNames = [
   "purchasePrice",
   "downPayment",
   "salesTaxPercent",
   "upfrontFees",
   "yearsOwned",
+  "startingVehicleAgeYears",
+  "startingOdometerMiles",
   "annualMiles",
   "annualMileageChangePercent",
   "cityDrivingSharePercent",
@@ -403,15 +407,17 @@ function applyLocationProfileDefaults(announce = true) {
     return;
   }
 
-  setNumericField("salesTaxPercent", (regionProfile.regionSalesTaxRate * 100).toFixed(1));
-  setNumericField("annualRegistration", Math.round(regionProfile.regionAnnualRegistration));
-  applyEnergyDefaultsForFuelType(fuelTypeSelect.value);
+  if (applyRegionDefaultsCheckbox.checked) {
+    setNumericField("salesTaxPercent", (regionProfile.regionSalesTaxRate * 100).toFixed(1));
+    setNumericField("annualRegistration", Math.round(regionProfile.regionAnnualRegistration));
+    applyEnergyDefaultsForFuelType(fuelTypeSelect.value);
+  }
   syncRegionManagedFieldState();
 
   if (announce) {
     statusLine.textContent = applyRegionDefaultsCheckbox.checked
       ? `${regionOptionLabel(regionProfile)} backend defaults are active for tax, registration, and energy assumptions. Turn the region toggle off to edit those values manually.`
-      : `${regionOptionLabel(regionProfile)} starter defaults applied. You can still edit every assumption manually.`;
+      : `${regionOptionLabel(regionProfile)} selected. Manual tax, registration, and energy assumptions were preserved.`;
   }
 }
 
@@ -767,6 +773,8 @@ function collectFormValues() {
     salesTaxPercent: numericValue("salesTaxPercent"),
     upfrontFees: numericValue("upfrontFees"),
     yearsOwned: numericValue("yearsOwned"),
+    startingVehicleAgeYears: numericValue("startingVehicleAgeYears"),
+    startingOdometerMiles: numericValue("startingOdometerMiles"),
     annualMiles: numericValue("annualMiles"),
     annualMileageChangePercent: numericValue("annualMileageChangePercent"),
     cityDrivingSharePercent: numericValue("cityDrivingSharePercent"),
@@ -834,6 +842,17 @@ function calculateCombinedMpg(cityShare, cityMpg, highwayMpg) {
 
 function presetDescriptionText(preset) {
   return `${preset.presetDescription} Prefills purchase price, efficiency, insurance, registration, maintenance, depreciation, resale, and repair-risk assumptions. Plug-in vehicles also preload their electric-driving defaults when available. You can still edit any field manually afterward.`;
+}
+
+function suggestedStartingStateForCatalogEntry(catalogEntry) {
+  const modelYear = Number(catalogEntry.catalogYear) || currentCalendarYear;
+  const ageYears = Math.max(0, currentCalendarYear - modelYear);
+  const expectedAnnualMiles = Number(catalogEntry.catalogExpectedAnnualMilesForResale) || 0;
+
+  return {
+    startingVehicleAgeYears: ageYears,
+    startingOdometerMiles: Math.round(ageYears * expectedAnnualMiles),
+  };
 }
 
 function presetLikeFromCatalogEntry(catalogEntry) {
@@ -942,9 +961,14 @@ function applyVehicleCatalogSelectionById(vehicleId) {
   setVehicleLookupFromEntry(catalogEntry);
   vehiclePresetSelect.value = vehicleId;
   applyVehiclePreset(preset);
+  const suggestedStartingState = suggestedStartingStateForCatalogEntry(catalogEntry);
+  setNumericField("startingVehicleAgeYears", suggestedStartingState.startingVehicleAgeYears.toFixed(1));
+  setNumericField("startingOdometerMiles", suggestedStartingState.startingOdometerMiles);
   if (applyRegionDefaultsCheckbox.checked) {
     applyRegionCalibrationState(false);
     statusLine.textContent = `${catalogEntry.catalogName} loaded. ${regionOptionLabel(selectedRegionProfile())} backend defaults remain active for tax, registration, and energy assumptions.`;
+  } else {
+    statusLine.textContent = `${catalogEntry.catalogName} loaded. Suggested starting age and odometer were filled from the model year, and your manual region assumptions were preserved.`;
   }
   setVehicleLookupStatus(
     `${catalogEntry.catalogName} selected. Known car-specific assumptions were autofilled, and you can still edit any value manually.`
@@ -1153,6 +1177,8 @@ function buildRequestPayload(values) {
       simulationSalesTaxRate: values.salesTaxPercent / 100,
       simulationUpfrontFees: values.upfrontFees,
       simulationYearsOwned: values.yearsOwned,
+      simulationStartingVehicleAgeYears: values.startingVehicleAgeYears,
+      simulationStartingOdometerMiles: values.startingOdometerMiles,
       simulationAnnualMiles: values.annualMiles,
       simulationAnnualMileageChangeRate: values.annualMileageChangePercent / 100,
       simulationCityDrivingShare: cityDrivingShare,
@@ -1502,16 +1528,19 @@ function renderInsightPlaceholder() {
 
 function renderYearlyBreakdownPlaceholder() {
   yearlyGrid.innerHTML = `
-        <article class="yearly-card">
-          <h4>Yearly timeline</h4>
-          <dl>
-            <div><dt>Miles driven</dt><dd>After a run</dd></div>
-            <div><dt>Cumulative miles</dt><dd>After a run</dd></div>
-            <div><dt>City + highway miles</dt><dd>After a run</dd></div>
-            <div><dt>Energy used</dt><dd>After a run</dd></div>
-            <div><dt>City + highway energy</dt><dd>After a run</dd></div>
-            <div><dt>Annual totals</dt><dd>After a run</dd></div>
-            <div><dt>Year 1 purchase costs</dt><dd>After a run</dd></div>
+	        <article class="yearly-card">
+	          <h4>Yearly timeline</h4>
+	          <dl>
+	            <div><dt>Miles driven</dt><dd>After a run</dd></div>
+	            <div><dt>Vehicle age entering year</dt><dd>After a run</dd></div>
+	            <div><dt>Owned miles so far</dt><dd>After a run</dd></div>
+	            <div><dt>Odometer</dt><dd>After a run</dd></div>
+	            <div><dt>City + highway miles</dt><dd>After a run</dd></div>
+	            <div><dt>Energy used</dt><dd>After a run</dd></div>
+	            <div><dt>City + highway energy</dt><dd>After a run</dd></div>
+	            <div><dt>Cash spent this year</dt><dd>After a run</dd></div>
+	            <div><dt>Net contribution to final total</dt><dd>After a run</dd></div>
+	            <div><dt>Year 1 purchase costs</dt><dd>After a run</dd></div>
             <div><dt>Insurance + registration</dt><dd>After a run</dd></div>
             <div><dt>Parking + tolls + inspection</dt><dd>After a run</dd></div>
             <div><dt>Inflation factor</dt><dd>After a run</dd></div>
@@ -1685,6 +1714,20 @@ function validateFormValues(values) {
 
   if (validateRequiredInteger(errors, values, "yearsOwned", "Years owned") && values.yearsOwned < 1) {
     pushValidationError(errors, "yearsOwned", "Years owned must be at least 1.");
+  }
+
+  if (
+    validateRequiredNumber(errors, values, "startingVehicleAgeYears", "Starting vehicle age") &&
+    values.startingVehicleAgeYears < 0
+  ) {
+    pushValidationError(errors, "startingVehicleAgeYears", "Starting vehicle age cannot be negative.");
+  }
+
+  if (
+    validateRequiredNumber(errors, values, "startingOdometerMiles", "Starting odometer") &&
+    values.startingOdometerMiles < 0
+  ) {
+    pushValidationError(errors, "startingOdometerMiles", "Starting odometer cannot be negative.");
   }
 
   if (validateRequiredNumber(errors, values, "annualMiles", "Annual miles") && values.annualMiles < 0) {
@@ -2406,17 +2449,22 @@ function renderYearlyBreakdown(response) {
           `;
 
       return `
-        <article class="yearly-card">
-          <h4>Year ${year.yearlyYear}</h4>
-          <dl>
-            <div><dt>Miles driven</dt><dd>${formatMiles(year.yearlyMilesDriven)}</dd></div>
-            <div><dt>Cumulative miles</dt><dd>${formatMiles(year.yearlyCumulativeMilesDriven)}</dd></div>
-            <div><dt>City + highway miles</dt><dd>${formatMiles(year.yearlyCityMilesDriven)} / ${formatMiles(
-              year.yearlyHighwayMilesDriven
-            )}</dd></div>
-            ${energySection}
-            <div><dt>Total for year</dt><dd>${currency.format(year.yearlyTotalCost)}</dd></div>
-            <div><dt>Year 1 purchase costs</dt><dd>${currency.format(year.yearlyPurchaseTax + year.yearlyUpfrontFees)}</dd></div>
+	        <article class="yearly-card">
+	          <h4>Year ${year.yearlyYear}</h4>
+	          <dl>
+	            <div><dt>Miles driven</dt><dd>${formatMiles(year.yearlyMilesDriven)}</dd></div>
+	            <div><dt>Vehicle age entering year</dt><dd>${year.yearlyVehicleAgeYears.toFixed(1)} years</dd></div>
+	            <div><dt>Owned miles so far</dt><dd>${formatMiles(year.yearlyCumulativeMilesDriven)}</dd></div>
+	            <div><dt>Odometer</dt><dd>${formatMiles(year.yearlyOdometerMiles)}</dd></div>
+	            <div><dt>City + highway miles</dt><dd>${formatMiles(year.yearlyCityMilesDriven)} / ${formatMiles(
+	              year.yearlyHighwayMilesDriven
+	            )}</dd></div>
+	            ${energySection}
+	            <div><dt>Cash spent this year</dt><dd>${currency.format(year.yearlyCashOutflow)}</dd></div>
+	            <div><dt>Loan settlement at sale</dt><dd>${currency.format(year.yearlyLoanSettlementApplied)}</dd></div>
+	            <div><dt>Resale credit at sale</dt><dd>${currency.format(year.yearlyResaleCreditApplied)}</dd></div>
+	            <div><dt>Net contribution to final total</dt><dd>${currency.format(year.yearlyTotalCost)}</dd></div>
+	            <div><dt>Year 1 purchase costs</dt><dd>${currency.format(year.yearlyPurchaseTax + year.yearlyUpfrontFees)}</dd></div>
             <div><dt>Insurance + registration</dt><dd>${currency.format(
               year.yearlyInsurance + year.yearlyRegistration
             )}</dd></div>
@@ -2456,12 +2504,12 @@ function drawYearlyCostChart(yearlyBreakdown, baselineYearlyBreakdown = []) {
   yearlyChartContext.clearRect(0, 0, width, height);
 
   if (!yearlyBreakdown.length) {
-    drawYearlyPlaceholderChart("No yearly pattern yet", "Run a simulation to draw the annual cost path.");
+    drawYearlyPlaceholderChart("No yearly cash pattern yet", "Run a simulation to draw the annual cash-spend path.");
     return;
   }
 
-  const values = yearlyBreakdown.map((year) => year.yearlyTotalCost);
-  const baselineValues = baselineYearlyBreakdown.map((year) => year.yearlyTotalCost);
+  const values = yearlyBreakdown.map((year) => year.yearlyCashOutflow);
+  const baselineValues = baselineYearlyBreakdown.map((year) => year.yearlyCashOutflow);
   const maxValue = Math.max(...values, ...baselineValues, 1);
   const yearCount = Math.max(yearlyBreakdown.length, baselineYearlyBreakdown.length);
   const chartLeft = 48;
@@ -2482,7 +2530,7 @@ function drawYearlyCostChart(yearlyBreakdown, baselineYearlyBreakdown = []) {
   yearlyChartContext.stroke();
 
   yearlyBreakdown.forEach((year, index) => {
-    const barHeight = (year.yearlyTotalCost / maxValue) * chartHeight;
+    const barHeight = (year.yearlyCashOutflow / maxValue) * chartHeight;
     const x = chartLeft + index * barWidth + 10;
     const y = chartBottom - barHeight;
 
@@ -2502,7 +2550,7 @@ function drawYearlyCostChart(yearlyBreakdown, baselineYearlyBreakdown = []) {
 
     baselineYearlyBreakdown.forEach((year, index) => {
       const x = chartLeft + index * barWidth + barWidth / 2;
-      const y = chartBottom - (year.yearlyTotalCost / maxValue) * chartHeight;
+      const y = chartBottom - (year.yearlyCashOutflow / maxValue) * chartHeight;
 
       if (index === 0) {
         yearlyChartContext.moveTo(x, y);
@@ -2515,7 +2563,7 @@ function drawYearlyCostChart(yearlyBreakdown, baselineYearlyBreakdown = []) {
 
     baselineYearlyBreakdown.forEach((year, index) => {
       const x = chartLeft + index * barWidth + barWidth / 2;
-      const y = chartBottom - (year.yearlyTotalCost / maxValue) * chartHeight;
+      const y = chartBottom - (year.yearlyCashOutflow / maxValue) * chartHeight;
       yearlyChartContext.fillStyle = "rgba(70, 110, 148, 0.95)";
       yearlyChartContext.beginPath();
       yearlyChartContext.arc(x, y, 4, 0, Math.PI * 2);
@@ -2728,6 +2776,7 @@ async function runSimulation() {
       label: buildScenarioLabel(values),
       fuelType: normalizedFuelType(values.fuelType),
       inputValues: cloneData(values),
+      resolvedInput: cloneData(payload.responseResolvedInput || null),
       response: cloneData(payload),
     };
     replaceUrlWithCurrentScenario();
@@ -2740,7 +2789,7 @@ async function runSimulation() {
     redrawChartsForLatestRun();
     setResultsCallout(
       "How to read this run",
-      "Average cost is the across-run mean. Median is the middle outcome. The 10th to 90th percentile band is a practical low-to-high range for many scenarios, but outliers can still land outside it."
+      "Average cost is the across-run mean. Median is the middle outcome. The 10th to 90th percentile band is a practical low-to-high range for many scenarios, but outliers can still land outside it. The yearly chart shows cash spent by year, while the yearly cards also show the final-total contribution after sale adjustments."
     );
 
     statusLine.textContent = `Ran ${payload.responseSummary.summaryIterations.toLocaleString()} scenarios with seed ${payload.responseSeedUsed}.`;
@@ -2895,8 +2944,8 @@ fuelTypeSelect.addEventListener("change", () => {
     applyLocationProfileDefaults();
     return;
   }
-
-  applyEnergyDefaultsForFuelType(fuelTypeSelect.value);
+  syncRegionManagedFieldState();
+  statusLine.textContent = "Fuel type changed. Manual tax, registration, and energy assumptions were preserved.";
 });
 
 locationProfileSelect.addEventListener("change", () => {
