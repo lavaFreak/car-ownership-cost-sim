@@ -1,0 +1,44 @@
+2025|Chevrolet|Blazer AWD
+2025|Chevrolet|Blazer EV AWD
+2025|Chevrolet|Blazer EV AWD SS
+2025|Chevrolet|Blazer EV FWD
+2025|Chevrolet|Blazer EV FWD 22 inch tire
+2025|Chevrolet|Blazer EV RWD
+2025|Chevrolet|Blazer FWD
+2025|Chevrolet|Colorado 2WD
+2025|Chevrolet|Colorado 4WD
+2025|Chevrolet|Colorado Mud Terrain Tires 4WD
+2025|Chevrolet|Colorado ZR2 4WD
+2025|Chevrolet|Colorado ZR2 Bison 4WD
+2025|Chevrolet|Corvette
+2025|Chevrolet|Corvette E-Ray
+2025|Chevrolet|Corvette Z06
+2025|Chevrolet|Corvette Z06 Carbon Aero
+2025|Chevrolet|Corvette ZR1
+2025|Chevrolet|Equinox AWD
+2025|Chevrolet|Equinox EV AWD (11 kW Charger)
+2025|Chevrolet|Equinox EV AWD (19 kW Charger)
+2025|Chevrolet|Equinox EV FWD
+2025|Chevrolet|Equinox FWD
+2025|Chevrolet|Malibu
+2025|Chevrolet|Silverado 2WD
+2025|Chevrolet|Silverado 4WD
+2025|Chevrolet|Silverado 4WD ZR2
+2025|Chevrolet|Silverado Cab Chassis 2WD
+2025|Chevrolet|Silverado Cab Chassis 4WD
+2025|Chevrolet|Silverado EV (11 kW Charger)
+2025|Chevrolet|Silverado EV (19 kW Charger)
+2025|Chevrolet|Silverado EV 2WT
+2025|Chevrolet|Silverado EV 5WT (11 kW Charger)
+2025|Chevrolet|Silverado EV 5WT (19 kW Charger)
+2025|Chevrolet|Silverado EV 8WT
+2025|Chevrolet|Silverado Mud Terrain Tires 4WD
+2025|Chevrolet|Suburban 2WD
+2025|Chevrolet|Suburban 4WD
+2025|Chevrolet|Tahoe 2WD
+2025|Chevrolet|Tahoe 4WD
+2025|Chevrolet|Trailblazer AWD
+2025|Chevrolet|Trailblazer FWD
+2025|Chevrolet|Traverse AWD
+2025|Chevrolet|Traverse FWD
+2025|Chevrolet|Trax

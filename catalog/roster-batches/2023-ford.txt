@@ -1,0 +1,59 @@
+2023|Ford|Bronco 4WD
+2023|Ford|Bronco Badlands 4WD
+2023|Ford|Bronco Black Diamond 4WD
+2023|Ford|Bronco Raptor 4WD
+2023|Ford|Bronco Sasquatch 4WD
+2023|Ford|Bronco Sport 4WD
+2023|Ford|Edge AWD
+2023|Ford|Escape AWD
+2023|Ford|Escape AWD HEV
+2023|Ford|Escape FWD
+2023|Ford|Escape FWD HEV
+2023|Ford|Escape FWD PHEV
+2023|Ford|Expedition 2WD
+2023|Ford|Expedition 4WD
+2023|Ford|Expedition Timberline AWD
+2023|Ford|Explorer AWD
+2023|Ford|Explorer FFV AWD
+2023|Ford|Explorer HEV AWD
+2023|Ford|Explorer HEV RWD
+2023|Ford|Explorer Platinum HEV AWD
+2023|Ford|Explorer Platinum HEV RWD
+2023|Ford|Explorer RWD
+2023|Ford|Explorer Timberline AWD
+2023|Ford|F-150 Lightning 4WD
+2023|Ford|F-150 Lightning 4WD Extended Range
+2023|Ford|F-150 Lightning Platinum 4WD
+2023|Ford|F150 Pickup 2WD
+2023|Ford|F150 Pickup 2WD FFV
+2023|Ford|F150 Pickup 2WD HEV
+2023|Ford|F150 Pickup 4WD
+2023|Ford|F150 Pickup 4WD FFV
+2023|Ford|F150 Pickup 4WD HEV
+2023|Ford|F150 Pickup Tremor 4WD
+2023|Ford|F150 Pickup Tremor 4WD FFV
+2023|Ford|F150 RAPTOR 37 4WD
+2023|Ford|F150 RAPTOR 4WD
+2023|Ford|F150 RAPTOR R 4WD
+2023|Ford|Maverick AWD
+2023|Ford|Maverick FWD
+2023|Ford|Maverick HEV FWD
+2023|Ford|Maverick Tremor AWD
+2023|Ford|Mustang
+2023|Ford|Mustang Convertible
+2023|Ford|Mustang HO Convertible
+2023|Ford|Mustang HO Coupe
+2023|Ford|Mustang Mach 1
+2023|Ford|Mustang Mach-E AWD
+2023|Ford|Mustang Mach-E AWD Extended
+2023|Ford|MUSTANG MACH-E CAL RT 1 ER AWD
+2023|Ford|Mustang Mach-E GT
+2023|Ford|Mustang Mach-E GT Performance
+2023|Ford|Mustang Mach-E RWD
+2023|Ford|Mustang Mach-E RWD Extended
+2023|Ford|Mustang Mach-E RWD LFP
+2023|Ford|Ranger 2WD
+2023|Ford|Ranger 4WD
+2023|Ford|Ranger Tremor 4WD
+2023|Ford|Transit Connect Van FWD
+2023|Ford|Transit Connect Wagon LWB FWD

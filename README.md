@@ -359,9 +359,11 @@ The catalog importer now supports two project-owned input files:
 That split is the first real scaling step toward broader `2020+` coverage,
 because not every vehicle now needs a fully hand-authored maintenance,
 depreciation, repair-risk, and insurance profile before it can appear in the
-app. The current checked-in runtime catalog now covers `395` vehicles across
-`2023` through `2026`, built from `10` curated source seeds plus `385`
-lighter-weight roster rows.
+app. The current checked-in runtime catalog now covers `1006` vehicles across
+`2023` through `2026`, built from `10` curated source seeds plus `996`
+lighter-weight roster rows. The biggest makes in the current catalog are now
+`Ford`, `Kia`, `Chevrolet`, `Toyota`, `Hyundai`, and `Honda`, which is a much
+better foundation for continuing toward broader mainstream coverage.
 
 The repository also includes a basic GitHub Actions workflow that runs the main
 build and test checks on pushes and pull requests.

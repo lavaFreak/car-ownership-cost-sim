@@ -1,0 +1,44 @@
+2024|Ford|Bronco 4WD
+2024|Ford|Bronco Badlands 4WD
+2024|Ford|Bronco Black Diamond 4WD
+2024|Ford|Bronco Raptor 4WD
+2024|Ford|Bronco Sasquatch 4WD
+2024|Ford|Bronco Sport 4WD
+2024|Ford|Edge AWD
+2024|Ford|Escape AWD
+2024|Ford|Escape AWD HEV
+2024|Ford|Escape FWD
+2024|Ford|Escape FWD HEV
+2024|Ford|Expedition 2WD
+2024|Ford|Expedition 4WD
+2024|Ford|Expedition Timberline AWD
+2024|Ford|Explorer AWD
+2024|Ford|Explorer FFV AWD
+2024|Ford|Explorer RWD
+2024|Ford|Explorer Timberline AWD
+2024|Ford|F-150 Lightning 4WD
+2024|Ford|F-150 Lightning 4WD Extended Range
+2024|Ford|F-150 Lightning Platinum 4WD
+2024|Ford|F-150 Lightning PRO 4WD Extended Range
+2024|Ford|F150 Pickup 2WD
+2024|Ford|F150 Pickup 4WD
+2024|Ford|F150 Pickup 4WD HEV
+2024|Ford|F150 Pickup Tremor 4WD
+2024|Ford|F150 RAPTOR 4WD
+2024|Ford|F150 RAPTOR R 4WD
+2024|Ford|Maverick AWD
+2024|Ford|Maverick FWD
+2024|Ford|Maverick HEV FWD
+2024|Ford|Maverick Tremor AWD
+2024|Ford|Mustang
+2024|Ford|Mustang Dark Horse
+2024|Ford|Mustang Mach-E AWD
+2024|Ford|Mustang Mach-E AWD Extended
+2024|Ford|Mustang Mach-E GT
+2024|Ford|Mustang Mach-E Rally
+2024|Ford|Mustang Mach-E RWD
+2024|Ford|Mustang Mach-E RWD Extended
+2024|Ford|Mustang Performance Package
+2024|Ford|Ranger 2WD
+2024|Ford|Ranger 4WD
+2024|Ford|Ranger RAPTOR 4WD

@@ -1,0 +1,33 @@
+2023|Kia|Carnival
+2023|Kia|EV6 AWD GT
+2023|Kia|EV6 Long Range AWD (19 inch tires)
+2023|Kia|EV6 Long Range AWD (20 inch tires)
+2023|Kia|EV6 Long Range RWD
+2023|Kia|EV6 Standard Range RWD
+2023|Kia|Forte
+2023|Kia|Forte FE
+2023|Kia|K5
+2023|Kia|K5 AWD
+2023|Kia|Niro
+2023|Kia|Niro Electric
+2023|Kia|Niro FE
+2023|Kia|Niro Plug-in Hybrid
+2023|Kia|Rio
+2023|Kia|Seltos AWD
+2023|Kia|Seltos FWD
+2023|Kia|Sorento AWD
+2023|Kia|Sorento FWD
+2023|Kia|Sorento Hybrid AWD
+2023|Kia|Sorento Hybrid FWD
+2023|Kia|Sorento Plug-in Hybrid
+2023|Kia|Soul
+2023|Kia|Soul Eco dynamics
+2023|Kia|Sportage AWD
+2023|Kia|Sportage FWD
+2023|Kia|Sportage Hybrid AWD
+2023|Kia|Sportage Hybrid FWD
+2023|Kia|Sportage Plug-in Hybrid
+2023|Kia|Stinger AWD
+2023|Kia|Stinger RWD
+2023|Kia|Telluride AWD
+2023|Kia|Telluride FWD

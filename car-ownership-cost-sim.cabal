@@ -19,9 +19,19 @@ extra-source-files:
     catalog/vehicle-source-seeds.json
     catalog/vehicle-roster.json
     catalog/roster-batches/2023-mainstream.txt
+    catalog/roster-batches/2023-kia.txt
+    catalog/roster-batches/2023-ford.txt
     catalog/roster-batches/2024-mainstream.txt
+    catalog/roster-batches/2024-kia.txt
+    catalog/roster-batches/2024-ford.txt
     catalog/roster-batches/2025-mainstream.txt
+    catalog/roster-batches/2025-kia.txt
+    catalog/roster-batches/2025-ford.txt
+    catalog/roster-batches/2025-chevrolet.txt
     catalog/roster-batches/2026-mainstream.txt
+    catalog/roster-batches/2026-kia.txt
+    catalog/roster-batches/2026-ford.txt
+    catalog/roster-batches/2026-chevrolet.txt
     docs/vehicle-data-sourcing.md
     scripts/expand-roster-batch.sh
     static/index.html

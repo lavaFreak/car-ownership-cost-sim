@@ -1,0 +1,56 @@
+2026|Chevrolet|Blazer AWD
+2026|Chevrolet|Blazer EV AWD
+2026|Chevrolet|Blazer EV AWD SS
+2026|Chevrolet|Blazer EV FWD
+2026|Chevrolet|Blazer EV FWD 22 inch tire
+2026|Chevrolet|Blazer FWD
+2026|Chevrolet|Colorado 2WD
+2026|Chevrolet|Colorado 4WD
+2026|Chevrolet|Colorado Mud Terrain Tires 4WD
+2026|Chevrolet|Colorado ZR2 4WD
+2026|Chevrolet|Colorado ZR2 Bison 4WD
+2026|Chevrolet|Corvette
+2026|Chevrolet|Corvette E-Ray
+2026|Chevrolet|Corvette Z06
+2026|Chevrolet|Corvette Z06 Carbon Aero
+2026|Chevrolet|Corvette ZR1
+2026|Chevrolet|Corvette ZR1X
+2026|Chevrolet|Equinox AWD
+2026|Chevrolet|Equinox EV AWD (11 kW Charger)
+2026|Chevrolet|Equinox EV AWD (19 kW Charger)
+2026|Chevrolet|Equinox EV FWD
+2026|Chevrolet|Equinox FWD
+2026|Chevrolet|Silverado (with Sport Mode) 2WD
+2026|Chevrolet|Silverado (with Sport Mode) 4WD
+2026|Chevrolet|Silverado (with Sport Mode) 4WD M6
+2026|Chevrolet|Silverado 2WD
+2026|Chevrolet|Silverado 4WD
+2026|Chevrolet|Silverado 4WD  (Flex Fuel)
+2026|Chevrolet|Silverado 4WD 4M
+2026|Chevrolet|Silverado 4WD ZR2
+2026|Chevrolet|Silverado 4WD ZR2 (Sport/Off Road)
+2026|Chevrolet|Silverado Cab Chassis 2WD
+2026|Chevrolet|Silverado Cab Chassis 4WD
+2026|Chevrolet|Silverado EV 14-mod battery, 11kW 15-mode charger
+2026|Chevrolet|Silverado EV 14-mod battery, 11kW 6-mode charger
+2026|Chevrolet|Silverado EV 20-mod battery, 11kW 15-mode charger
+2026|Chevrolet|Silverado EV 20-mod battery, 19kW 15-mode charger
+2026|Chevrolet|Silverado EV 20-mod battery, 19kW 6-mode charger
+2026|Chevrolet|Silverado EV 24-mod battery, 19kW 6-mode charger
+2026|Chevrolet|Silverado Mud Terrain Tires (Sport Mode) 4WD
+2026|Chevrolet|Silverado Mud Terrain Tires (with Sport Mode) 4WD
+2026|Chevrolet|Silverado Mud Terrain Tires 4WD
+2026|Chevrolet|Silverado Mud Terrain Tires 4WD  (Flex Fuel)
+2026|Chevrolet|Silverado Mud Terrain Tires 4WD (Sport/off road)
+2026|Chevrolet|Silverado Mud Terrain Tires 4WD 4M
+2026|Chevrolet|Suburban 2WD
+2026|Chevrolet|Suburban 4WD
+2026|Chevrolet|Tahoe 2WD
+2026|Chevrolet|Tahoe 4WD
+2026|Chevrolet|Trailblazer AWD
+2026|Chevrolet|Trailblazer FWD
+2026|Chevrolet|Trailblazer FWD (Flex Fuel)
+2026|Chevrolet|Traverse AWD
+2026|Chevrolet|Traverse FWD
+2026|Chevrolet|Trax
+2026|Chevrolet|Trax (Flex Fuel)

@@ -1,0 +1,35 @@
+2026|Kia|Carnival
+2026|Kia|Carnival Hybrid
+2026|Kia|EV6 AWD GT
+2026|Kia|EV6 Long Range AWD (19 inch Wheels)
+2026|Kia|EV6 Long Range AWD (20 inch Wheels)
+2026|Kia|EV6 Long Range RWD
+2026|Kia|EV6 Standard Range RWD
+2026|Kia|EV9 GT
+2026|Kia|EV9 Long Range AWD
+2026|Kia|EV9 Long Range AWD GT-Line
+2026|Kia|EV9 Long Range RWD
+2026|Kia|EV9 Standard Range RWD
+2026|Kia|K4
+2026|Kia|K4 4DR w/ DMS
+2026|Kia|K4 Hatchback
+2026|Kia|K4 without DMS
+2026|Kia|K5
+2026|Kia|K5 AWD
+2026|Kia|K5 w/Stop-Start
+2026|Kia|Niro
+2026|Kia|Niro Electric
+2026|Kia|Niro FE
+2026|Kia|Niro Plug-in Hybrid
+2026|Kia|Seltos AWD
+2026|Kia|Sorento AWD
+2026|Kia|Sorento FWD
+2026|Kia|Sorento Hybrid AWD
+2026|Kia|Sorento Hybrid FWD
+2026|Kia|Sorento Plug-in Hybrid
+2026|Kia|Sportage AWD
+2026|Kia|Sportage FWD
+2026|Kia|Sportage Hybrid AWD
+2026|Kia|Sportage Hybrid FWD
+2026|Kia|Sportage Plug-in Hybrid
+2026|Kia|Sportage X-pro

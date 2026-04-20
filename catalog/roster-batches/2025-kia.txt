@@ -1,0 +1,35 @@
+2025|Kia|Carnival
+2025|Kia|Carnival Hybrid
+2025|Kia|EV6 AWD GT
+2025|Kia|EV6 Long Range AWD (19 inch Wheels)
+2025|Kia|EV6 Long Range AWD (20 inch Wheels)
+2025|Kia|EV6 Long Range RWD
+2025|Kia|EV6 Standard Range RWD
+2025|Kia|EV9 Long Range AWD
+2025|Kia|EV9 Long Range AWD GT-Line
+2025|Kia|EV9 Long Range RWD
+2025|Kia|EV9 Standard Range RWD
+2025|Kia|K4
+2025|Kia|K5
+2025|Kia|K5 AWD
+2025|Kia|Niro
+2025|Kia|Niro Electric
+2025|Kia|Niro FE
+2025|Kia|Niro Plug-in Hybrid
+2025|Kia|Seltos AWD
+2025|Kia|Seltos FWD
+2025|Kia|Sorento AWD
+2025|Kia|Sorento FWD
+2025|Kia|Sorento Hybrid AWD
+2025|Kia|Sorento Hybrid FWD
+2025|Kia|Sorento Plug-in Hybrid
+2025|Kia|Soul
+2025|Kia|Soul Eco dynamics
+2025|Kia|Sportage AWD
+2025|Kia|Sportage FWD
+2025|Kia|Sportage Hybrid AWD
+2025|Kia|Sportage Hybrid FWD
+2025|Kia|Sportage Plug-in Hybrid
+2025|Kia|Sportage X-pro
+2025|Kia|Telluride AWD
+2025|Kia|Telluride FWD
