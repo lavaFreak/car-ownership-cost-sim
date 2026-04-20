@@ -10,20 +10,29 @@ The frontend is intentionally lightweight:
 - static HTML in [static/index.html](/Users/garion/Work/projects/car-ownership-cost-sim/static/index.html)
 - static CSS in [static/styles.css](/Users/garion/Work/projects/car-ownership-cost-sim/static/styles.css)
 - one controller script in [static/app.js](/Users/garion/Work/projects/car-ownership-cost-sim/static/app.js)
+- one render and chart helper asset in [static/app-render.js](/Users/garion/Work/projects/car-ownership-cost-sim/static/app-render.js)
 
 There is no framework, build step, or client-side bundler right now.
 
-## Responsibilities of `static/app.js`
+## Responsibilities of the frontend scripts
 
-The frontend controller currently does six jobs:
+[static/app.js](/Users/garion/Work/projects/car-ownership-cost-sim/static/app.js)
+currently does five jobs:
 
 1. collect form values
 2. validate inputs before sending a request
 3. convert form data into the backend JSON request shape
 4. keep catalog-backed vehicle lookup state usable as the local catalog grows
 5. keep shareable URLs in sync with the current scenario
-6. render the API response into cards, comparison views, yearly rows, and
-   simple canvas charts
+
+[static/app-render.js](/Users/garion/Work/projects/car-ownership-cost-sim/static/app-render.js)
+owns the DOM-heavy results layer:
+
+1. render summary and breakdown cards
+2. render scenario comparison state
+3. render the yearly timeline cards
+4. draw the simple canvas charts
+5. define placeholder states before the first successful run
 
 ## Form structure
 
@@ -180,8 +189,10 @@ dependencies:
 
 - change `index.html` when adding or restructuring form sections or result
   containers
-- change `app.js` when adding inputs, validation, request fields, or rendering
-  logic
+- change `app.js` when adding inputs, validation, request fields, lookup
+  behavior, or scenario-state logic
+- change `app-render.js` when changing summary cards, comparison views, yearly
+  cards, placeholder states, or chart drawing
 - change `styles.css` when visual structure or responsive behavior needs
   adjustment
 

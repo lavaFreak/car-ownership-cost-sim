@@ -53,9 +53,11 @@ The app is split into four layers:
   Checked-in query lists that drive repeatable batch roster expansion runs.
 - [static/index.html](/Users/garion/Work/projects/car-ownership-cost-sim/static/index.html)
   Form structure and results containers.
+- [static/app-render.js](/Users/garion/Work/projects/car-ownership-cost-sim/static/app-render.js)
+  Browser-side result rendering, comparison cards, and chart drawing.
 - [static/app.js](/Users/garion/Work/projects/car-ownership-cost-sim/static/app.js)
-  Frontend controller for validation, request building, URL sharing, and
-  rendering.
+  Frontend controller for validation, request building, lookup state, and URL
+  sharing.
 - [test/Spec.hs](/Users/garion/Work/projects/car-ownership-cost-sim/test/Spec.hs)
   Model, importer, and route-level regression coverage.
 
@@ -75,8 +77,8 @@ The normal runtime path looks like this:
    selected region into concrete tax, registration, and energy assumptions.
 8. `simulateRequestWithSeed` runs the Monte Carlo engine and returns a
    `SimulationResponse`.
-9. The frontend renders summary cards, an example breakdown, yearly cards, and
-   charts from that response.
+9. `static/app-render.js` renders summary cards, an example breakdown, yearly
+   cards, and charts from that response.
 
 ## Catalog refresh flow
 
@@ -120,7 +122,8 @@ which runs build, test, and a frontend syntax check.
 - Change the API surface in `WebApp.hs`.
 - Change preset or local vehicle data behavior in `VehicleCatalog.hs`,
   `VehicleCatalogImport.hs`, and `VehiclePresets.hs`.
-- Change UI validation or rendering behavior in `static/app.js`.
+- Change UI validation behavior in `static/app.js`.
+- Change results rendering or chart behavior in `static/app-render.js`.
 
 ## Current architectural tradeoffs
 

@@ -22,7 +22,7 @@ import CarOwnershipCostSim.Types (SimulationRequest (..), exampleSimulationReque
 import CarOwnershipCostSim.VehicleCatalog (VehicleCatalogEntry)
 import CarOwnershipCostSim.VehiclePresets (vehiclePresetsFromCatalog)
 import Data.Aeson ((.=), eitherDecode, object)
-import Network.HTTP.Types.Status (status400)
+import Network.HTTP.Types.Status (status400, status404)
 import Network.Wai (Application)
 import Network.Wai.Middleware.Autohead (autohead)
 import System.Random (randomIO)
@@ -32,7 +32,8 @@ import Web.Scotty
 data StaticAssetPaths = StaticAssetPaths
   { assetIndexHtml :: FilePath,
     assetStylesCss :: FilePath,
-    assetAppJs :: FilePath
+    assetAppJs :: FilePath,
+    assetAppRenderJs :: FilePath
   }
 
 -- | Build the WAI application used by the executable and test suite.
@@ -55,6 +56,16 @@ appRoutes vehicleCatalog staticAssets = do
   get "/app.js" $ do
     setHeader "Content-Type" "application/javascript; charset=utf-8"
     file (assetAppJs staticAssets)
+
+  get "/assets/:asset" $ do
+    assetName <- pathParam "asset"
+    case resolveSupplementalAsset assetName staticAssets of
+      Just assetPath -> do
+        setHeader "Content-Type" "application/javascript; charset=utf-8"
+        file assetPath
+      Nothing -> do
+        status status404
+        text "Unknown asset."
 
   get "/api/example" $
     json exampleSimulationRequest
@@ -91,3 +102,8 @@ badRequest errorMessage details = do
       [ "error" .= errorMessage,
         "details" .= details
       ]
+
+-- | Resolve optional frontend assets that live alongside the main browser shell.
+resolveSupplementalAsset :: String -> StaticAssetPaths -> Maybe FilePath
+resolveSupplementalAsset "app-render.js" = Just . assetAppRenderJs
+resolveSupplementalAsset _ = const Nothing

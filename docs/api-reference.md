@@ -275,6 +275,6 @@ The API is still an internal project API rather than a frozen public contract.
 When request or response fields change:
 
 1. update `Types.hs`
-2. update `static/app.js`
+2. update `static/app.js` and `static/app-render.js` if the browser response handling changed
 3. update route or regression tests in `test/Spec.hs`
 4. update this document if the user-facing contract changed

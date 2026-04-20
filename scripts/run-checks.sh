@@ -28,6 +28,8 @@ echo "==> cabal test"
 env CABAL_DIR="${CABAL_DIR}" XDG_CACHE_HOME="${XDG_CACHE_HOME}" cabal --store-dir="${CABAL_STORE_DIR}" test
 
 if command -v node >/dev/null 2>&1; then
+  echo "==> node --check static/app-render.js"
+  node --check static/app-render.js
   echo "==> node --check static/app.js"
   node --check static/app.js
 fi

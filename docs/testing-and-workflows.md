@@ -25,7 +25,8 @@ The check script currently runs:
 
 1. `cabal build`
 2. `cabal test`
-3. `node --check static/app.js`
+3. `node --check static/app-render.js`
+4. `node --check static/app.js`
 
 It also defaults Cabal state into `/tmp`-backed directories so the command
 works more reliably in sandboxed or ephemeral environments. If that temporary
@@ -120,7 +121,8 @@ When changing simulation behavior:
 
 1. update the model in `Simulation.hs`
 2. update shared types in `Types.hs` if the request or response changed
-3. update the frontend in `static/app.js` and `static/index.html` if needed
+3. update the frontend in `static/app.js`, `static/app-render.js`, and
+   `static/index.html` if needed
 4. extend tests in `test/Spec.hs`
 5. update the relevant docs page if the user-facing model changed
 

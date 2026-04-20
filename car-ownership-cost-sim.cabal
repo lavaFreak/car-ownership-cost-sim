@@ -26,6 +26,7 @@ extra-source-files:
     scripts/expand-roster-batch.sh
     static/index.html
     static/styles.css
+    static/app-render.js
     static/app.js
     test/fixtures/fueleconomy/vehicle-47097.xml
     test/fixtures/fueleconomy/vehicle-47339.xml
@@ -39,6 +40,7 @@ data-files:
     catalog/vehicle-roster.json
     static/index.html
     static/styles.css
+    static/app-render.js
     static/app.js
     test/fixtures/fueleconomy/vehicle-47097.xml
     test/fixtures/fueleconomy/vehicle-47339.xml

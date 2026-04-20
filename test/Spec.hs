@@ -1412,15 +1412,19 @@ webAssetRoutesSmokeTest =
     homeResponse <- runRequest testApplication methodGet "/" BL.empty []
     stylesResponse <- runRequest testApplication methodGet "/styles.css" BL.empty []
     scriptResponse <- runRequest testApplication methodGet "/app.js" BL.empty []
+    renderScriptResponse <- runRequest testApplication methodGet "/assets/app-render.js" BL.empty []
     let homeBody = BL8.unpack (simpleBody homeResponse)
         stylesBody = BL8.unpack (simpleBody stylesResponse)
         scriptBody = BL8.unpack (simpleBody scriptResponse)
+        renderScriptBody = BL8.unpack (simpleBody renderScriptResponse)
     assertEqual "home route returns 200" status200 (simpleStatus homeResponse)
     assertEqual "styles route returns 200" status200 (simpleStatus stylesResponse)
     assertEqual "script route returns 200" status200 (simpleStatus scriptResponse)
+    assertEqual "render script route returns 200" status200 (simpleStatus renderScriptResponse)
     assertBool "home route contains the simulation form" ("sim-form" `contains` homeBody)
     assertBool "styles route serves CSS" ("body" `contains` stylesBody)
     assertBool "script route serves the frontend bootstrap" ("loadVehiclePresets" `contains` scriptBody)
+    assertBool "render script route serves the extracted renderer" ("renderInitialResultsState" `contains` renderScriptBody)
 
 homepageHeadRouteTest :: Test
 homepageHeadRouteTest =
@@ -1778,11 +1782,13 @@ buildTestApplication = do
   indexHtmlPath <- getDataFileName "static/index.html"
   stylesCssPath <- getDataFileName "static/styles.css"
   appJsPath <- getDataFileName "static/app.js"
+  appRenderJsPath <- getDataFileName "static/app-render.js"
   let staticAssets =
         StaticAssetPaths
           { assetIndexHtml = indexHtmlPath,
             assetStylesCss = stylesCssPath,
-            assetAppJs = appJsPath
+            assetAppJs = appJsPath,
+            assetAppRenderJs = appRenderJsPath
           }
   buildApplication vehicleCatalog staticAssets
 

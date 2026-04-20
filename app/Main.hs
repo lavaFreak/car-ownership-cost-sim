@@ -22,13 +22,15 @@ main = do
   indexHtmlPath <- getDataFileName "static/index.html"
   stylesCssPath <- getDataFileName "static/styles.css"
   appJsPath <- getDataFileName "static/app.js"
+  appRenderJsPath <- getDataFileName "static/app-render.js"
   vehicleCatalog <- loadVehicleCatalog catalogPath
   port <- readServerPort
   let staticAssets =
         StaticAssetPaths
           { assetIndexHtml = indexHtmlPath,
             assetStylesCss = stylesCssPath,
-            assetAppJs = appJsPath
+            assetAppJs = appJsPath,
+            assetAppRenderJs = appRenderJsPath
           }
   application <- buildApplication vehicleCatalog staticAssets
   run port application
