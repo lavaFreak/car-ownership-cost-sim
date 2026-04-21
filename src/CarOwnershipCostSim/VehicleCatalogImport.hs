@@ -324,6 +324,7 @@ buildCatalogImportSeedFromSourceSeed sourceSeed vpicModels fuelEconomyVehicle = 
   let generatedDefaults =
         defaultCatalogAssumptions
           (sourcePurchasePrice sourceSeed)
+          (sourceMake sourceSeed)
           (normalizedFuelType fuelEconomyVehicle)
           (fuelEconomyVehicleClass fuelEconomyVehicle)
           (fuelEconomyVehicleDrive fuelEconomyVehicle)
@@ -370,6 +371,7 @@ buildCatalogImportSeedFromRosterSeed rosterSeed vpicModels fuelEconomyVehicle = 
   let generatedDefaults =
         defaultCatalogAssumptions
           (rosterPurchasePrice rosterSeed)
+          (rosterMake rosterSeed)
           (normalizedFuelType fuelEconomyVehicle)
           (fuelEconomyVehicleClass fuelEconomyVehicle)
           (fuelEconomyVehicleDrive fuelEconomyVehicle)

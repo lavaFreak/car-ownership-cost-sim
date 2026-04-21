@@ -84,9 +84,9 @@ the core simulation code.
 - `src/CarOwnershipCostSim/VehicleCatalog.hs`
   Defines the normalized local vehicle catalog and shared catalog-facing types.
 - `src/CarOwnershipCostSim/VehicleCatalogDefaults.hs`
-  Generates rule-based ownership assumptions from objective vehicle attributes
-  so bulk catalog growth does not require fully hand-curated data for every
-  model.
+  Generates make-aware, rule-based ownership assumptions from objective
+  vehicle attributes so bulk catalog growth does not require fully hand-curated
+  data for every model.
 - `src/CarOwnershipCostSim/VehicleCatalogImport.hs`
   Parses official `vPIC` and `FuelEconomy.gov` payloads into catalog entries,
   supports both curated source seeds and lightweight roster rows, and merges
@@ -353,8 +353,8 @@ The catalog importer now supports two project-owned input files:
 - [catalog/vehicle-source-seeds.json](/Users/garion/Work/projects/car-ownership-cost-sim/catalog/vehicle-source-seeds.json)
   for curated vehicles where we want hand-tuned assumptions or overrides
 - [catalog/vehicle-roster.json](/Users/garion/Work/projects/car-ownership-cost-sim/catalog/vehicle-roster.json)
-  for lighter-weight rows that rely on generated defaults from official vehicle
-  attributes
+  for lighter-weight rows that rely on make-aware generated defaults from
+  official vehicle attributes
 
 That split is the first real scaling step toward broader `2020+` coverage,
 because not every vehicle now needs a fully hand-authored maintenance,

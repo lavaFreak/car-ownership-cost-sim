@@ -5,10 +5,10 @@ Module      : CarOwnershipCostSim.VehicleCatalogDefaults
 Description : Rule-based default ownership assumptions for scalable catalog import.
 
 This module exists to reduce the amount of per-vehicle hand-curation needed to
-build a useful catalog. Objective upstream data such as vehicle class, fuel
-type, drive layout, and MPG can be used to infer a reasonable first-pass set of
-ownership assumptions. Curated source seeds can still override any of these
-values when we want higher-fidelity tuning for specific vehicles.
+build a useful catalog. Objective upstream data such as make, vehicle class,
+fuel type, drive layout, and MPG can be used to infer a reasonable first-pass
+set of ownership assumptions. Curated source seeds can still override any of
+these values when we want higher-fidelity tuning for specific vehicles.
 -}
 module CarOwnershipCostSim.VehicleCatalogDefaults
   ( GeneratedCatalogAssumptions (..),
@@ -65,6 +65,21 @@ data DriveBucket
   | OtherDrive
   deriving (Eq, Show)
 
+-- | Brand-level calibration used to keep generated defaults from treating all
+-- vehicles in the same class/fuel/drive bucket as interchangeable.
+data BrandCalibration = BrandCalibration
+  { brandPriceModifier :: Double,
+    brandInsuranceModifier :: Double,
+    brandMaintenanceMultiplier :: Double,
+    brandDepreciationModifier :: Double,
+    brandFirstYearBonusModifier :: Double,
+    brandResidualFloorModifier :: Double,
+    brandMileagePenaltyModifier :: Double,
+    brandRepairProbabilityModifier :: Double,
+    brandRepairCostModifier :: Double
+  }
+  deriving (Eq, Show)
+
 -- | Generate a plain-language catalog description from objective vehicle
 -- attributes. This keeps bulk-imported rows user-friendly without requiring a
 -- hand-written summary for every exact trim.
@@ -88,37 +103,86 @@ defaultCatalogDescription rawFuelType maybeVehicleClass maybeDrive combinedMpg =
 defaultCatalogAssumptions ::
   Maybe Double ->
   String ->
+  String ->
   Maybe String ->
   Maybe String ->
   Double ->
   GeneratedCatalogAssumptions
-defaultCatalogAssumptions maybePurchasePrice rawFuelType maybeVehicleClass maybeDrive combinedMpg =
+defaultCatalogAssumptions maybePurchasePrice rawMake rawFuelType maybeVehicleClass maybeDrive combinedMpg =
   let fuelBucket = classifyFuelType rawFuelType
       classBucket = classifyVehicleClass maybeVehicleClass
       driveBucket = classifyDrive maybeDrive
-      purchasePrice = maybe (estimatedPurchasePrice fuelBucket classBucket driveBucket combinedMpg) id maybePurchasePrice
-      annualInsurance = roundMoney (900 + purchasePrice * 0.025 + fuelInsuranceModifier fuelBucket + classInsuranceModifier classBucket)
+      brandCalibration = lookupBrandCalibration rawMake
+      purchasePrice =
+        maybe
+          (estimatedPurchasePrice fuelBucket classBucket driveBucket combinedMpg + brandPriceModifier brandCalibration)
+          id
+          maybePurchasePrice
+      annualInsurance =
+        roundMoney
+          ( 900
+              + purchasePrice * 0.025
+              + fuelInsuranceModifier fuelBucket
+              + classInsuranceModifier classBucket
+              + brandInsuranceModifier brandCalibration
+          )
       annualRegistration = roundMoney (180 + purchasePrice * 0.0015 + classRegistrationModifier classBucket)
       maintenanceMean =
-        roundMoney
+        roundMoney $
           ( classMaintenanceBase classBucket
               + fuelMaintenanceModifier fuelBucket
               + driveMaintenanceModifier driveBucket
           )
+            * brandMaintenanceMultiplier brandCalibration
       maintenanceStdDev = roundMoney (max 120 (maintenanceMean * 0.28))
-      depreciationMean = clamp 0.08 0.24 (fuelDepreciationBase fuelBucket + classDepreciationModifier classBucket + priceDepreciationModifier purchasePrice)
+      depreciationMean =
+        clamp
+          0.08
+          0.24
+          ( fuelDepreciationBase fuelBucket
+              + classDepreciationModifier classBucket
+              + priceDepreciationModifier purchasePrice
+              + brandDepreciationModifier brandCalibration
+          )
       depreciationStdDev = depreciationStdDevForFuel fuelBucket
       depreciationLowerBound = clamp 0.05 0.2 (depreciationMean - depreciationStdDev * 2.5)
       depreciationUpperBound = clamp (depreciationMean + 0.05) 0.38 (depreciationMean + depreciationStdDev * 2.8)
-      firstYearDepreciationBonus = clamp 0.06 0.16 (fuelFirstYearBonus fuelBucket + classFirstYearBonus classBucket)
-      residualValueFloorPercent = clamp 0.22 0.42 (fuelResidualFloor fuelBucket + classResidualFloorModifier classBucket)
-      extraMileageDepreciationPerMile = roundCents (fuelMileagePenalty fuelBucket + classMileagePenaltyModifier classBucket)
-      repairShockProbability = clamp 0.06 0.18 (fuelRepairProbability fuelBucket + classRepairProbabilityModifier classBucket)
+      firstYearDepreciationBonus =
+        clamp
+          0.06
+          0.16
+          ( fuelFirstYearBonus fuelBucket
+              + classFirstYearBonus classBucket
+              + brandFirstYearBonusModifier brandCalibration
+          )
+      residualValueFloorPercent =
+        clamp
+          0.22
+          0.42
+          ( fuelResidualFloor fuelBucket
+              + classResidualFloorModifier classBucket
+              + brandResidualFloorModifier brandCalibration
+          )
+      extraMileageDepreciationPerMile =
+        roundCents
+          ( fuelMileagePenalty fuelBucket
+              + classMileagePenaltyModifier classBucket
+              + brandMileagePenaltyModifier brandCalibration
+          )
+      repairShockProbability =
+        clamp
+          0.06
+          0.18
+          ( fuelRepairProbability fuelBucket
+              + classRepairProbabilityModifier classBucket
+              + brandRepairProbabilityModifier brandCalibration
+          )
       repairShockMean =
         roundMoney
           ( classRepairBase classBucket
               + fuelRepairCostModifier fuelBucket
               + driveRepairCostModifier driveBucket
+              + brandRepairCostModifier brandCalibration
           )
       repairShockStdDev = roundMoney (max 350 (repairShockMean * 0.45))
    in GeneratedCatalogAssumptions
@@ -381,6 +445,130 @@ classRepairBase CrossoverSuv = 1800
 classRepairBase Minivan = 1750
 classRepairBase TruckLike = 2200
 classRepairBase OtherVehicleClass = 1600
+
+lookupBrandCalibration :: String -> BrandCalibration
+lookupBrandCalibration rawMake =
+  case normalizeComparable rawMake of
+    "toyota" ->
+      BrandCalibration
+        { brandPriceModifier = 1400,
+          brandInsuranceModifier = -60,
+          brandMaintenanceMultiplier = 0.88,
+          brandDepreciationModifier = -0.018,
+          brandFirstYearBonusModifier = -0.012,
+          brandResidualFloorModifier = 0.04,
+          brandMileagePenaltyModifier = -0.02,
+          brandRepairProbabilityModifier = -0.018,
+          brandRepairCostModifier = -220
+        }
+    "honda" ->
+      BrandCalibration
+        { brandPriceModifier = 1100,
+          brandInsuranceModifier = -40,
+          brandMaintenanceMultiplier = 0.91,
+          brandDepreciationModifier = -0.014,
+          brandFirstYearBonusModifier = -0.01,
+          brandResidualFloorModifier = 0.03,
+          brandMileagePenaltyModifier = -0.015,
+          brandRepairProbabilityModifier = -0.014,
+          brandRepairCostModifier = -180
+        }
+    "mazda" ->
+      BrandCalibration
+        { brandPriceModifier = 700,
+          brandInsuranceModifier = -20,
+          brandMaintenanceMultiplier = 0.95,
+          brandDepreciationModifier = -0.007,
+          brandFirstYearBonusModifier = -0.004,
+          brandResidualFloorModifier = 0.015,
+          brandMileagePenaltyModifier = -0.008,
+          brandRepairProbabilityModifier = -0.006,
+          brandRepairCostModifier = -90
+        }
+    "subaru" ->
+      BrandCalibration
+        { brandPriceModifier = 900,
+          brandInsuranceModifier = 40,
+          brandMaintenanceMultiplier = 1.02,
+          brandDepreciationModifier = -0.003,
+          brandFirstYearBonusModifier = 0,
+          brandResidualFloorModifier = 0.01,
+          brandMileagePenaltyModifier = 0.002,
+          brandRepairProbabilityModifier = 0.004,
+          brandRepairCostModifier = 60
+        }
+    "hyundai" ->
+      BrandCalibration
+        { brandPriceModifier = 100,
+          brandInsuranceModifier = -10,
+          brandMaintenanceMultiplier = 0.96,
+          brandDepreciationModifier = 0.002,
+          brandFirstYearBonusModifier = 0.002,
+          brandResidualFloorModifier = 0,
+          brandMileagePenaltyModifier = 0,
+          brandRepairProbabilityModifier = 0.001,
+          brandRepairCostModifier = -40
+        }
+    "kia" ->
+      BrandCalibration
+        { brandPriceModifier = 0,
+          brandInsuranceModifier = 0,
+          brandMaintenanceMultiplier = 0.97,
+          brandDepreciationModifier = 0.003,
+          brandFirstYearBonusModifier = 0.002,
+          brandResidualFloorModifier = 0,
+          brandMileagePenaltyModifier = 0.002,
+          brandRepairProbabilityModifier = 0.002,
+          brandRepairCostModifier = -20
+        }
+    "ford" ->
+      BrandCalibration
+        { brandPriceModifier = 350,
+          brandInsuranceModifier = 35,
+          brandMaintenanceMultiplier = 1.05,
+          brandDepreciationModifier = 0.009,
+          brandFirstYearBonusModifier = 0.004,
+          brandResidualFloorModifier = -0.012,
+          brandMileagePenaltyModifier = 0.01,
+          brandRepairProbabilityModifier = 0.01,
+          brandRepairCostModifier = 150
+        }
+    "chevrolet" ->
+      BrandCalibration
+        { brandPriceModifier = 150,
+          brandInsuranceModifier = 25,
+          brandMaintenanceMultiplier = 1.04,
+          brandDepreciationModifier = 0.01,
+          brandFirstYearBonusModifier = 0.004,
+          brandResidualFloorModifier = -0.015,
+          brandMileagePenaltyModifier = 0.012,
+          brandRepairProbabilityModifier = 0.012,
+          brandRepairCostModifier = 180
+        }
+    "tesla" ->
+      BrandCalibration
+        { brandPriceModifier = 6000,
+          brandInsuranceModifier = 280,
+          brandMaintenanceMultiplier = 0.82,
+          brandDepreciationModifier = 0.024,
+          brandFirstYearBonusModifier = 0.012,
+          brandResidualFloorModifier = -0.035,
+          brandMileagePenaltyModifier = 0.01,
+          brandRepairProbabilityModifier = 0.004,
+          brandRepairCostModifier = 650
+        }
+    _ ->
+      BrandCalibration
+        { brandPriceModifier = 0,
+          brandInsuranceModifier = 0,
+          brandMaintenanceMultiplier = 1,
+          brandDepreciationModifier = 0,
+          brandFirstYearBonusModifier = 0,
+          brandResidualFloorModifier = 0,
+          brandMileagePenaltyModifier = 0,
+          brandRepairProbabilityModifier = 0,
+          brandRepairCostModifier = 0
+        }
 
 fuelRepairCostModifier :: FuelBucket -> Double
 fuelRepairCostModifier GasolineVehicle = 0

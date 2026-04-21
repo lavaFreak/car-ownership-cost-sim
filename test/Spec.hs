@@ -31,6 +31,10 @@ import CarOwnershipCostSim.VehicleCatalog
     defaultVehicleCatalogRelativePath,
     loadVehicleCatalog,
   )
+import CarOwnershipCostSim.VehicleCatalogDefaults
+  ( GeneratedCatalogAssumptions (..),
+    defaultCatalogAssumptions,
+  )
 import CarOwnershipCostSim.VehicleCatalogImport
   ( FuelEconomyMenuItem (..),
     FuelEconomyVehicleRecord (..),
@@ -105,6 +109,7 @@ tests =
       TestLabel "FuelEconomy options can suggest roster seeds" fuelEconomyRosterSuggestionTest,
       TestLabel "validated roster seeds infer canonical base models" validatedRosterSeedCanonicalizationTest,
       TestLabel "missing source assumptions fall back to generated defaults" generatedSourceDefaultsTest,
+      TestLabel "generated defaults are calibrated by make" brandAwareGeneratedDefaultsTest,
       TestLabel "source seed validation rejects wrong vPIC model matches" sourceSeedValidationFailureTest,
       TestLabel "API example route returns a valid simulation request" apiExampleRouteTest,
       TestLabel "API region route returns backend calibration profiles" apiRegionsRouteTest,
@@ -1335,6 +1340,67 @@ generatedSourceDefaultsTest =
     assertBool "generated extra-mile resale penalty stays positive" (importExtraMileageDepreciationPerMile generatedImportSeed > 0)
     assertBool "generated repair shock probability stays in range" (importRepairShockProbability generatedImportSeed >= 0.05 && importRepairShockProbability generatedImportSeed <= 0.15)
     assertBool "generated repair shock mean stays positive" (boundedNormalMean (importRepairShockCost generatedImportSeed) > 0)
+
+brandAwareGeneratedDefaultsTest :: Test
+brandAwareGeneratedDefaultsTest =
+  TestCase $ do
+    let toyotaDefaults =
+          defaultCatalogAssumptions
+            Nothing
+            "Toyota"
+            "gasoline"
+            (Just "Compact Cars")
+            (Just "Front-Wheel Drive")
+            32
+        fordDefaults =
+          defaultCatalogAssumptions
+            Nothing
+            "Ford"
+            "gasoline"
+            (Just "Compact Cars")
+            (Just "Front-Wheel Drive")
+            32
+        genericElectricDefaults =
+          defaultCatalogAssumptions
+            Nothing
+            "Generic"
+            "electric"
+            (Just "Midsize Cars")
+            (Just "All-Wheel Drive")
+            110
+        teslaDefaults =
+          defaultCatalogAssumptions
+            Nothing
+            "Tesla"
+            "electric"
+            (Just "Midsize Cars")
+            (Just "All-Wheel Drive")
+            110
+    assertBool
+      "Toyota defaults carry lower maintenance than Ford for the same basic shape"
+      ( boundedNormalMean (generatedAnnualMaintenance toyotaDefaults)
+          < boundedNormalMean (generatedAnnualMaintenance fordDefaults)
+      )
+    assertBool
+      "Toyota defaults carry lower repair risk than Ford for the same basic shape"
+      ( generatedRepairShockProbability toyotaDefaults
+          < generatedRepairShockProbability fordDefaults
+      )
+    assertBool
+      "Toyota defaults preserve more residual value than Ford for the same basic shape"
+      ( generatedResidualValueFloorPercent toyotaDefaults
+          > generatedResidualValueFloorPercent fordDefaults
+      )
+    assertBool
+      "Tesla defaults carry higher insurance than a generic electric peer"
+      ( generatedAnnualInsurance teslaDefaults
+          > generatedAnnualInsurance genericElectricDefaults
+      )
+    assertBool
+      "Tesla defaults carry a lower residual floor than a generic electric peer"
+      ( generatedResidualValueFloorPercent teslaDefaults
+          < generatedResidualValueFloorPercent genericElectricDefaults
+      )
 
 sourceSeedValidationFailureTest :: Test
 sourceSeedValidationFailureTest =
