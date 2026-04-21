@@ -94,8 +94,8 @@ The vehicle catalog is not rebuilt during normal web requests.
    `buildCatalogFromLiveCatalogInputs`.
 5. `VehicleCatalogImport.hs` fetches upstream data and validates that each
    source or roster row still matches the official payloads. Curated rows may
-   override generated assumptions; roster rows rely on make-aware generated
-   defaults.
+   override generated assumptions; roster rows rely on make-aware, trim-aware
+   generated defaults.
 6. The resulting normalized rows are written to
    [catalog/vehicle-catalog.json](/Users/garion/Work/projects/car-ownership-cost-sim/catalog/vehicle-catalog.json).
 7. The web server loads that local catalog at startup and serves it from memory.

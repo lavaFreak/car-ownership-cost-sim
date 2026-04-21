@@ -110,6 +110,7 @@ tests =
       TestLabel "validated roster seeds infer canonical base models" validatedRosterSeedCanonicalizationTest,
       TestLabel "missing source assumptions fall back to generated defaults" generatedSourceDefaultsTest,
       TestLabel "generated defaults are calibrated by make" brandAwareGeneratedDefaultsTest,
+      TestLabel "generated defaults are calibrated by trim and package" variantAwareGeneratedDefaultsTest,
       TestLabel "source seed validation rejects wrong vPIC model matches" sourceSeedValidationFailureTest,
       TestLabel "API example route returns a valid simulation request" apiExampleRouteTest,
       TestLabel "API region route returns backend calibration profiles" apiRegionsRouteTest,
@@ -1348,6 +1349,8 @@ brandAwareGeneratedDefaultsTest =
           defaultCatalogAssumptions
             Nothing
             "Toyota"
+            "Corolla"
+            "LE"
             "gasoline"
             (Just "Compact Cars")
             (Just "Front-Wheel Drive")
@@ -1356,6 +1359,8 @@ brandAwareGeneratedDefaultsTest =
           defaultCatalogAssumptions
             Nothing
             "Ford"
+            "Focus"
+            "SE"
             "gasoline"
             (Just "Compact Cars")
             (Just "Front-Wheel Drive")
@@ -1364,6 +1369,8 @@ brandAwareGeneratedDefaultsTest =
           defaultCatalogAssumptions
             Nothing
             "Generic"
+            "Midsize EV"
+            "Base"
             "electric"
             (Just "Midsize Cars")
             (Just "All-Wheel Drive")
@@ -1372,6 +1379,8 @@ brandAwareGeneratedDefaultsTest =
           defaultCatalogAssumptions
             Nothing
             "Tesla"
+            "Model 3"
+            "Long Range"
             "electric"
             (Just "Midsize Cars")
             (Just "All-Wheel Drive")
@@ -1400,6 +1409,75 @@ brandAwareGeneratedDefaultsTest =
       "Tesla defaults carry a lower residual floor than a generic electric peer"
       ( generatedResidualValueFloorPercent teslaDefaults
           < generatedResidualValueFloorPercent genericElectricDefaults
+      )
+
+variantAwareGeneratedDefaultsTest :: Test
+variantAwareGeneratedDefaultsTest =
+  TestCase $ do
+    let baseTruckDefaults =
+          defaultCatalogAssumptions
+            Nothing
+            "Ford"
+            "F150 Pickup"
+            "XLT"
+            "gasoline"
+            (Just "Pickup Trucks")
+            (Just "4WD")
+            18
+        raptorDefaults =
+          defaultCatalogAssumptions
+            Nothing
+            "Ford"
+            "F150 RAPTOR 4WD"
+            "Raptor"
+            "gasoline"
+            (Just "Pickup Trucks")
+            (Just "4WD")
+            18
+        baseHybridSuvDefaults =
+          defaultCatalogAssumptions
+            Nothing
+            "Ford"
+            "Explorer HEV AWD"
+            "ST-Line"
+            "hybrid"
+            (Just "Standard Sport Utility Vehicle")
+            (Just "All-Wheel Drive")
+            27
+        platinumDefaults =
+          defaultCatalogAssumptions
+            Nothing
+            "Ford"
+            "Explorer Platinum HEV AWD"
+            "Platinum"
+            "hybrid"
+            (Just "Standard Sport Utility Vehicle")
+            (Just "All-Wheel Drive")
+            27
+    assertBool
+      "Raptor-style defaults carry higher maintenance than the base truck"
+      ( boundedNormalMean (generatedAnnualMaintenance raptorDefaults)
+          > boundedNormalMean (generatedAnnualMaintenance baseTruckDefaults)
+      )
+    assertBool
+      "Raptor-style defaults carry higher insurance than the base truck"
+      ( generatedAnnualInsurance raptorDefaults
+          > generatedAnnualInsurance baseTruckDefaults
+      )
+    assertBool
+      "Raptor-style defaults carry a higher repair risk than the base truck"
+      ( generatedRepairShockProbability raptorDefaults
+          > generatedRepairShockProbability baseTruckDefaults
+      )
+    assertBool
+      "Premium trims carry higher insurance than the comparable base hybrid SUV"
+      ( generatedAnnualInsurance platinumDefaults
+          > generatedAnnualInsurance baseHybridSuvDefaults
+      )
+    assertBool
+      "Premium trims carry a lower residual floor than the comparable base hybrid SUV"
+      ( generatedResidualValueFloorPercent platinumDefaults
+          < generatedResidualValueFloorPercent baseHybridSuvDefaults
       )
 
 sourceSeedValidationFailureTest :: Test

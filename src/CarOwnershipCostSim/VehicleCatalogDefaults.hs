@@ -5,10 +5,11 @@ Module      : CarOwnershipCostSim.VehicleCatalogDefaults
 Description : Rule-based default ownership assumptions for scalable catalog import.
 
 This module exists to reduce the amount of per-vehicle hand-curation needed to
-build a useful catalog. Objective upstream data such as make, vehicle class,
-fuel type, drive layout, and MPG can be used to infer a reasonable first-pass
-set of ownership assumptions. Curated source seeds can still override any of
-these values when we want higher-fidelity tuning for specific vehicles.
+build a useful catalog. Objective upstream data such as make, model, trim,
+vehicle class, fuel type, drive layout, and MPG can be used to infer a
+reasonable first-pass set of ownership assumptions. Curated source seeds can
+still override any of these values when we want higher-fidelity tuning for
+specific vehicles.
 -}
 module CarOwnershipCostSim.VehicleCatalogDefaults
   ( GeneratedCatalogAssumptions (..),
@@ -80,6 +81,22 @@ data BrandCalibration = BrandCalibration
   }
   deriving (Eq, Show)
 
+-- | Trim/package-level calibration used to differentiate performance, off-road,
+-- and premium variants that would otherwise share the same broad default
+-- bucket.
+data VariantCalibration = VariantCalibration
+  { variantPriceModifier :: Double,
+    variantInsuranceModifier :: Double,
+    variantMaintenanceMultiplier :: Double,
+    variantDepreciationModifier :: Double,
+    variantFirstYearBonusModifier :: Double,
+    variantResidualFloorModifier :: Double,
+    variantMileagePenaltyModifier :: Double,
+    variantRepairProbabilityModifier :: Double,
+    variantRepairCostModifier :: Double
+  }
+  deriving (Eq, Show)
+
 -- | Generate a plain-language catalog description from objective vehicle
 -- attributes. This keeps bulk-imported rows user-friendly without requiring a
 -- hand-written summary for every exact trim.
@@ -104,18 +121,24 @@ defaultCatalogAssumptions ::
   Maybe Double ->
   String ->
   String ->
+  String ->
+  String ->
   Maybe String ->
   Maybe String ->
   Double ->
   GeneratedCatalogAssumptions
-defaultCatalogAssumptions maybePurchasePrice rawMake rawFuelType maybeVehicleClass maybeDrive combinedMpg =
+defaultCatalogAssumptions maybePurchasePrice rawMake rawModel rawTrim rawFuelType maybeVehicleClass maybeDrive combinedMpg =
   let fuelBucket = classifyFuelType rawFuelType
       classBucket = classifyVehicleClass maybeVehicleClass
       driveBucket = classifyDrive maybeDrive
       brandCalibration = lookupBrandCalibration rawMake
+      variantCalibration = lookupVariantCalibration rawModel rawTrim
       purchasePrice =
         maybe
-          (estimatedPurchasePrice fuelBucket classBucket driveBucket combinedMpg + brandPriceModifier brandCalibration)
+          ( estimatedPurchasePrice fuelBucket classBucket driveBucket combinedMpg
+              + brandPriceModifier brandCalibration
+              + variantPriceModifier variantCalibration
+          )
           id
           maybePurchasePrice
       annualInsurance =
@@ -125,6 +148,7 @@ defaultCatalogAssumptions maybePurchasePrice rawMake rawFuelType maybeVehicleCla
               + fuelInsuranceModifier fuelBucket
               + classInsuranceModifier classBucket
               + brandInsuranceModifier brandCalibration
+              + variantInsuranceModifier variantCalibration
           )
       annualRegistration = roundMoney (180 + purchasePrice * 0.0015 + classRegistrationModifier classBucket)
       maintenanceMean =
@@ -134,6 +158,7 @@ defaultCatalogAssumptions maybePurchasePrice rawMake rawFuelType maybeVehicleCla
               + driveMaintenanceModifier driveBucket
           )
             * brandMaintenanceMultiplier brandCalibration
+            * variantMaintenanceMultiplier variantCalibration
       maintenanceStdDev = roundMoney (max 120 (maintenanceMean * 0.28))
       depreciationMean =
         clamp
@@ -143,6 +168,7 @@ defaultCatalogAssumptions maybePurchasePrice rawMake rawFuelType maybeVehicleCla
               + classDepreciationModifier classBucket
               + priceDepreciationModifier purchasePrice
               + brandDepreciationModifier brandCalibration
+              + variantDepreciationModifier variantCalibration
           )
       depreciationStdDev = depreciationStdDevForFuel fuelBucket
       depreciationLowerBound = clamp 0.05 0.2 (depreciationMean - depreciationStdDev * 2.5)
@@ -154,6 +180,7 @@ defaultCatalogAssumptions maybePurchasePrice rawMake rawFuelType maybeVehicleCla
           ( fuelFirstYearBonus fuelBucket
               + classFirstYearBonus classBucket
               + brandFirstYearBonusModifier brandCalibration
+              + variantFirstYearBonusModifier variantCalibration
           )
       residualValueFloorPercent =
         clamp
@@ -162,12 +189,14 @@ defaultCatalogAssumptions maybePurchasePrice rawMake rawFuelType maybeVehicleCla
           ( fuelResidualFloor fuelBucket
               + classResidualFloorModifier classBucket
               + brandResidualFloorModifier brandCalibration
+              + variantResidualFloorModifier variantCalibration
           )
       extraMileageDepreciationPerMile =
         roundCents
           ( fuelMileagePenalty fuelBucket
               + classMileagePenaltyModifier classBucket
               + brandMileagePenaltyModifier brandCalibration
+              + variantMileagePenaltyModifier variantCalibration
           )
       repairShockProbability =
         clamp
@@ -176,6 +205,7 @@ defaultCatalogAssumptions maybePurchasePrice rawMake rawFuelType maybeVehicleCla
           ( fuelRepairProbability fuelBucket
               + classRepairProbabilityModifier classBucket
               + brandRepairProbabilityModifier brandCalibration
+              + variantRepairProbabilityModifier variantCalibration
           )
       repairShockMean =
         roundMoney
@@ -183,6 +213,7 @@ defaultCatalogAssumptions maybePurchasePrice rawMake rawFuelType maybeVehicleCla
               + fuelRepairCostModifier fuelBucket
               + driveRepairCostModifier driveBucket
               + brandRepairCostModifier brandCalibration
+              + variantRepairCostModifier variantCalibration
           )
       repairShockStdDev = roundMoney (max 350 (repairShockMean * 0.45))
    in GeneratedCatalogAssumptions
@@ -569,6 +600,141 @@ lookupBrandCalibration rawMake =
           brandRepairProbabilityModifier = 0,
           brandRepairCostModifier = 0
         }
+
+lookupVariantCalibration :: String -> String -> VariantCalibration
+lookupVariantCalibration rawModel rawTrim =
+  combineVariantCalibrations
+    [ if matchesAnyKeyword normalizedVariantText performanceKeywords
+          && not (matchesAnyKeyword normalizedVariantText premiumOnlyKeywords)
+        then performanceVariantCalibration
+        else neutralVariantCalibration,
+      if matchesAnyKeyword normalizedVariantText offRoadKeywords
+        then offRoadVariantCalibration
+        else neutralVariantCalibration,
+      if matchesAnyKeyword normalizedVariantText premiumKeywords
+        then premiumVariantCalibration
+        else neutralVariantCalibration
+    ]
+  where
+    normalizedVariantText = normalizeComparable (rawModel <> " " <> rawTrim)
+
+combineVariantCalibrations :: [VariantCalibration] -> VariantCalibration
+combineVariantCalibrations =
+  foldl combineVariantCalibration neutralVariantCalibration
+
+combineVariantCalibration :: VariantCalibration -> VariantCalibration -> VariantCalibration
+combineVariantCalibration leftCalibration rightCalibration =
+  VariantCalibration
+    { variantPriceModifier = variantPriceModifier leftCalibration + variantPriceModifier rightCalibration,
+      variantInsuranceModifier = variantInsuranceModifier leftCalibration + variantInsuranceModifier rightCalibration,
+      variantMaintenanceMultiplier = variantMaintenanceMultiplier leftCalibration * variantMaintenanceMultiplier rightCalibration,
+      variantDepreciationModifier = variantDepreciationModifier leftCalibration + variantDepreciationModifier rightCalibration,
+      variantFirstYearBonusModifier = variantFirstYearBonusModifier leftCalibration + variantFirstYearBonusModifier rightCalibration,
+      variantResidualFloorModifier = variantResidualFloorModifier leftCalibration + variantResidualFloorModifier rightCalibration,
+      variantMileagePenaltyModifier = variantMileagePenaltyModifier leftCalibration + variantMileagePenaltyModifier rightCalibration,
+      variantRepairProbabilityModifier = variantRepairProbabilityModifier leftCalibration + variantRepairProbabilityModifier rightCalibration,
+      variantRepairCostModifier = variantRepairCostModifier leftCalibration + variantRepairCostModifier rightCalibration
+    }
+
+neutralVariantCalibration :: VariantCalibration
+neutralVariantCalibration =
+  VariantCalibration
+    { variantPriceModifier = 0,
+      variantInsuranceModifier = 0,
+      variantMaintenanceMultiplier = 1,
+      variantDepreciationModifier = 0,
+      variantFirstYearBonusModifier = 0,
+      variantResidualFloorModifier = 0,
+      variantMileagePenaltyModifier = 0,
+      variantRepairProbabilityModifier = 0,
+      variantRepairCostModifier = 0
+    }
+
+performanceVariantCalibration :: VariantCalibration
+performanceVariantCalibration =
+  VariantCalibration
+    { variantPriceModifier = 8500,
+      variantInsuranceModifier = 240,
+      variantMaintenanceMultiplier = 1.15,
+      variantDepreciationModifier = 0.018,
+      variantFirstYearBonusModifier = 0.01,
+      variantResidualFloorModifier = -0.025,
+      variantMileagePenaltyModifier = 0.02,
+      variantRepairProbabilityModifier = 0.014,
+      variantRepairCostModifier = 500
+    }
+
+offRoadVariantCalibration :: VariantCalibration
+offRoadVariantCalibration =
+  VariantCalibration
+    { variantPriceModifier = 4500,
+      variantInsuranceModifier = 110,
+      variantMaintenanceMultiplier = 1.12,
+      variantDepreciationModifier = 0.008,
+      variantFirstYearBonusModifier = 0.002,
+      variantResidualFloorModifier = 0.005,
+      variantMileagePenaltyModifier = 0.015,
+      variantRepairProbabilityModifier = 0.012,
+      variantRepairCostModifier = 300
+    }
+
+premiumVariantCalibration :: VariantCalibration
+premiumVariantCalibration =
+  VariantCalibration
+    { variantPriceModifier = 6000,
+      variantInsuranceModifier = 130,
+      variantMaintenanceMultiplier = 1.07,
+      variantDepreciationModifier = 0.01,
+      variantFirstYearBonusModifier = 0.005,
+      variantResidualFloorModifier = -0.012,
+      variantMileagePenaltyModifier = 0.008,
+      variantRepairProbabilityModifier = 0.005,
+      variantRepairCostModifier = 180
+    }
+
+performanceKeywords :: [String]
+performanceKeywords =
+  [ "raptor",
+    "zr1x",
+    "zr1",
+    "z06",
+    "darkhorse",
+    "gtd",
+    "mach1",
+    "gt",
+    "ss",
+    "rally",
+    "eray"
+  ]
+
+offRoadKeywords :: [String]
+offRoadKeywords =
+  [ "badlands",
+    "sasquatch",
+    "tremor",
+    "zr2",
+    "bison",
+    "x-pro",
+    "timberline",
+    "woodland",
+    "trailboss"
+  ]
+
+premiumKeywords :: [String]
+premiumKeywords =
+  [ "platinum",
+    "limited",
+    "premium",
+    "signature",
+    "gt-line"
+  ]
+
+premiumOnlyKeywords :: [String]
+premiumOnlyKeywords = ["gt-line"]
+
+matchesAnyKeyword :: String -> [String] -> Bool
+matchesAnyKeyword normalizedVariantText =
+  any (`containsComparable` normalizedVariantText)
 
 fuelRepairCostModifier :: FuelBucket -> Double
 fuelRepairCostModifier GasolineVehicle = 0
