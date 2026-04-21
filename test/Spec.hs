@@ -31,6 +31,11 @@ import CarOwnershipCostSim.VehicleCatalog
     defaultVehicleCatalogRelativePath,
     loadVehicleCatalog,
   )
+import CarOwnershipCostSim.VehicleCatalogCalibrations
+  ( VehicleCatalogCalibrationDataset (..),
+    defaultVehicleCatalogCalibrationsRelativePath,
+    loadVehicleCatalogCalibrationDataset,
+  )
 import CarOwnershipCostSim.VehicleCatalogDefaults
   ( GeneratedCatalogAssumptions (..),
     defaultCatalogAssumptions,
@@ -100,6 +105,7 @@ tests =
       TestLabel "catalog import seeds build normalized entries" catalogImportSeedTest,
       TestLabel "vehicle source seeds load cleanly" vehicleSourceSeedLoadTest,
       TestLabel "vehicle roster seeds load cleanly" vehicleRosterSeedLoadTest,
+      TestLabel "ownership calibration dataset loads cleanly" ownershipCalibrationLoadTest,
       TestLabel "vPIC fixtures decode model listings" vpicFixtureDecodingTest,
       TestLabel "FuelEconomy menus decode cleanly" fuelEconomyMenuDecodingTest,
       TestLabel "FuelEconomy fixtures decode vehicle details" fuelEconomyFixtureDecodingTest,
@@ -1062,6 +1068,14 @@ vehicleRosterSeedLoadTest =
     assertEqual "the lightweight roster spans 2023 through 2026" [2023, 2024, 2025, 2026] rosterYears
     mapM_ assertVehicleRosterSeedLooksUsable rosterSeeds
 
+ownershipCalibrationLoadTest :: Test
+ownershipCalibrationLoadTest =
+  TestCase $ do
+    calibrationDataset <- loadDefaultVehicleCatalogCalibrations
+    assertEqual "ownership calibration source name stays stable" "project-owned ownership calibration anchors" (calibrationSourceName calibrationDataset)
+    assertEqual "ownership calibration dataset keeps nine make anchors" 9 (length (calibrationBrandCalibrations calibrationDataset))
+    assertEqual "ownership calibration dataset keeps three variant rules" 3 (length (calibrationVariantRules calibrationDataset))
+
 vpicFixtureDecodingTest :: Test
 vpicFixtureDecodingTest =
   TestCase $ do
@@ -1131,6 +1145,7 @@ fuelEconomyFixtureDecodingTest =
 plugInHybridImportTest :: Test
 plugInHybridImportTest =
   TestCase $ do
+    calibrationDataset <- loadDefaultVehicleCatalogCalibrations
     priusPrimeFuelEconomyVehicle <- decodeFuelEconomyFixture "test/fixtures/fueleconomy/vehicle-49014.xml"
     let rosterSeed =
           VehicleCatalogRosterSeed
@@ -1154,7 +1169,7 @@ plugInHybridImportTest =
       either
         (\decodeError -> assertFailure ("Plug-in hybrid roster import did not build: " <> decodeError) >> pure fallbackCatalogImportSeed)
         pure
-        (buildCatalogImportSeedFromRosterSeed rosterSeed vpicModels priusPrimeFuelEconomyVehicle)
+        (buildCatalogImportSeedFromRosterSeed calibrationDataset rosterSeed vpicModels priusPrimeFuelEconomyVehicle)
     assertEqual "plug-in hybrid imports normalize the mixed fuel type" "plug-in-hybrid" (fuelEconomyFuelType (importFuelEconomy importSeed))
     assertEqual "plug-in hybrid imports keep the electric-driving share" (Just 0.677) (fuelEconomyElectricDrivingShare (importFuelEconomy importSeed))
     assertEqual "plug-in hybrid imports keep electric city MPGe" (Just 125) (fuelEconomyElectricCityMpge (importFuelEconomy importSeed))
@@ -1163,6 +1178,7 @@ plugInHybridImportTest =
 sourceSeedCatalogBuildTest :: Test
 sourceSeedCatalogBuildTest =
   TestCase $ do
+    calibrationDataset <- loadDefaultVehicleCatalogCalibrations
     sourceSeeds <- loadDefaultVehicleSourceSeeds
     let maybeCorollaSourceSeed = lookupVehicleSourceSeed "corolla-hybrid-2024" sourceSeeds
         maybeCivicSourceSeed = lookupVehicleSourceSeed "civic-hatchback-2024" sourceSeeds
@@ -1184,12 +1200,12 @@ sourceSeedCatalogBuildTest =
       either
         (\decodeError -> assertFailure ("Corolla source seed did not build: " <> decodeError) >> pure fallbackVehicleCatalogEntry)
         pure
-        (buildVehicleCatalogEntryFromSourceSeed corollaSourceSeed corollaVpicModels corollaFuelEconomyVehicle)
+        (buildVehicleCatalogEntryFromSourceSeed calibrationDataset corollaSourceSeed corollaVpicModels corollaFuelEconomyVehicle)
     civicCatalogImportSeed <-
       either
         (\decodeError -> assertFailure ("Civic source seed did not build: " <> decodeError) >> pure fallbackCatalogImportSeed)
         pure
-        (buildCatalogImportSeedFromSourceSeed civicSourceSeed hondaVpicModels civicFuelEconomyVehicle)
+        (buildCatalogImportSeedFromSourceSeed calibrationDataset civicSourceSeed hondaVpicModels civicFuelEconomyVehicle)
     assertEqual "Corolla catalog name stays presentation-friendly" "2024 Toyota Corolla Hybrid LE" (catalogName corollaCatalogEntry)
     assertClose "Corolla official combined MPG is carried through" 50 (catalogCombinedMpg corollaCatalogEntry)
     assertEqual "Corolla fuel type is normalized from official data" "hybrid-gasoline" (catalogFuelType corollaCatalogEntry)
@@ -1203,6 +1219,7 @@ sourceSeedCatalogBuildTest =
 rosterSeedCatalogBuildTest :: Test
 rosterSeedCatalogBuildTest =
   TestCase $ do
+    calibrationDataset <- loadDefaultVehicleCatalogCalibrations
     toyotaVpicModels <- decodeVpicFixture "test/fixtures/vpic/toyota-2024-models.json"
     corollaFuelEconomyVehicle <- decodeFuelEconomyFixture "test/fixtures/fueleconomy/vehicle-47339.xml"
     let rosterSeed =
@@ -1223,7 +1240,7 @@ rosterSeedCatalogBuildTest =
       either
         (\decodeError -> assertFailure ("Roster seed did not build: " <> decodeError) >> pure fallbackCatalogImportSeed)
         pure
-        (buildCatalogImportSeedFromRosterSeed rosterSeed toyotaVpicModels corollaFuelEconomyVehicle)
+        (buildCatalogImportSeedFromRosterSeed calibrationDataset rosterSeed toyotaVpicModels corollaFuelEconomyVehicle)
     assertEqual "roster import uses the requested display model" "Corolla Hybrid" (vpicModel (importIdentity rosterImportSeed))
     assertEqual "roster import preserves official fuel mapping" "hybrid-gasoline" (fuelEconomyFuelType (importFuelEconomy rosterImportSeed))
     assertBool "roster description is generated when omitted" ("Generated baseline" `contains` importDescription rosterImportSeed)
@@ -1303,6 +1320,7 @@ validatedRosterSeedCanonicalizationTest =
 generatedSourceDefaultsTest :: Test
 generatedSourceDefaultsTest =
   TestCase $ do
+    calibrationDataset <- loadDefaultVehicleCatalogCalibrations
     sourceSeeds <- loadDefaultVehicleSourceSeeds
     corollaSourceSeed <-
       maybe
@@ -1329,7 +1347,7 @@ generatedSourceDefaultsTest =
       either
         (\decodeError -> assertFailure ("Minimal source seed did not build from generated defaults: " <> decodeError) >> pure fallbackCatalogImportSeed)
         pure
-        (buildCatalogImportSeedFromSourceSeed minimalSeed toyotaVpicModels corollaFuelEconomyVehicle)
+        (buildCatalogImportSeedFromSourceSeed calibrationDataset minimalSeed toyotaVpicModels corollaFuelEconomyVehicle)
     assertBool "generated purchase price stays positive" (importPurchasePrice generatedImportSeed > 20000)
     assertBool "generated insurance stays positive" (importAnnualInsurance generatedImportSeed > 1000)
     assertBool "generated registration stays positive" (importAnnualRegistration generatedImportSeed > 150)
@@ -1345,8 +1363,10 @@ generatedSourceDefaultsTest =
 brandAwareGeneratedDefaultsTest :: Test
 brandAwareGeneratedDefaultsTest =
   TestCase $ do
+    calibrationDataset <- loadDefaultVehicleCatalogCalibrations
     let toyotaDefaults =
           defaultCatalogAssumptions
+            calibrationDataset
             Nothing
             "Toyota"
             "Corolla"
@@ -1357,6 +1377,7 @@ brandAwareGeneratedDefaultsTest =
             32
         fordDefaults =
           defaultCatalogAssumptions
+            calibrationDataset
             Nothing
             "Ford"
             "Focus"
@@ -1367,6 +1388,7 @@ brandAwareGeneratedDefaultsTest =
             32
         genericElectricDefaults =
           defaultCatalogAssumptions
+            calibrationDataset
             Nothing
             "Generic"
             "Midsize EV"
@@ -1377,6 +1399,7 @@ brandAwareGeneratedDefaultsTest =
             110
         teslaDefaults =
           defaultCatalogAssumptions
+            calibrationDataset
             Nothing
             "Tesla"
             "Model 3"
@@ -1414,8 +1437,10 @@ brandAwareGeneratedDefaultsTest =
 variantAwareGeneratedDefaultsTest :: Test
 variantAwareGeneratedDefaultsTest =
   TestCase $ do
+    calibrationDataset <- loadDefaultVehicleCatalogCalibrations
     let baseTruckDefaults =
           defaultCatalogAssumptions
+            calibrationDataset
             Nothing
             "Ford"
             "F150 Pickup"
@@ -1426,6 +1451,7 @@ variantAwareGeneratedDefaultsTest =
             18
         raptorDefaults =
           defaultCatalogAssumptions
+            calibrationDataset
             Nothing
             "Ford"
             "F150 RAPTOR 4WD"
@@ -1436,6 +1462,7 @@ variantAwareGeneratedDefaultsTest =
             18
         baseHybridSuvDefaults =
           defaultCatalogAssumptions
+            calibrationDataset
             Nothing
             "Ford"
             "Explorer HEV AWD"
@@ -1446,6 +1473,7 @@ variantAwareGeneratedDefaultsTest =
             27
         platinumDefaults =
           defaultCatalogAssumptions
+            calibrationDataset
             Nothing
             "Ford"
             "Explorer Platinum HEV AWD"
@@ -1483,6 +1511,7 @@ variantAwareGeneratedDefaultsTest =
 sourceSeedValidationFailureTest :: Test
 sourceSeedValidationFailureTest =
   TestCase $ do
+    calibrationDataset <- loadDefaultVehicleCatalogCalibrations
     corollaSourceSeeds <- loadDefaultVehicleSourceSeeds
     corollaSourceSeed <-
       maybe
@@ -1492,7 +1521,7 @@ sourceSeedValidationFailureTest =
     toyotaVpicModels <- decodeVpicFixture "test/fixtures/vpic/toyota-2024-models.json"
     corollaFuelEconomyVehicle <- decodeFuelEconomyFixture "test/fixtures/fueleconomy/vehicle-47339.xml"
     let badSourceSeed = corollaSourceSeed {sourceBaseModel = "NotARealModel"}
-        buildResult = buildCatalogImportSeedFromSourceSeed badSourceSeed toyotaVpicModels corollaFuelEconomyVehicle
+        buildResult = buildCatalogImportSeedFromSourceSeed calibrationDataset badSourceSeed toyotaVpicModels corollaFuelEconomyVehicle
     case buildResult of
       Left errorMessage ->
         assertBool "the error points at missing vPIC model support" ("vPIC" `contains` errorMessage)
@@ -1914,6 +1943,11 @@ loadDefaultVehicleRosterSeeds :: IO [VehicleCatalogRosterSeed]
 loadDefaultVehicleRosterSeeds = do
   rosterSeedPath <- getDataFileName defaultVehicleCatalogRosterSeedsRelativePath
   loadVehicleCatalogRosterSeeds rosterSeedPath
+
+loadDefaultVehicleCatalogCalibrations :: IO VehicleCatalogCalibrationDataset
+loadDefaultVehicleCatalogCalibrations = do
+  calibrationPath <- getDataFileName defaultVehicleCatalogCalibrationsRelativePath
+  loadVehicleCatalogCalibrationDataset calibrationPath
 
 loadDefaultVehicleCatalog :: IO [VehicleCatalogEntry]
 loadDefaultVehicleCatalog = do

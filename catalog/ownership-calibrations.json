@@ -1,0 +1,158 @@
+{
+  "sourceName": "project-owned ownership calibration anchors",
+  "updatedAt": "2026-04-21",
+  "brandCalibrations": [
+    {
+      "make": "Toyota",
+      "priceModifier": 1400,
+      "insuranceModifier": -60,
+      "maintenanceMultiplier": 0.88,
+      "depreciationModifier": -0.018,
+      "firstYearBonusModifier": -0.012,
+      "residualFloorModifier": 0.04,
+      "mileagePenaltyModifier": -0.02,
+      "repairProbabilityModifier": -0.018,
+      "repairCostModifier": -220
+    },
+    {
+      "make": "Honda",
+      "priceModifier": 1100,
+      "insuranceModifier": -40,
+      "maintenanceMultiplier": 0.91,
+      "depreciationModifier": -0.014,
+      "firstYearBonusModifier": -0.01,
+      "residualFloorModifier": 0.03,
+      "mileagePenaltyModifier": -0.015,
+      "repairProbabilityModifier": -0.014,
+      "repairCostModifier": -180
+    },
+    {
+      "make": "Mazda",
+      "priceModifier": 700,
+      "insuranceModifier": -20,
+      "maintenanceMultiplier": 0.95,
+      "depreciationModifier": -0.007,
+      "firstYearBonusModifier": -0.004,
+      "residualFloorModifier": 0.015,
+      "mileagePenaltyModifier": -0.008,
+      "repairProbabilityModifier": -0.006,
+      "repairCostModifier": -90
+    },
+    {
+      "make": "Subaru",
+      "priceModifier": 900,
+      "insuranceModifier": 40,
+      "maintenanceMultiplier": 1.02,
+      "depreciationModifier": -0.003,
+      "firstYearBonusModifier": 0,
+      "residualFloorModifier": 0.01,
+      "mileagePenaltyModifier": 0.002,
+      "repairProbabilityModifier": 0.004,
+      "repairCostModifier": 60
+    },
+    {
+      "make": "Hyundai",
+      "priceModifier": 100,
+      "insuranceModifier": -10,
+      "maintenanceMultiplier": 0.96,
+      "depreciationModifier": 0.002,
+      "firstYearBonusModifier": 0.002,
+      "residualFloorModifier": 0,
+      "mileagePenaltyModifier": 0,
+      "repairProbabilityModifier": 0.001,
+      "repairCostModifier": -40
+    },
+    {
+      "make": "Kia",
+      "priceModifier": 0,
+      "insuranceModifier": 0,
+      "maintenanceMultiplier": 0.97,
+      "depreciationModifier": 0.003,
+      "firstYearBonusModifier": 0.002,
+      "residualFloorModifier": 0,
+      "mileagePenaltyModifier": 0.002,
+      "repairProbabilityModifier": 0.002,
+      "repairCostModifier": -20
+    },
+    {
+      "make": "Ford",
+      "priceModifier": 350,
+      "insuranceModifier": 35,
+      "maintenanceMultiplier": 1.05,
+      "depreciationModifier": 0.009,
+      "firstYearBonusModifier": 0.004,
+      "residualFloorModifier": -0.012,
+      "mileagePenaltyModifier": 0.01,
+      "repairProbabilityModifier": 0.01,
+      "repairCostModifier": 150
+    },
+    {
+      "make": "Chevrolet",
+      "priceModifier": 150,
+      "insuranceModifier": 25,
+      "maintenanceMultiplier": 1.04,
+      "depreciationModifier": 0.01,
+      "firstYearBonusModifier": 0.004,
+      "residualFloorModifier": -0.015,
+      "mileagePenaltyModifier": 0.012,
+      "repairProbabilityModifier": 0.012,
+      "repairCostModifier": 180
+    },
+    {
+      "make": "Tesla",
+      "priceModifier": 6000,
+      "insuranceModifier": 280,
+      "maintenanceMultiplier": 0.82,
+      "depreciationModifier": 0.024,
+      "firstYearBonusModifier": 0.012,
+      "residualFloorModifier": -0.035,
+      "mileagePenaltyModifier": 0.01,
+      "repairProbabilityModifier": 0.004,
+      "repairCostModifier": 650
+    }
+  ],
+  "variantRules": [
+    {
+      "ruleId": "performance",
+      "keywords": ["raptor", "zr1x", "zr1", "z06", "darkhorse", "gtd", "mach1", "gt", "ss", "rally", "eray"],
+      "excludeKeywords": ["gt-line"],
+      "priceModifier": 8500,
+      "insuranceModifier": 240,
+      "maintenanceMultiplier": 1.15,
+      "depreciationModifier": 0.018,
+      "firstYearBonusModifier": 0.01,
+      "residualFloorModifier": -0.025,
+      "mileagePenaltyModifier": 0.02,
+      "repairProbabilityModifier": 0.014,
+      "repairCostModifier": 500
+    },
+    {
+      "ruleId": "off-road",
+      "keywords": ["badlands", "sasquatch", "tremor", "zr2", "bison", "x-pro", "timberline", "woodland", "trailboss"],
+      "excludeKeywords": [],
+      "priceModifier": 4500,
+      "insuranceModifier": 110,
+      "maintenanceMultiplier": 1.12,
+      "depreciationModifier": 0.008,
+      "firstYearBonusModifier": 0.002,
+      "residualFloorModifier": 0.005,
+      "mileagePenaltyModifier": 0.015,
+      "repairProbabilityModifier": 0.012,
+      "repairCostModifier": 300
+    },
+    {
+      "ruleId": "premium",
+      "keywords": ["platinum", "limited", "premium", "signature", "gt-line"],
+      "excludeKeywords": [],
+      "priceModifier": 6000,
+      "insuranceModifier": 130,
+      "maintenanceMultiplier": 1.07,
+      "depreciationModifier": 0.01,
+      "firstYearBonusModifier": 0.005,
+      "residualFloorModifier": -0.012,
+      "mileagePenaltyModifier": 0.008,
+      "repairProbabilityModifier": 0.005,
+      "repairCostModifier": 180
+    }
+  ]
+}

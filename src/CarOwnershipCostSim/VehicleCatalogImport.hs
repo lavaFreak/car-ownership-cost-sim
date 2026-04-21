@@ -11,6 +11,8 @@ hybrid:
 
 - project-owned JSON source seeds keep pricing and modeling assumptions under
   our control
+- project-owned calibration JSON keeps scalable generated defaults reviewable
+  instead of hidden in code constants
 - NHTSA vPIC provides normalization checks for year/make/model identity
 - FuelEconomy.gov supplies MPG and fuel-type data
 
@@ -18,7 +20,8 @@ The code here is used by the catalog-building CLI and heavily exercised by the
 test suite because upstream data normalization is one of the easiest places for
 quiet regressions to appear. The importer now supports both curated source
 seeds, where we want hand-tuned overrides, and lightweight roster rows, where
-generated defaults are good enough to get broader coverage into the catalog.
+generated defaults plus the checked-in calibration dataset are good enough to
+get broader coverage into the catalog.
 -}
 module CarOwnershipCostSim.VehicleCatalogImport
   ( VehicleCatalogSourceSeed (..),
@@ -52,6 +55,7 @@ import Control.Concurrent.QSem (newQSem, signalQSem, waitQSem)
 import Control.Concurrent.Async (mapConcurrently)
 import Control.Exception (bracket_)
 import CarOwnershipCostSim.Types (BoundedNormal)
+import CarOwnershipCostSim.VehicleCatalogCalibrations (VehicleCatalogCalibrationDataset)
 import CarOwnershipCostSim.VehicleCatalogDefaults
   ( GeneratedCatalogAssumptions (..),
     defaultCatalogDescription,
@@ -312,17 +316,19 @@ discoverVehicleRosterSeeds sourceUpdatedAt vehicleYear vehicleMake catalogModel 
 -- | Combine one source seed with upstream records to produce a normalized
 -- catalog import seed.
 buildCatalogImportSeedFromSourceSeed ::
+  VehicleCatalogCalibrationDataset ->
   VehicleCatalogSourceSeed ->
   [VpicModelResult] ->
   FuelEconomyVehicleRecord ->
   Either String CatalogImportSeed
-buildCatalogImportSeedFromSourceSeed sourceSeed vpicModels fuelEconomyVehicle = do
+buildCatalogImportSeedFromSourceSeed calibrationDataset sourceSeed vpicModels fuelEconomyVehicle = do
   ensureMatches "source year" (show (sourceYear sourceSeed)) (show (fuelEconomyVehicleYear fuelEconomyVehicle))
   ensureMatches "source make" (sourceMake sourceSeed) (fuelEconomyVehicleMake fuelEconomyVehicle)
   assertVpicBaseModelFound (sourceBaseModel sourceSeed) vpicModels
   assertFuelEconomyBaseModelMatches (sourceBaseModel sourceSeed) fuelEconomyVehicle
   let generatedDefaults =
         defaultCatalogAssumptions
+          calibrationDataset
           (sourcePurchasePrice sourceSeed)
           (sourceMake sourceSeed)
           (sourceCatalogModel sourceSeed)
@@ -361,17 +367,19 @@ buildCatalogImportSeedFromSourceSeed sourceSeed vpicModels fuelEconomyVehicle = 
 -- | Combine one lightweight roster row with upstream records to produce a
 -- normalized catalog import seed that relies on generated defaults.
 buildCatalogImportSeedFromRosterSeed ::
+  VehicleCatalogCalibrationDataset ->
   VehicleCatalogRosterSeed ->
   [VpicModelResult] ->
   FuelEconomyVehicleRecord ->
   Either String CatalogImportSeed
-buildCatalogImportSeedFromRosterSeed rosterSeed vpicModels fuelEconomyVehicle = do
+buildCatalogImportSeedFromRosterSeed calibrationDataset rosterSeed vpicModels fuelEconomyVehicle = do
   ensureMatches "roster year" (show (rosterYear rosterSeed)) (show (fuelEconomyVehicleYear fuelEconomyVehicle))
   ensureMatches "roster make" (rosterMake rosterSeed) (fuelEconomyVehicleMake fuelEconomyVehicle)
   assertVpicBaseModelFound (maybe (rosterBaseModel rosterSeed) id (rosterVpicBaseModel rosterSeed)) vpicModels
   assertFuelEconomyBaseModelMatches (rosterBaseModel rosterSeed) fuelEconomyVehicle
   let generatedDefaults =
         defaultCatalogAssumptions
+          calibrationDataset
           (rosterPurchasePrice rosterSeed)
           (rosterMake rosterSeed)
           (rosterCatalogModel rosterSeed)
@@ -419,27 +427,29 @@ buildCatalogImportSeedFromRosterSeed rosterSeed vpicModels fuelEconomyVehicle = 
 
 -- | Build a final catalog entry from already-decoded upstream records.
 buildVehicleCatalogEntryFromSourceSeed ::
+  VehicleCatalogCalibrationDataset ->
   VehicleCatalogSourceSeed ->
   [VpicModelResult] ->
   FuelEconomyVehicleRecord ->
   Either String VehicleCatalogEntry
-buildVehicleCatalogEntryFromSourceSeed sourceSeed vpicModels fuelEconomyVehicle =
-  buildVehicleCatalogEntry <$> buildCatalogImportSeedFromSourceSeed sourceSeed vpicModels fuelEconomyVehicle
+buildVehicleCatalogEntryFromSourceSeed calibrationDataset sourceSeed vpicModels fuelEconomyVehicle =
+  buildVehicleCatalogEntry <$> buildCatalogImportSeedFromSourceSeed calibrationDataset sourceSeed vpicModels fuelEconomyVehicle
 
 -- | Build a final catalog entry from a lightweight roster row plus upstream
 -- records.
 buildVehicleCatalogEntryFromRosterSeed ::
+  VehicleCatalogCalibrationDataset ->
   VehicleCatalogRosterSeed ->
   [VpicModelResult] ->
   FuelEconomyVehicleRecord ->
   Either String VehicleCatalogEntry
-buildVehicleCatalogEntryFromRosterSeed rosterSeed vpicModels fuelEconomyVehicle =
-  buildVehicleCatalogEntry <$> buildCatalogImportSeedFromRosterSeed rosterSeed vpicModels fuelEconomyVehicle
+buildVehicleCatalogEntryFromRosterSeed calibrationDataset rosterSeed vpicModels fuelEconomyVehicle =
+  buildVehicleCatalogEntry <$> buildCatalogImportSeedFromRosterSeed calibrationDataset rosterSeed vpicModels fuelEconomyVehicle
 
 -- | Fetch live upstream payloads for one source seed and build the final
 -- catalog row.
-buildVehicleCatalogEntryFromLiveSources :: VehicleCatalogSourceSeed -> IO VehicleCatalogEntry
-buildVehicleCatalogEntryFromLiveSources sourceSeed = do
+buildVehicleCatalogEntryFromLiveSources :: VehicleCatalogCalibrationDataset -> VehicleCatalogSourceSeed -> IO VehicleCatalogEntry
+buildVehicleCatalogEntryFromLiveSources calibrationDataset sourceSeed = do
   vpicPayload <- fetchUrl (vpicModelsUrl sourceSeed)
   fuelEconomyPayload <- fetchUrl (fuelEconomyVehicleUrl sourceSeed)
   vpicModels <-
@@ -455,28 +465,29 @@ buildVehicleCatalogEntryFromLiveSources sourceSeed = do
   either
     (\decodeError -> fail ("Unable to build catalog entry for " <> sourceCatalogId sourceSeed <> ": " <> decodeError))
     pure
-    (buildVehicleCatalogEntryFromSourceSeed sourceSeed vpicModels fuelEconomyVehicle)
+    (buildVehicleCatalogEntryFromSourceSeed calibrationDataset sourceSeed vpicModels fuelEconomyVehicle)
 
 -- | Rebuild the entire local catalog from the curated source-seed list.
-buildCatalogFromLiveSources :: [VehicleCatalogSourceSeed] -> IO [VehicleCatalogEntry]
-buildCatalogFromLiveSources =
-  limitedMapConcurrently catalogRefreshConcurrency buildVehicleCatalogEntryFromLiveSources
+buildCatalogFromLiveSources :: VehicleCatalogCalibrationDataset -> [VehicleCatalogSourceSeed] -> IO [VehicleCatalogEntry]
+buildCatalogFromLiveSources calibrationDataset =
+  limitedMapConcurrently catalogRefreshConcurrency (buildVehicleCatalogEntryFromLiveSources calibrationDataset)
 
 -- | Rebuild the local catalog from both curated source seeds and lightweight
 -- roster rows. Duplicate catalog ids are rejected to keep the combined catalog
 -- unambiguous.
 buildCatalogFromLiveCatalogInputs ::
+  VehicleCatalogCalibrationDataset ->
   [VehicleCatalogSourceSeed] ->
   [VehicleCatalogRosterSeed] ->
   IO [VehicleCatalogEntry]
-buildCatalogFromLiveCatalogInputs sourceSeeds rosterSeeds = do
+buildCatalogFromLiveCatalogInputs calibrationDataset sourceSeeds rosterSeeds = do
   assertUniqueCatalogIds (map sourceCatalogId sourceSeeds <> map rosterCatalogId rosterSeeds)
-  sourceEntries <- buildCatalogFromLiveSources sourceSeeds
-  rosterEntries <- limitedMapConcurrently catalogRefreshConcurrency buildVehicleCatalogEntryFromLiveRosterSeed rosterSeeds
+  sourceEntries <- buildCatalogFromLiveSources calibrationDataset sourceSeeds
+  rosterEntries <- limitedMapConcurrently catalogRefreshConcurrency (buildVehicleCatalogEntryFromLiveRosterSeed calibrationDataset) rosterSeeds
   pure (sourceEntries <> rosterEntries)
 
-buildVehicleCatalogEntryFromLiveRosterSeed :: VehicleCatalogRosterSeed -> IO VehicleCatalogEntry
-buildVehicleCatalogEntryFromLiveRosterSeed rosterSeed = do
+buildVehicleCatalogEntryFromLiveRosterSeed :: VehicleCatalogCalibrationDataset -> VehicleCatalogRosterSeed -> IO VehicleCatalogEntry
+buildVehicleCatalogEntryFromLiveRosterSeed calibrationDataset rosterSeed = do
   vpicPayload <- fetchUrl (vpicModelsUrlForRosterSeed rosterSeed)
   fuelEconomyPayload <- fetchUrl (fuelEconomyVehicleUrlForRosterSeed rosterSeed)
   vpicModels <-
@@ -492,7 +503,7 @@ buildVehicleCatalogEntryFromLiveRosterSeed rosterSeed = do
   either
     (\decodeError -> fail ("Unable to build roster-based catalog entry for " <> rosterCatalogId rosterSeed <> ": " <> decodeError))
     pure
-    (buildVehicleCatalogEntryFromRosterSeed rosterSeed vpicModels fuelEconomyVehicle)
+    (buildVehicleCatalogEntryFromRosterSeed calibrationDataset rosterSeed vpicModels fuelEconomyVehicle)
 
 -- | Fill in canonical FuelEconomy base-model information plus any needed
 -- vPIC override so a roster seed can round-trip through the full importer.

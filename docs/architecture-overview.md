@@ -32,6 +32,9 @@ The app is split into four layers:
   Mean and percentile helpers used by the simulation summary.
 - [src/CarOwnershipCostSim/VehicleCatalog.hs](/Users/garion/Work/projects/car-ownership-cost-sim/src/CarOwnershipCostSim/VehicleCatalog.hs)
   Local catalog types and load helpers.
+- [src/CarOwnershipCostSim/VehicleCatalogCalibrations.hs](/Users/garion/Work/projects/car-ownership-cost-sim/src/CarOwnershipCostSim/VehicleCatalogCalibrations.hs)
+  Checked-in make and trim calibration dataset loader plus lookup helpers for
+  generated catalog defaults.
 - [src/CarOwnershipCostSim/VehicleCatalogImport.hs](/Users/garion/Work/projects/car-ownership-cost-sim/src/CarOwnershipCostSim/VehicleCatalogImport.hs)
   Import path from curated seeds, lightweight roster rows, and official
   upstream data.
@@ -51,6 +54,9 @@ The app is split into four layers:
   official model queries.
 - [catalog/roster-batches/](/Users/garion/Work/projects/car-ownership-cost-sim/catalog/roster-batches)
   Checked-in query lists that drive repeatable batch roster expansion runs.
+- [catalog/ownership-calibrations.json](/Users/garion/Work/projects/car-ownership-cost-sim/catalog/ownership-calibrations.json)
+  Project-owned make and trim calibration anchors that keep generated defaults
+  data-backed and reviewable.
 - [static/index.html](/Users/garion/Work/projects/car-ownership-cost-sim/static/index.html)
   Form structure and results containers.
 - [static/app-render.js](/Users/garion/Work/projects/car-ownership-cost-sim/static/app-render.js)
@@ -88,17 +94,19 @@ The vehicle catalog is not rebuilt during normal web requests.
    [catalog/vehicle-source-seeds.json](/Users/garion/Work/projects/car-ownership-cost-sim/catalog/vehicle-source-seeds.json).
 2. Lightweight bulk-coverage rows live in
    [catalog/vehicle-roster.json](/Users/garion/Work/projects/car-ownership-cost-sim/catalog/vehicle-roster.json).
-3. `app/DiscoverVehicleRoster.hs` can query official menus and generate new
+3. Checked-in make and trim calibration anchors live in
+   [catalog/ownership-calibrations.json](/Users/garion/Work/projects/car-ownership-cost-sim/catalog/ownership-calibrations.json).
+4. `app/DiscoverVehicleRoster.hs` can query official menus and generate new
    roster candidates before they are checked in.
-4. `app/BuildCatalog.hs` loads both files and calls
+5. `app/BuildCatalog.hs` loads all three project-owned inputs and calls
    `buildCatalogFromLiveCatalogInputs`.
-5. `VehicleCatalogImport.hs` fetches upstream data and validates that each
+6. `VehicleCatalogImport.hs` fetches upstream data and validates that each
    source or roster row still matches the official payloads. Curated rows may
-   override generated assumptions; roster rows rely on make-aware, trim-aware
-   generated defaults.
-6. The resulting normalized rows are written to
+   override generated assumptions; roster rows rely on generated defaults that
+   are tuned by the checked-in calibration dataset.
+7. The resulting normalized rows are written to
    [catalog/vehicle-catalog.json](/Users/garion/Work/projects/car-ownership-cost-sim/catalog/vehicle-catalog.json).
-7. The web server loads that local catalog at startup and serves it from memory.
+8. The web server loads that local catalog at startup and serves it from memory.
 
 ## Testing strategy
 

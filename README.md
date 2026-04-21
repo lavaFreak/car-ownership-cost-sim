@@ -83,10 +83,12 @@ the core simulation code.
   Provides summary helpers such as mean and percentile calculations.
 - `src/CarOwnershipCostSim/VehicleCatalog.hs`
   Defines the normalized local vehicle catalog and shared catalog-facing types.
+- `src/CarOwnershipCostSim/VehicleCatalogCalibrations.hs`
+  Loads the checked-in make and trim calibration anchors that feed generated
+  ownership defaults.
 - `src/CarOwnershipCostSim/VehicleCatalogDefaults.hs`
-  Generates make-aware, trim-aware rule-based ownership assumptions from
-  objective vehicle attributes so bulk catalog growth does not require fully
-  hand-curated data for every model.
+  Generates baseline ownership assumptions from objective vehicle attributes
+  and then applies the data-backed make and trim calibration dataset.
 - `src/CarOwnershipCostSim/VehicleCatalogImport.hs`
   Parses official `vPIC` and `FuelEconomy.gov` payloads into catalog entries,
   supports both curated source seeds and lightweight roster rows, and merges
@@ -97,8 +99,8 @@ the core simulation code.
 - `app/Main.hs`
   Runs the Scotty server and exposes the web routes and API endpoints.
 - `app/BuildCatalog.hs`
-  Rebuilds the local vehicle catalog from API-backed source seeds plus the
-  lightweight roster file.
+  Rebuilds the local vehicle catalog from API-backed source seeds, the
+  lightweight roster file, and the checked-in ownership calibration dataset.
 - `app/DiscoverVehicleRoster.hs`
   Queries official FuelEconomy.gov menus and prints model lists or paste-ready
   lightweight roster rows for faster catalog growth.
@@ -106,6 +108,9 @@ the core simulation code.
   Contains the browser UI.
 - `test/Spec.hs`
   Holds deterministic tests for the simulation model and data-import pipeline.
+- `catalog/ownership-calibrations.json`
+  Stores the checked-in make and trim calibration anchors used by the scalable
+  catalog-default pipeline.
 
 ## Documentation Guide
 
@@ -353,8 +358,10 @@ The catalog importer now supports two project-owned input files:
 - [catalog/vehicle-source-seeds.json](/Users/garion/Work/projects/car-ownership-cost-sim/catalog/vehicle-source-seeds.json)
   for curated vehicles where we want hand-tuned assumptions or overrides
 - [catalog/vehicle-roster.json](/Users/garion/Work/projects/car-ownership-cost-sim/catalog/vehicle-roster.json)
-  for lighter-weight rows that rely on make-aware, trim-aware generated
-  defaults from official vehicle attributes
+  for lighter-weight rows that rely on generated defaults from official vehicle
+  attributes
+- [catalog/ownership-calibrations.json](/Users/garion/Work/projects/car-ownership-cost-sim/catalog/ownership-calibrations.json)
+  for the checked-in make and trim anchors that tune those generated defaults
 
 That split is the first real scaling step toward broader `2020+` coverage,
 because not every vehicle now needs a fully hand-authored maintenance,
