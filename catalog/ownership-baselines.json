@@ -1,0 +1,198 @@
+{
+  "fuelBuckets": [
+    {
+      "id": "gasoline",
+      "priceModifier": 0,
+      "efficiencyPriceThreshold": null,
+      "efficiencyPricePerPoint": 0,
+      "insuranceModifier": 0,
+      "maintenanceModifier": 0,
+      "depreciationBase": 0.15,
+      "depreciationStdDev": 0.032,
+      "firstYearBonus": 0.1,
+      "residualFloor": 0.31,
+      "mileagePenalty": 0.13,
+      "repairProbability": 0.1,
+      "repairCostModifier": 0
+    },
+    {
+      "id": "hybrid",
+      "priceModifier": 3200,
+      "efficiencyPriceThreshold": 35,
+      "efficiencyPricePerPoint": 60,
+      "insuranceModifier": 70,
+      "maintenanceModifier": -40,
+      "depreciationBase": 0.138,
+      "depreciationStdDev": 0.032,
+      "firstYearBonus": 0.09,
+      "residualFloor": 0.36,
+      "mileagePenalty": 0.12,
+      "repairProbability": 0.09,
+      "repairCostModifier": 100
+    },
+    {
+      "id": "plug-in-hybrid",
+      "priceModifier": 7000,
+      "efficiencyPriceThreshold": 35,
+      "efficiencyPricePerPoint": 60,
+      "insuranceModifier": 180,
+      "maintenanceModifier": 40,
+      "depreciationBase": 0.17,
+      "depreciationStdDev": 0.045,
+      "firstYearBonus": 0.12,
+      "residualFloor": 0.29,
+      "mileagePenalty": 0.14,
+      "repairProbability": 0.1,
+      "repairCostModifier": 250
+    },
+    {
+      "id": "electric",
+      "priceModifier": 9500,
+      "efficiencyPriceThreshold": 100,
+      "efficiencyPricePerPoint": 35,
+      "insuranceModifier": 320,
+      "maintenanceModifier": -170,
+      "depreciationBase": 0.19,
+      "depreciationStdDev": 0.055,
+      "firstYearBonus": 0.14,
+      "residualFloor": 0.26,
+      "mileagePenalty": 0.15,
+      "repairProbability": 0.08,
+      "repairCostModifier": 250
+    },
+    {
+      "id": "diesel",
+      "priceModifier": 2500,
+      "efficiencyPriceThreshold": null,
+      "efficiencyPricePerPoint": 0,
+      "insuranceModifier": 60,
+      "maintenanceModifier": 70,
+      "depreciationBase": 0.158,
+      "depreciationStdDev": 0.032,
+      "firstYearBonus": 0.1,
+      "residualFloor": 0.3,
+      "mileagePenalty": 0.14,
+      "repairProbability": 0.11,
+      "repairCostModifier": 200
+    }
+  ],
+  "classBuckets": [
+    {
+      "id": "compact-car",
+      "priceBase": 25000,
+      "insuranceModifier": -40,
+      "registrationModifier": 0,
+      "maintenanceBase": 560,
+      "depreciationModifier": -0.01,
+      "firstYearBonus": -0.01,
+      "residualFloorModifier": 0.02,
+      "mileagePenaltyModifier": -0.01,
+      "repairProbabilityModifier": -0.01,
+      "repairBase": 1300
+    },
+    {
+      "id": "midsize-car",
+      "priceBase": 31000,
+      "insuranceModifier": 0,
+      "registrationModifier": 10,
+      "maintenanceBase": 670,
+      "depreciationModifier": -0.004,
+      "firstYearBonus": 0,
+      "residualFloorModifier": 0.01,
+      "mileagePenaltyModifier": 0,
+      "repairProbabilityModifier": 0,
+      "repairBase": 1500
+    },
+    {
+      "id": "large-car",
+      "priceBase": 36000,
+      "insuranceModifier": 80,
+      "registrationModifier": 15,
+      "maintenanceBase": 730,
+      "depreciationModifier": 0.008,
+      "firstYearBonus": 0.01,
+      "residualFloorModifier": -0.01,
+      "mileagePenaltyModifier": 0.01,
+      "repairProbabilityModifier": 0.01,
+      "repairBase": 1650
+    },
+    {
+      "id": "crossover-suv",
+      "priceBase": 34000,
+      "insuranceModifier": 120,
+      "registrationModifier": 20,
+      "maintenanceBase": 780,
+      "depreciationModifier": 0.004,
+      "firstYearBonus": 0.005,
+      "residualFloorModifier": 0.005,
+      "mileagePenaltyModifier": 0.01,
+      "repairProbabilityModifier": 0.02,
+      "repairBase": 1800
+    },
+    {
+      "id": "minivan",
+      "priceBase": 39000,
+      "insuranceModifier": 100,
+      "registrationModifier": 22,
+      "maintenanceBase": 800,
+      "depreciationModifier": -0.008,
+      "firstYearBonus": -0.01,
+      "residualFloorModifier": 0.02,
+      "mileagePenaltyModifier": 0.01,
+      "repairProbabilityModifier": 0.02,
+      "repairBase": 1750
+    },
+    {
+      "id": "truck-like",
+      "priceBase": 43000,
+      "insuranceModifier": 170,
+      "registrationModifier": 35,
+      "maintenanceBase": 920,
+      "depreciationModifier": 0.01,
+      "firstYearBonus": 0.01,
+      "residualFloorModifier": 0,
+      "mileagePenaltyModifier": 0.02,
+      "repairProbabilityModifier": 0.03,
+      "repairBase": 2200
+    },
+    {
+      "id": "other",
+      "priceBase": 30000,
+      "insuranceModifier": 40,
+      "registrationModifier": 10,
+      "maintenanceBase": 700,
+      "depreciationModifier": 0,
+      "firstYearBonus": 0,
+      "residualFloorModifier": 0,
+      "mileagePenaltyModifier": 0,
+      "repairProbabilityModifier": 0,
+      "repairBase": 1600
+    }
+  ],
+  "driveBuckets": [
+    {
+      "id": "front-wheel-drive",
+      "priceModifier": 0,
+      "maintenanceModifier": 0,
+      "repairCostModifier": 0
+    },
+    {
+      "id": "rear-wheel-drive",
+      "priceModifier": 1000,
+      "maintenanceModifier": 20,
+      "repairCostModifier": 75
+    },
+    {
+      "id": "all-wheel-drive",
+      "priceModifier": 2500,
+      "maintenanceModifier": 55,
+      "repairCostModifier": 200
+    },
+    {
+      "id": "other",
+      "priceModifier": 800,
+      "maintenanceModifier": 20,
+      "repairCostModifier": 75
+    }
+  ]
+}

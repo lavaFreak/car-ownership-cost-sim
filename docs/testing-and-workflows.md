@@ -106,14 +106,16 @@ This workflow depends on the curated source seeds in
 [catalog/vehicle-source-seeds.json](/Users/garion/Work/projects/car-ownership-cost-sim/catalog/vehicle-source-seeds.json),
 the lightweight roster in
 [catalog/vehicle-roster.json](/Users/garion/Work/projects/car-ownership-cost-sim/catalog/vehicle-roster.json),
+the checked-in ownership baselines in
+[catalog/ownership-baselines.json](/Users/garion/Work/projects/car-ownership-cost-sim/catalog/ownership-baselines.json),
 the checked-in ownership calibration anchors in
 [catalog/ownership-calibrations.json](/Users/garion/Work/projects/car-ownership-cost-sim/catalog/ownership-calibrations.json),
 plus the importer logic in
 [src/CarOwnershipCostSim/VehicleCatalogImport.hs](/Users/garion/Work/projects/car-ownership-cost-sim/src/CarOwnershipCostSim/VehicleCatalogImport.hs).
 Source seeds can now omit many ownership-cost assumptions; the importer will
 fill them with generated defaults derived from official vehicle attributes plus
-the checked-in calibration dataset, and curated values only need to be supplied
-when we want to override those generated assumptions. Roster rows go one step lighter and can omit the
+the checked-in baseline and calibration datasets, and curated values only need
+to be supplied when we want to override those generated assumptions. Roster rows go one step lighter and can omit the
 ownership-cost tuning entirely, using only identity fields plus an optional
 price anchor.
 

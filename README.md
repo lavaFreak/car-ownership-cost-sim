@@ -77,6 +77,9 @@ the core simulation code.
 - `src/CarOwnershipCostSim/RegionProfiles.hs`
   Defines the shared region calibration profiles used by both the API and the
   simulation engine.
+- `src/CarOwnershipCostSim/VehicleCatalogBaselines.hs`
+  Loads the checked-in class, fuel, and drive bucket baselines that feed the
+  scalable generated ownership assumptions.
 - `src/CarOwnershipCostSim/Simulation.hs`
   Contains the Monte Carlo engine and ownership cost calculations.
 - `src/CarOwnershipCostSim/Statistics.hs`
@@ -88,7 +91,7 @@ the core simulation code.
   ownership defaults.
 - `src/CarOwnershipCostSim/VehicleCatalogDefaults.hs`
   Generates baseline ownership assumptions from objective vehicle attributes
-  and then applies the data-backed make and trim calibration dataset.
+  and then applies the data-backed bucket and make/trim calibration datasets.
 - `src/CarOwnershipCostSim/VehicleCatalogImport.hs`
   Parses official `vPIC` and `FuelEconomy.gov` payloads into catalog entries,
   supports both curated source seeds and lightweight roster rows, and merges
@@ -100,7 +103,8 @@ the core simulation code.
   Runs the Scotty server and exposes the web routes and API endpoints.
 - `app/BuildCatalog.hs`
   Rebuilds the local vehicle catalog from API-backed source seeds, the
-  lightweight roster file, and the checked-in ownership calibration dataset.
+  lightweight roster file, with the checked-in ownership baseline/calibration
+  datasets applied during generated-default resolution.
 - `app/DiscoverVehicleRoster.hs`
   Queries official FuelEconomy.gov menus and prints model lists or paste-ready
   lightweight roster rows for faster catalog growth.
@@ -111,6 +115,11 @@ the core simulation code.
 - `catalog/ownership-calibrations.json`
   Stores the checked-in make and trim calibration anchors used by the scalable
   catalog-default pipeline.
+- `catalog/ownership-baselines.json`
+  Stores the checked-in fuel, class, and drive bucket baselines used by the
+  scalable catalog-default pipeline.
+- `catalog/region-profiles.json`
+  Stores the checked-in region defaults used by the API and simulation engine.
 
 ## Documentation Guide
 

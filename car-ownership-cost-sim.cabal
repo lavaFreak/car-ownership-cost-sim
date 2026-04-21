@@ -19,6 +19,8 @@ extra-source-files:
     catalog/vehicle-source-seeds.json
     catalog/vehicle-roster.json
     catalog/ownership-calibrations.json
+    catalog/ownership-baselines.json
+    catalog/region-profiles.json
     catalog/roster-batches/2023-mainstream.txt
     catalog/roster-batches/2023-kia.txt
     catalog/roster-batches/2023-ford.txt
@@ -50,6 +52,8 @@ data-files:
     catalog/vehicle-source-seeds.json
     catalog/vehicle-roster.json
     catalog/ownership-calibrations.json
+    catalog/ownership-baselines.json
+    catalog/region-profiles.json
     static/index.html
     static/styles.css
     static/app-render.js
@@ -69,6 +73,8 @@ common shared-properties
 -- and reusable web app definition.
 library
     import:           shared-properties
+    autogen-modules:
+        Paths_car_ownership_cost_sim
     hs-source-dirs:   src
     exposed-modules:
         CarOwnershipCostSim.RegionProfiles
@@ -76,11 +82,14 @@ library
         CarOwnershipCostSim.Statistics
         CarOwnershipCostSim.Types
         CarOwnershipCostSim.VehicleCatalog
+        CarOwnershipCostSim.VehicleCatalogBaselines
         CarOwnershipCostSim.VehicleCatalogCalibrations
         CarOwnershipCostSim.VehicleCatalogDefaults
         CarOwnershipCostSim.VehicleCatalogImport
         CarOwnershipCostSim.VehiclePresets
         CarOwnershipCostSim.WebApp
+    other-modules:
+        Paths_car_ownership_cost_sim
     build-depends:
         base >=4.18 && <4.21,
         aeson >=2.1 && <2.3,

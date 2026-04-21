@@ -7,8 +7,9 @@ build a useful catalog. Objective upstream data such as make, model, trim,
 vehicle class, fuel type, drive layout, and MPG can be used to infer a
 reasonable first-pass set of ownership assumptions. Curated source seeds can
 still override any of these values when we want higher-fidelity tuning for
-specific vehicles. The highest-leverage make and variant modifiers now come
-from the checked-in calibration dataset rather than hidden code constants.
+specific vehicles. The broad fuel/class/drive baselines plus the highest-
+leverage make and variant modifiers now come from checked-in datasets rather
+than hidden code constants.
 -}
 module CarOwnershipCostSim.VehicleCatalogDefaults
   ( GeneratedCatalogAssumptions (..),
@@ -17,6 +18,15 @@ module CarOwnershipCostSim.VehicleCatalogDefaults
   )
 where
 
+import CarOwnershipCostSim.VehicleCatalogBaselines
+  ( ClassBucketBaseline (..),
+    DriveBucketBaseline (..),
+    FuelBucketBaseline (..),
+    defaultVehicleCatalogBaselineDataset,
+    lookupClassBucketBaseline,
+    lookupDriveBucketBaseline,
+    lookupFuelBucketBaseline,
+  )
 import CarOwnershipCostSim.VehicleCatalogCalibrations
   ( BrandCalibration (..),
     VariantCalibration (..),
@@ -106,11 +116,14 @@ defaultCatalogAssumptions calibrationDataset maybePurchasePrice rawMake rawModel
   let fuelBucket = classifyFuelType rawFuelType
       classBucket = classifyVehicleClass maybeVehicleClass
       driveBucket = classifyDrive maybeDrive
+      fuelBaseline = lookupFuelBaseline fuelBucket
+      classBaseline = lookupClassBaseline classBucket
+      driveBaseline = lookupDriveBaseline driveBucket
       brandCalibration = lookupBrandCalibration calibrationDataset rawMake
       variantCalibration = lookupVariantCalibration calibrationDataset rawModel rawTrim
       purchasePrice =
         maybe
-          ( estimatedPurchasePrice fuelBucket classBucket driveBucket combinedMpg
+          ( estimatedPurchasePrice fuelBaseline classBaseline driveBaseline combinedMpg
               + brandPriceModifier brandCalibration
               + variantPriceModifier variantCalibration
           )
@@ -120,17 +133,17 @@ defaultCatalogAssumptions calibrationDataset maybePurchasePrice rawMake rawModel
         roundMoney
           ( 900
               + purchasePrice * 0.025
-              + fuelInsuranceModifier fuelBucket
-              + classInsuranceModifier classBucket
+              + fuelBaselineInsuranceModifier fuelBaseline
+              + classBaselineInsuranceModifier classBaseline
               + brandInsuranceModifier brandCalibration
               + variantInsuranceModifier variantCalibration
           )
-      annualRegistration = roundMoney (180 + purchasePrice * 0.0015 + classRegistrationModifier classBucket)
+      annualRegistration = roundMoney (180 + purchasePrice * 0.0015 + classBaselineRegistrationModifier classBaseline)
       maintenanceMean =
         roundMoney $
-          ( classMaintenanceBase classBucket
-              + fuelMaintenanceModifier fuelBucket
-              + driveMaintenanceModifier driveBucket
+          ( classBaselineMaintenanceBase classBaseline
+              + fuelBaselineMaintenanceModifier fuelBaseline
+              + driveBaselineMaintenanceModifier driveBaseline
           )
             * brandMaintenanceMultiplier brandCalibration
             * variantMaintenanceMultiplier variantCalibration
@@ -139,21 +152,21 @@ defaultCatalogAssumptions calibrationDataset maybePurchasePrice rawMake rawModel
         clamp
           0.08
           0.24
-          ( fuelDepreciationBase fuelBucket
-              + classDepreciationModifier classBucket
+          ( fuelBaselineDepreciationBase fuelBaseline
+              + classBaselineDepreciationModifier classBaseline
               + priceDepreciationModifier purchasePrice
               + brandDepreciationModifier brandCalibration
               + variantDepreciationModifier variantCalibration
           )
-      depreciationStdDev = depreciationStdDevForFuel fuelBucket
+      depreciationStdDev = fuelBaselineDepreciationStdDev fuelBaseline
       depreciationLowerBound = clamp 0.05 0.2 (depreciationMean - depreciationStdDev * 2.5)
       depreciationUpperBound = clamp (depreciationMean + 0.05) 0.38 (depreciationMean + depreciationStdDev * 2.8)
       firstYearDepreciationBonus =
         clamp
           0.06
           0.16
-          ( fuelFirstYearBonus fuelBucket
-              + classFirstYearBonus classBucket
+          ( fuelBaselineFirstYearBonus fuelBaseline
+              + classBaselineFirstYearBonus classBaseline
               + brandFirstYearBonusModifier brandCalibration
               + variantFirstYearBonusModifier variantCalibration
           )
@@ -161,15 +174,15 @@ defaultCatalogAssumptions calibrationDataset maybePurchasePrice rawMake rawModel
         clamp
           0.22
           0.42
-          ( fuelResidualFloor fuelBucket
-              + classResidualFloorModifier classBucket
+          ( fuelBaselineResidualFloor fuelBaseline
+              + classBaselineResidualFloorModifier classBaseline
               + brandResidualFloorModifier brandCalibration
               + variantResidualFloorModifier variantCalibration
           )
       extraMileageDepreciationPerMile =
         roundCents
-          ( fuelMileagePenalty fuelBucket
-              + classMileagePenaltyModifier classBucket
+          ( fuelBaselineMileagePenalty fuelBaseline
+              + classBaselineMileagePenaltyModifier classBaseline
               + brandMileagePenaltyModifier brandCalibration
               + variantMileagePenaltyModifier variantCalibration
           )
@@ -177,16 +190,16 @@ defaultCatalogAssumptions calibrationDataset maybePurchasePrice rawMake rawModel
         clamp
           0.06
           0.18
-          ( fuelRepairProbability fuelBucket
-              + classRepairProbabilityModifier classBucket
+          ( fuelBaselineRepairProbability fuelBaseline
+              + classBaselineRepairProbabilityModifier classBaseline
               + brandRepairProbabilityModifier brandCalibration
               + variantRepairProbabilityModifier variantCalibration
           )
       repairShockMean =
         roundMoney
-          ( classRepairBase classBucket
-              + fuelRepairCostModifier fuelBucket
-              + driveRepairCostModifier driveBucket
+          ( classBaselineRepairBase classBaseline
+              + fuelBaselineRepairCostModifier fuelBaseline
+              + driveBaselineRepairCostModifier driveBaseline
               + brandRepairCostModifier brandCalibration
               + variantRepairCostModifier variantCalibration
           )
@@ -268,104 +281,19 @@ classifyDrive maybeDrive =
       | otherwise -> OtherDrive
     Nothing -> OtherDrive
 
-estimatedPurchasePrice :: FuelBucket -> ClassBucket -> DriveBucket -> Double -> Double
-estimatedPurchasePrice fuelBucket classBucket driveBucket combinedMpg =
+estimatedPurchasePrice :: FuelBucketBaseline -> ClassBucketBaseline -> DriveBucketBaseline -> Double -> Double
+estimatedPurchasePrice fuelBaseline classBaseline driveBaseline combinedMpg =
   roundMoney $
-    classPriceBase classBucket
-      + fuelPriceModifier fuelBucket
-      + drivePriceModifier driveBucket
-      + efficiencyPriceModifier fuelBucket combinedMpg
+    classBaselinePriceBase classBaseline
+      + fuelBaselinePriceModifier fuelBaseline
+      + driveBaselinePriceModifier driveBaseline
+      + efficiencyPriceModifier fuelBaseline combinedMpg
 
-classPriceBase :: ClassBucket -> Double
-classPriceBase CompactCar = 25000
-classPriceBase MidsizeCar = 31000
-classPriceBase LargeCar = 36000
-classPriceBase CrossoverSuv = 34000
-classPriceBase Minivan = 39000
-classPriceBase TruckLike = 43000
-classPriceBase OtherVehicleClass = 30000
-
-fuelPriceModifier :: FuelBucket -> Double
-fuelPriceModifier GasolineVehicle = 0
-fuelPriceModifier HybridVehicle = 3200
-fuelPriceModifier PlugInHybridVehicle = 7000
-fuelPriceModifier ElectricVehicle = 9500
-fuelPriceModifier DieselVehicle = 2500
-
-drivePriceModifier :: DriveBucket -> Double
-drivePriceModifier FrontWheelDrive = 0
-drivePriceModifier RearWheelDrive = 1000
-drivePriceModifier AllWheelDrive = 2500
-drivePriceModifier OtherDrive = 800
-
-efficiencyPriceModifier :: FuelBucket -> Double -> Double
-efficiencyPriceModifier ElectricVehicle combinedMpg = max 0 ((combinedMpg - 100) * 35)
-efficiencyPriceModifier fuelBucket combinedMpg
-  | fuelBucket == HybridVehicle || fuelBucket == PlugInHybridVehicle = max 0 ((combinedMpg - 35) * 60)
-  | otherwise = 0
-
-fuelInsuranceModifier :: FuelBucket -> Double
-fuelInsuranceModifier GasolineVehicle = 0
-fuelInsuranceModifier HybridVehicle = 70
-fuelInsuranceModifier PlugInHybridVehicle = 180
-fuelInsuranceModifier ElectricVehicle = 320
-fuelInsuranceModifier DieselVehicle = 60
-
-classInsuranceModifier :: ClassBucket -> Double
-classInsuranceModifier CompactCar = -40
-classInsuranceModifier MidsizeCar = 0
-classInsuranceModifier LargeCar = 80
-classInsuranceModifier CrossoverSuv = 120
-classInsuranceModifier Minivan = 100
-classInsuranceModifier TruckLike = 170
-classInsuranceModifier OtherVehicleClass = 40
-
-classRegistrationModifier :: ClassBucket -> Double
-classRegistrationModifier CompactCar = 0
-classRegistrationModifier MidsizeCar = 10
-classRegistrationModifier LargeCar = 15
-classRegistrationModifier CrossoverSuv = 20
-classRegistrationModifier Minivan = 22
-classRegistrationModifier TruckLike = 35
-classRegistrationModifier OtherVehicleClass = 10
-
-classMaintenanceBase :: ClassBucket -> Double
-classMaintenanceBase CompactCar = 560
-classMaintenanceBase MidsizeCar = 670
-classMaintenanceBase LargeCar = 730
-classMaintenanceBase CrossoverSuv = 780
-classMaintenanceBase Minivan = 800
-classMaintenanceBase TruckLike = 920
-classMaintenanceBase OtherVehicleClass = 700
-
-fuelMaintenanceModifier :: FuelBucket -> Double
-fuelMaintenanceModifier GasolineVehicle = 0
-fuelMaintenanceModifier HybridVehicle = -40
-fuelMaintenanceModifier PlugInHybridVehicle = 40
-fuelMaintenanceModifier ElectricVehicle = -170
-fuelMaintenanceModifier DieselVehicle = 70
-
-driveMaintenanceModifier :: DriveBucket -> Double
-driveMaintenanceModifier FrontWheelDrive = 0
-driveMaintenanceModifier RearWheelDrive = 20
-driveMaintenanceModifier AllWheelDrive = 55
-driveMaintenanceModifier OtherDrive = 20
-
-fuelDepreciationBase :: FuelBucket -> Double
-fuelDepreciationBase GasolineVehicle = 0.15
-fuelDepreciationBase HybridVehicle = 0.138
-fuelDepreciationBase PlugInHybridVehicle = 0.17
-fuelDepreciationBase ElectricVehicle = 0.19
-fuelDepreciationBase DieselVehicle = 0.158
-
-classDepreciationModifier :: ClassBucket -> Double
-classDepreciationModifier CompactCar = -0.01
-classDepreciationModifier MidsizeCar = -0.004
-classDepreciationModifier LargeCar = 0.008
-classDepreciationModifier CrossoverSuv = 0.004
-classDepreciationModifier Minivan = -0.008
-classDepreciationModifier TruckLike = 0.01
-classDepreciationModifier OtherVehicleClass = 0
+efficiencyPriceModifier :: FuelBucketBaseline -> Double -> Double
+efficiencyPriceModifier fuelBaseline combinedMpg =
+  case fuelBaselineEfficiencyPriceThreshold fuelBaseline of
+    Just threshold -> max 0 ((combinedMpg - threshold) * fuelBaselineEfficiencyPricePerPoint fuelBaseline)
+    Nothing -> 0
 
 priceDepreciationModifier :: Double -> Double
 priceDepreciationModifier purchasePrice
@@ -374,96 +302,39 @@ priceDepreciationModifier purchasePrice
   | purchasePrice >= 30000 = 0.004
   | otherwise = 0
 
-depreciationStdDevForFuel :: FuelBucket -> Double
-depreciationStdDevForFuel ElectricVehicle = 0.055
-depreciationStdDevForFuel PlugInHybridVehicle = 0.045
-depreciationStdDevForFuel _ = 0.032
+lookupFuelBaseline :: FuelBucket -> FuelBucketBaseline
+lookupFuelBaseline =
+  lookupFuelBucketBaseline defaultVehicleCatalogBaselineDataset . fuelBucketKey
 
-fuelFirstYearBonus :: FuelBucket -> Double
-fuelFirstYearBonus GasolineVehicle = 0.1
-fuelFirstYearBonus HybridVehicle = 0.09
-fuelFirstYearBonus PlugInHybridVehicle = 0.12
-fuelFirstYearBonus ElectricVehicle = 0.14
-fuelFirstYearBonus DieselVehicle = 0.1
+lookupClassBaseline :: ClassBucket -> ClassBucketBaseline
+lookupClassBaseline =
+  lookupClassBucketBaseline defaultVehicleCatalogBaselineDataset . classBucketKey
 
-classFirstYearBonus :: ClassBucket -> Double
-classFirstYearBonus CompactCar = -0.01
-classFirstYearBonus MidsizeCar = 0
-classFirstYearBonus LargeCar = 0.01
-classFirstYearBonus CrossoverSuv = 0.005
-classFirstYearBonus Minivan = -0.01
-classFirstYearBonus TruckLike = 0.01
-classFirstYearBonus OtherVehicleClass = 0
+lookupDriveBaseline :: DriveBucket -> DriveBucketBaseline
+lookupDriveBaseline =
+  lookupDriveBucketBaseline defaultVehicleCatalogBaselineDataset . driveBucketKey
 
-fuelResidualFloor :: FuelBucket -> Double
-fuelResidualFloor GasolineVehicle = 0.31
-fuelResidualFloor HybridVehicle = 0.36
-fuelResidualFloor PlugInHybridVehicle = 0.29
-fuelResidualFloor ElectricVehicle = 0.26
-fuelResidualFloor DieselVehicle = 0.3
+fuelBucketKey :: FuelBucket -> String
+fuelBucketKey GasolineVehicle = "gasoline"
+fuelBucketKey HybridVehicle = "hybrid"
+fuelBucketKey PlugInHybridVehicle = "plug-in-hybrid"
+fuelBucketKey ElectricVehicle = "electric"
+fuelBucketKey DieselVehicle = "diesel"
 
-classResidualFloorModifier :: ClassBucket -> Double
-classResidualFloorModifier CompactCar = 0.02
-classResidualFloorModifier MidsizeCar = 0.01
-classResidualFloorModifier LargeCar = -0.01
-classResidualFloorModifier CrossoverSuv = 0.005
-classResidualFloorModifier Minivan = 0.02
-classResidualFloorModifier TruckLike = 0
-classResidualFloorModifier OtherVehicleClass = 0
+classBucketKey :: ClassBucket -> String
+classBucketKey CompactCar = "compact-car"
+classBucketKey MidsizeCar = "midsize-car"
+classBucketKey LargeCar = "large-car"
+classBucketKey CrossoverSuv = "crossover-suv"
+classBucketKey Minivan = "minivan"
+classBucketKey TruckLike = "truck-like"
+classBucketKey OtherVehicleClass = "other"
 
-fuelMileagePenalty :: FuelBucket -> Double
-fuelMileagePenalty GasolineVehicle = 0.13
-fuelMileagePenalty HybridVehicle = 0.12
-fuelMileagePenalty PlugInHybridVehicle = 0.14
-fuelMileagePenalty ElectricVehicle = 0.15
-fuelMileagePenalty DieselVehicle = 0.14
-
-classMileagePenaltyModifier :: ClassBucket -> Double
-classMileagePenaltyModifier CompactCar = -0.01
-classMileagePenaltyModifier MidsizeCar = 0
-classMileagePenaltyModifier LargeCar = 0.01
-classMileagePenaltyModifier CrossoverSuv = 0.01
-classMileagePenaltyModifier Minivan = 0.01
-classMileagePenaltyModifier TruckLike = 0.02
-classMileagePenaltyModifier OtherVehicleClass = 0
-
-fuelRepairProbability :: FuelBucket -> Double
-fuelRepairProbability GasolineVehicle = 0.1
-fuelRepairProbability HybridVehicle = 0.09
-fuelRepairProbability PlugInHybridVehicle = 0.1
-fuelRepairProbability ElectricVehicle = 0.08
-fuelRepairProbability DieselVehicle = 0.11
-
-classRepairProbabilityModifier :: ClassBucket -> Double
-classRepairProbabilityModifier CompactCar = -0.01
-classRepairProbabilityModifier MidsizeCar = 0
-classRepairProbabilityModifier LargeCar = 0.01
-classRepairProbabilityModifier CrossoverSuv = 0.02
-classRepairProbabilityModifier Minivan = 0.02
-classRepairProbabilityModifier TruckLike = 0.03
-classRepairProbabilityModifier OtherVehicleClass = 0
-
-classRepairBase :: ClassBucket -> Double
-classRepairBase CompactCar = 1300
-classRepairBase MidsizeCar = 1500
-classRepairBase LargeCar = 1650
-classRepairBase CrossoverSuv = 1800
-classRepairBase Minivan = 1750
-classRepairBase TruckLike = 2200
-classRepairBase OtherVehicleClass = 1600
-
-fuelRepairCostModifier :: FuelBucket -> Double
-fuelRepairCostModifier GasolineVehicle = 0
-fuelRepairCostModifier HybridVehicle = 100
-fuelRepairCostModifier PlugInHybridVehicle = 250
-fuelRepairCostModifier ElectricVehicle = 250
-fuelRepairCostModifier DieselVehicle = 200
-
-driveRepairCostModifier :: DriveBucket -> Double
-driveRepairCostModifier FrontWheelDrive = 0
-driveRepairCostModifier RearWheelDrive = 75
-driveRepairCostModifier AllWheelDrive = 200
-driveRepairCostModifier OtherDrive = 75
+driveBucketKey :: DriveBucket -> String
+driveBucketKey FrontWheelDrive = "front-wheel-drive"
+driveBucketKey RearWheelDrive = "rear-wheel-drive"
+driveBucketKey AllWheelDrive = "all-wheel-drive"
+driveBucketKey OtherDrive = "other"
 
 containsNormalized :: String -> String -> Bool
 containsNormalized expectedValue actualValue =

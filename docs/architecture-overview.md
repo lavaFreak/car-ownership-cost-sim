@@ -25,13 +25,17 @@ The app is split into four layers:
   Shared request and response schema for the backend, tests, and browser.
 - [src/CarOwnershipCostSim/RegionProfiles.hs](/Users/garion/Work/projects/car-ownership-cost-sim/src/CarOwnershipCostSim/RegionProfiles.hs)
   Shared region-calibration profiles plus the backend logic that resolves
-  location-sensitive defaults into a simulation input.
+  location-sensitive defaults into a simulation input from the checked-in
+  region dataset.
 - [src/CarOwnershipCostSim/Simulation.hs](/Users/garion/Work/projects/car-ownership-cost-sim/src/CarOwnershipCostSim/Simulation.hs)
   Core ownership-cost engine, yearly modeling, and input validation.
 - [src/CarOwnershipCostSim/Statistics.hs](/Users/garion/Work/projects/car-ownership-cost-sim/src/CarOwnershipCostSim/Statistics.hs)
   Mean and percentile helpers used by the simulation summary.
 - [src/CarOwnershipCostSim/VehicleCatalog.hs](/Users/garion/Work/projects/car-ownership-cost-sim/src/CarOwnershipCostSim/VehicleCatalog.hs)
   Local catalog types and load helpers.
+- [src/CarOwnershipCostSim/VehicleCatalogBaselines.hs](/Users/garion/Work/projects/car-ownership-cost-sim/src/CarOwnershipCostSim/VehicleCatalogBaselines.hs)
+  Checked-in class, fuel, and drive bucket baselines for generated catalog
+  defaults.
 - [src/CarOwnershipCostSim/VehicleCatalogCalibrations.hs](/Users/garion/Work/projects/car-ownership-cost-sim/src/CarOwnershipCostSim/VehicleCatalogCalibrations.hs)
   Checked-in make and trim calibration dataset loader plus lookup helpers for
   generated catalog defaults.
@@ -57,6 +61,11 @@ The app is split into four layers:
 - [catalog/ownership-calibrations.json](/Users/garion/Work/projects/car-ownership-cost-sim/catalog/ownership-calibrations.json)
   Project-owned make and trim calibration anchors that keep generated defaults
   data-backed and reviewable.
+- [catalog/ownership-baselines.json](/Users/garion/Work/projects/car-ownership-cost-sim/catalog/ownership-baselines.json)
+  Project-owned fuel, class, and drive bucket baselines for scalable generated
+  defaults.
+- [catalog/region-profiles.json](/Users/garion/Work/projects/car-ownership-cost-sim/catalog/region-profiles.json)
+  Project-owned region defaults used by the API and simulation engine.
 - [static/index.html](/Users/garion/Work/projects/car-ownership-cost-sim/static/index.html)
   Form structure and results containers.
 - [static/app-render.js](/Users/garion/Work/projects/car-ownership-cost-sim/static/app-render.js)
@@ -94,19 +103,22 @@ The vehicle catalog is not rebuilt during normal web requests.
    [catalog/vehicle-source-seeds.json](/Users/garion/Work/projects/car-ownership-cost-sim/catalog/vehicle-source-seeds.json).
 2. Lightweight bulk-coverage rows live in
    [catalog/vehicle-roster.json](/Users/garion/Work/projects/car-ownership-cost-sim/catalog/vehicle-roster.json).
-3. Checked-in make and trim calibration anchors live in
+3. Checked-in fuel, class, and drive bucket baselines live in
+   [catalog/ownership-baselines.json](/Users/garion/Work/projects/car-ownership-cost-sim/catalog/ownership-baselines.json).
+4. Checked-in make and trim calibration anchors live in
    [catalog/ownership-calibrations.json](/Users/garion/Work/projects/car-ownership-cost-sim/catalog/ownership-calibrations.json).
-4. `app/DiscoverVehicleRoster.hs` can query official menus and generate new
+5. `app/DiscoverVehicleRoster.hs` can query official menus and generate new
    roster candidates before they are checked in.
-5. `app/BuildCatalog.hs` loads all three project-owned inputs and calls
-   `buildCatalogFromLiveCatalogInputs`.
-6. `VehicleCatalogImport.hs` fetches upstream data and validates that each
+6. `app/BuildCatalog.hs` loads the source and roster inputs, while the
+   generated-default modules load the checked-in baseline and calibration
+   datasets used by that rebuild path.
+7. `VehicleCatalogImport.hs` fetches upstream data and validates that each
    source or roster row still matches the official payloads. Curated rows may
    override generated assumptions; roster rows rely on generated defaults that
-   are tuned by the checked-in calibration dataset.
-7. The resulting normalized rows are written to
+   are tuned by the checked-in baseline and calibration datasets.
+8. The resulting normalized rows are written to
    [catalog/vehicle-catalog.json](/Users/garion/Work/projects/car-ownership-cost-sim/catalog/vehicle-catalog.json).
-8. The web server loads that local catalog at startup and serves it from memory.
+9. The web server loads that local catalog at startup and serves it from memory.
 
 ## Testing strategy
 

@@ -1,4 +1,5 @@
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 {-|
 Module      : CarOwnershipCostSim.RegionProfiles
@@ -6,13 +7,16 @@ Description : Shared region profiles for location-aware ownership modeling.
 
 The frontend originally carried region assumptions as a browser-only lookup
 table. This module moves those defaults into the Haskell library so the API,
-simulation engine, and UI can share the same source of truth.
+simulation engine, and UI can share the same source of truth, with the actual
+profile values now living in a checked-in data file.
 -}
 module CarOwnershipCostSim.RegionProfiles
   ( RegionProfile (..),
     allRegionProfiles,
     applyRegionProfileDefaults,
     defaultRegionProfileId,
+    defaultRegionProfilesRelativePath,
+    loadRegionProfiles,
     lookupRegionProfile,
     normalizeRegionProfileId,
     resolveRegionAdjustedInput,
@@ -20,10 +24,14 @@ module CarOwnershipCostSim.RegionProfiles
 where
 
 import CarOwnershipCostSim.Types (BoundedNormal (..), SimulationInput (..))
-import Data.Aeson (FromJSON, ToJSON)
+import Data.Aeson (FromJSON (..), Object, ToJSON (..), Value, eitherDecodeFileStrict', object, withObject, (.:?), (.=))
+import Data.Aeson.Key (fromString)
+import Data.Aeson.Types (Parser)
 import Data.Char (toLower)
 import Data.List (find)
 import GHC.Generics (Generic)
+import Paths_car_ownership_cost_sim (getDataFileName)
+import System.IO.Unsafe (unsafePerformIO)
 
 -- | Region-level defaults that can be promoted into the simulation contract.
 data RegionProfile = RegionProfile
@@ -40,88 +48,56 @@ data RegionProfile = RegionProfile
   }
   deriving (Eq, Show, Generic)
 
-instance FromJSON RegionProfile
+instance FromJSON RegionProfile where
+  parseJSON =
+    withObject "RegionProfile" $ \objectValue ->
+      RegionProfile
+        <$> parseStringField ["id", "regionId"] objectValue
+        <*> parseStringField ["label", "regionLabel"] objectValue
+        <*> parseDoubleField ["salesTaxRate", "regionSalesTaxRate"] objectValue
+        <*> parseDoubleField ["annualRegistration", "regionAnnualRegistration"] objectValue
+        <*> parseDoubleField ["homeChargingShare", "regionHomeChargingShare"] objectValue
+        <*> parseDoubleField ["chargingLossRate", "regionChargingLossRate"] objectValue
+        <*> parseBoundedNormalField ["gasolinePrice", "regionGasolinePrice"] objectValue
+        <*> parseBoundedNormalField ["dieselPrice", "regionDieselPrice"] objectValue
+        <*> parseBoundedNormalField ["homeChargingPrice", "regionHomeChargingPrice"] objectValue
+        <*> parseBoundedNormalField ["publicChargingPrice", "regionPublicChargingPrice"] objectValue
 
-instance ToJSON RegionProfile
+instance ToJSON RegionProfile where
+  toJSON regionProfile =
+    object
+      [ "regionId" .= regionId regionProfile,
+        "regionLabel" .= regionLabel regionProfile,
+        "regionSalesTaxRate" .= regionSalesTaxRate regionProfile,
+        "regionAnnualRegistration" .= regionAnnualRegistration regionProfile,
+        "regionHomeChargingShare" .= regionHomeChargingShare regionProfile,
+        "regionChargingLossRate" .= regionChargingLossRate regionProfile,
+        "regionGasolinePrice" .= regionGasolinePrice regionProfile,
+        "regionDieselPrice" .= regionDieselPrice regionProfile,
+        "regionHomeChargingPrice" .= regionHomeChargingPrice regionProfile,
+        "regionPublicChargingPrice" .= regionPublicChargingPrice regionProfile
+      ]
 
 defaultRegionProfileId :: String
 defaultRegionProfileId = "national"
 
+defaultRegionProfilesRelativePath :: FilePath
+defaultRegionProfilesRelativePath = "catalog/region-profiles.json"
+
+loadRegionProfiles :: FilePath -> IO [RegionProfile]
+loadRegionProfiles regionProfilesPath = do
+  decoded <- eitherDecodeFileStrict' regionProfilesPath
+  case decoded of
+    Left decodeError ->
+      error ("Unable to load region profiles from " <> regionProfilesPath <> ": " <> decodeError)
+    Right profiles -> pure profiles
+
 allRegionProfiles :: [RegionProfile]
 allRegionProfiles =
-  [ RegionProfile
-      { regionId = "national",
-        regionLabel = "National average",
-        regionSalesTaxRate = 0.0675,
-        regionAnnualRegistration = 220,
-        regionHomeChargingShare = 0.82,
-        regionChargingLossRate = 0.10,
-        regionGasolinePrice = boundedNormal 3.75 0.55 2.10 6.50,
-        regionDieselPrice = boundedNormal 4.15 0.60 2.35 6.90,
-        regionHomeChargingPrice = boundedNormal 0.16 0.04 0.08 0.35,
-        regionPublicChargingPrice = boundedNormal 0.43 0.10 0.20 0.95
-      },
-    RegionProfile
-      { regionId = "mountain-west",
-        regionLabel = "Mountain West",
-        regionSalesTaxRate = 0.062,
-        regionAnnualRegistration = 210,
-        regionHomeChargingShare = 0.84,
-        regionChargingLossRate = 0.10,
-        regionGasolinePrice = boundedNormal 3.48 0.42 2.10 5.85,
-        regionDieselPrice = boundedNormal 3.92 0.47 2.35 6.15,
-        regionHomeChargingPrice = boundedNormal 0.14 0.03 0.07 0.28,
-        regionPublicChargingPrice = boundedNormal 0.40 0.09 0.18 0.82
-      },
-    RegionProfile
-      { regionId = "west-coast",
-        regionLabel = "West Coast",
-        regionSalesTaxRate = 0.084,
-        regionAnnualRegistration = 320,
-        regionHomeChargingShare = 0.76,
-        regionChargingLossRate = 0.09,
-        regionGasolinePrice = boundedNormal 4.75 0.58 3.10 7.20,
-        regionDieselPrice = boundedNormal 5.15 0.62 3.35 7.75,
-        regionHomeChargingPrice = boundedNormal 0.26 0.05 0.15 0.46,
-        regionPublicChargingPrice = boundedNormal 0.53 0.10 0.30 1.05
-      },
-    RegionProfile
-      { regionId = "texas-south",
-        regionLabel = "Texas / Gulf South",
-        regionSalesTaxRate = 0.064,
-        regionAnnualRegistration = 120,
-        regionHomeChargingShare = 0.85,
-        regionChargingLossRate = 0.10,
-        regionGasolinePrice = boundedNormal 3.20 0.38 1.95 5.35,
-        regionDieselPrice = boundedNormal 3.70 0.43 2.20 5.85,
-        regionHomeChargingPrice = boundedNormal 0.13 0.03 0.07 0.27,
-        regionPublicChargingPrice = boundedNormal 0.39 0.08 0.18 0.78
-      },
-    RegionProfile
-      { regionId = "midwest",
-        regionLabel = "Midwest",
-        regionSalesTaxRate = 0.071,
-        regionAnnualRegistration = 190,
-        regionHomeChargingShare = 0.83,
-        regionChargingLossRate = 0.10,
-        regionGasolinePrice = boundedNormal 3.42 0.40 2.05 5.65,
-        regionDieselPrice = boundedNormal 3.86 0.45 2.30 6.00,
-        regionHomeChargingPrice = boundedNormal 0.15 0.03 0.08 0.30,
-        regionPublicChargingPrice = boundedNormal 0.41 0.09 0.20 0.83
-      },
-    RegionProfile
-      { regionId = "northeast",
-        regionLabel = "Northeast",
-        regionSalesTaxRate = 0.070,
-        regionAnnualRegistration = 260,
-        regionHomeChargingShare = 0.79,
-        regionChargingLossRate = 0.10,
-        regionGasolinePrice = boundedNormal 3.88 0.48 2.35 6.30,
-        regionDieselPrice = boundedNormal 4.28 0.53 2.55 6.75,
-        regionHomeChargingPrice = boundedNormal 0.22 0.05 0.12 0.42,
-        regionPublicChargingPrice = boundedNormal 0.49 0.10 0.26 0.98
-      }
-  ]
+  unsafePerformIO $ do
+    regionProfilesPath <- getDataFileName defaultRegionProfilesRelativePath
+    loadRegionProfiles regionProfilesPath
+{-# NOINLINE allRegionProfiles #-}
 
 lookupRegionProfile :: String -> Maybe RegionProfile
 lookupRegionProfile rawRegionId =
@@ -155,15 +131,6 @@ resolveRegionAdjustedInput simulationInput
         Just regionProfile -> applyRegionProfileDefaults regionProfile simulationInput
         Nothing -> simulationInput
 
-boundedNormal :: Double -> Double -> Double -> Double -> BoundedNormal
-boundedNormal meanValue stdDev lowerBound upperBound =
-  BoundedNormal
-    { boundedNormalMean = meanValue,
-      boundedNormalStdDev = stdDev,
-      boundedNormalLowerBound = lowerBound,
-      boundedNormalUpperBound = Just upperBound
-    }
-
 regionEnergyPriceForFuelType :: String -> RegionProfile -> BoundedNormal
 regionEnergyPriceForFuelType fuelType regionProfile =
   case normalizeFuelType fuelType of
@@ -176,3 +143,47 @@ normalizeFuelType rawFuelType =
   case map toLower rawFuelType of
     "hybrid" -> "hybrid-gasoline"
     normalizedFuelType -> normalizedFuelType
+
+parseStringField :: [String] -> Object -> Parser String
+parseStringField fieldNames objectValue =
+  parseField fieldNames objectValue
+
+parseDoubleField :: [String] -> Object -> Parser Double
+parseDoubleField fieldNames objectValue =
+  parseField fieldNames objectValue
+
+parseBoundedNormalField :: [String] -> Object -> Parser BoundedNormal
+parseBoundedNormalField fieldNames objectValue = do
+  boundedNormalValue <- parseField fieldNames objectValue :: Parser Value
+  withObject "BoundedNormalField" parseBoundedNormal boundedNormalValue
+
+parseBoundedNormal :: Object -> Parser BoundedNormal
+parseBoundedNormal objectValue =
+  BoundedNormal
+    <$> parseField ["mean", "boundedNormalMean"] objectValue
+    <*> parseField ["stdDev", "boundedNormalStdDev"] objectValue
+    <*> parseField ["lowerBound", "boundedNormalLowerBound"] objectValue
+    <*> parseOptionalField ["upperBound", "boundedNormalUpperBound"] objectValue
+
+parseField :: FromJSON a => [String] -> Object -> Parser a
+parseField fieldNames objectValue =
+  tryKeys fieldNames
+  where
+    tryKeys [] =
+      fail "Missing required region-profile field."
+    tryKeys (fieldName : remainingFieldNames) = do
+      maybeValue <- objectValue .:? fromString fieldName
+      case maybeValue of
+        Just value -> pure value
+        Nothing -> tryKeys remainingFieldNames
+
+parseOptionalField :: FromJSON a => [String] -> Object -> Parser (Maybe a)
+parseOptionalField fieldNames objectValue =
+  tryKeys fieldNames
+  where
+    tryKeys [] = pure Nothing
+    tryKeys (fieldName : remainingFieldNames) = do
+      maybeValue <- objectValue .:? fromString fieldName
+      case maybeValue of
+        Just value -> pure (Just value)
+        Nothing -> tryKeys remainingFieldNames

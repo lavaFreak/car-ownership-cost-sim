@@ -17,6 +17,9 @@ module Main (main) where
 import CarOwnershipCostSim.RegionProfiles
   ( RegionProfile (..),
     applyRegionProfileDefaults,
+    allRegionProfiles,
+    defaultRegionProfilesRelativePath,
+    loadRegionProfiles,
     lookupRegionProfile,
     resolveRegionAdjustedInput,
   )
@@ -30,6 +33,11 @@ import CarOwnershipCostSim.VehicleCatalog
     buildVehicleCatalogEntry,
     defaultVehicleCatalogRelativePath,
     loadVehicleCatalog,
+  )
+import CarOwnershipCostSim.VehicleCatalogBaselines
+  ( VehicleCatalogBaselineDataset (..),
+    defaultVehicleCatalogBaselinesRelativePath,
+    loadVehicleCatalogBaselineDataset,
   )
 import CarOwnershipCostSim.VehicleCatalogCalibrations
   ( VehicleCatalogCalibrationDataset (..),
@@ -105,7 +113,9 @@ tests =
       TestLabel "catalog import seeds build normalized entries" catalogImportSeedTest,
       TestLabel "vehicle source seeds load cleanly" vehicleSourceSeedLoadTest,
       TestLabel "vehicle roster seeds load cleanly" vehicleRosterSeedLoadTest,
+      TestLabel "ownership baseline dataset loads cleanly" ownershipBaselineLoadTest,
       TestLabel "ownership calibration dataset loads cleanly" ownershipCalibrationLoadTest,
+      TestLabel "region profile dataset loads cleanly" regionProfileLoadTest,
       TestLabel "vPIC fixtures decode model listings" vpicFixtureDecodingTest,
       TestLabel "FuelEconomy menus decode cleanly" fuelEconomyMenuDecodingTest,
       TestLabel "FuelEconomy fixtures decode vehicle details" fuelEconomyFixtureDecodingTest,
@@ -1068,6 +1078,14 @@ vehicleRosterSeedLoadTest =
     assertEqual "the lightweight roster spans 2023 through 2026" [2023, 2024, 2025, 2026] rosterYears
     mapM_ assertVehicleRosterSeedLooksUsable rosterSeeds
 
+ownershipBaselineLoadTest :: Test
+ownershipBaselineLoadTest =
+  TestCase $ do
+    baselineDataset <- loadDefaultVehicleCatalogBaselines
+    assertEqual "ownership baseline dataset keeps five fuel buckets" 5 (length (baselineFuelBuckets baselineDataset))
+    assertEqual "ownership baseline dataset keeps seven class buckets" 7 (length (baselineClassBuckets baselineDataset))
+    assertEqual "ownership baseline dataset keeps four drive buckets" 4 (length (baselineDriveBuckets baselineDataset))
+
 ownershipCalibrationLoadTest :: Test
 ownershipCalibrationLoadTest =
   TestCase $ do
@@ -1075,6 +1093,13 @@ ownershipCalibrationLoadTest =
     assertEqual "ownership calibration source name stays stable" "project-owned ownership calibration anchors" (calibrationSourceName calibrationDataset)
     assertEqual "ownership calibration dataset keeps nine make anchors" 9 (length (calibrationBrandCalibrations calibrationDataset))
     assertEqual "ownership calibration dataset keeps three variant rules" 3 (length (calibrationVariantRules calibrationDataset))
+
+regionProfileLoadTest :: Test
+regionProfileLoadTest =
+  TestCase $ do
+    loadedProfiles <- loadDefaultRegionProfiles
+    assertEqual "region profile dataset keeps six region profiles" 6 (length loadedProfiles)
+    assertEqual "library default region profiles match the checked-in dataset" loadedProfiles allRegionProfiles
 
 vpicFixtureDecodingTest :: Test
 vpicFixtureDecodingTest =
@@ -1944,10 +1969,20 @@ loadDefaultVehicleRosterSeeds = do
   rosterSeedPath <- getDataFileName defaultVehicleCatalogRosterSeedsRelativePath
   loadVehicleCatalogRosterSeeds rosterSeedPath
 
+loadDefaultVehicleCatalogBaselines :: IO VehicleCatalogBaselineDataset
+loadDefaultVehicleCatalogBaselines = do
+  baselinePath <- getDataFileName defaultVehicleCatalogBaselinesRelativePath
+  loadVehicleCatalogBaselineDataset baselinePath
+
 loadDefaultVehicleCatalogCalibrations :: IO VehicleCatalogCalibrationDataset
 loadDefaultVehicleCatalogCalibrations = do
   calibrationPath <- getDataFileName defaultVehicleCatalogCalibrationsRelativePath
   loadVehicleCatalogCalibrationDataset calibrationPath
+
+loadDefaultRegionProfiles :: IO [RegionProfile]
+loadDefaultRegionProfiles = do
+  regionProfilesPath <- getDataFileName defaultRegionProfilesRelativePath
+  loadRegionProfiles regionProfilesPath
 
 loadDefaultVehicleCatalog :: IO [VehicleCatalogEntry]
 loadDefaultVehicleCatalog = do
