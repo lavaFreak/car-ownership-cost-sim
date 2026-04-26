@@ -5,9 +5,6 @@ time using a Monte Carlo simulation. Instead of returning one fixed number, the
 app simulates many possible futures and reports a range of outcomes based on
 uncertainty in fuel prices, maintenance, and depreciation.
 
-The main question behind the project is simple: how much might a car actually
-cost to own when the future does not behave exactly as expected?
-
 ## Project Overview
 
 Most car cost calculators produce a single estimate. That is useful, but it can
