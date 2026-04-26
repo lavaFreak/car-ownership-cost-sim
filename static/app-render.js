@@ -342,6 +342,10 @@ function drawPlaceholderChart(title, detail) {
 }
 
 function drawYearlyPlaceholderChart(title, detail) {
+  if (!yearlyChart || !yearlyChartContext) {
+    return;
+  }
+
   const width = yearlyChart.width;
   const height = yearlyChart.height;
 
@@ -493,11 +497,31 @@ function renderInsights(response) {
       ? null
       : response.responseExampleBreakdown.costRepairShocks / response.responseExampleBreakdown.costTotal;
   const finalYear = yearlyBreakdown[yearlyBreakdown.length - 1] || null;
+  const peakCashYear =
+    yearlyBreakdown.reduce(
+      (bestYear, year) => (!bestYear || year.yearlyCashOutflow > bestYear.yearlyCashOutflow ? year : bestYear),
+      null
+    ) || null;
+  const lowestCashYear =
+    yearlyBreakdown.reduce(
+      (bestYear, year) => (!bestYear || year.yearlyCashOutflow < bestYear.yearlyCashOutflow ? year : bestYear),
+      null
+    ) || null;
+  const annualCashSwing =
+    peakCashYear && lowestCashYear ? peakCashYear.yearlyCashOutflow - lowestCashYear.yearlyCashOutflow : null;
 
   const insightCards = [
     {
       label: "Typical yearly cost",
       value: currency.format(summary.summaryMedianTotalCost / yearsOwned),
+    },
+    {
+      label: "Peak cash year",
+      value: peakCashYear ? `Y${peakCashYear.yearlyYear} · ${currency.format(peakCashYear.yearlyCashOutflow)}` : "N/A",
+    },
+    {
+      label: "Annual cash swing",
+      value: annualCashSwing === null ? "N/A" : currency.format(annualCashSwing),
     },
     {
       label: "10-90 spread",
@@ -680,6 +704,10 @@ function renderYearlyBreakdown(response) {
 }
 
 function drawYearlyCostChart(yearlyBreakdown, baselineYearlyBreakdown = []) {
+  if (!yearlyChart || !yearlyChartContext) {
+    return;
+  }
+
   const width = yearlyChart.width;
   const height = yearlyChart.height;
 
