@@ -31,8 +31,10 @@ import Web.Scotty
 -- | Absolute paths to the bundled static frontend assets.
 data StaticAssetPaths = StaticAssetPaths
   { assetIndexHtml :: FilePath,
+    assetReportHtml :: FilePath,
     assetStylesCss :: FilePath,
     assetAppJs :: FilePath,
+    assetReportJs :: FilePath,
     assetAppRenderJs :: FilePath
   }
 
@@ -49,6 +51,9 @@ appRoutes vehicleCatalog staticAssets = do
   get "/" $
     file (assetIndexHtml staticAssets)
 
+  get "/report" $
+    file (assetReportHtml staticAssets)
+
   get "/styles.css" $ do
     setHeader "Content-Type" "text/css; charset=utf-8"
     file (assetStylesCss staticAssets)
@@ -56,6 +61,10 @@ appRoutes vehicleCatalog staticAssets = do
   get "/app.js" $ do
     setHeader "Content-Type" "application/javascript; charset=utf-8"
     file (assetAppJs staticAssets)
+
+  get "/report.js" $ do
+    setHeader "Content-Type" "application/javascript; charset=utf-8"
+    file (assetReportJs staticAssets)
 
   get "/assets/:asset" $ do
     assetName <- pathParam "asset"

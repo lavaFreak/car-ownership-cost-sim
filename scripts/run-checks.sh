@@ -32,4 +32,6 @@ if command -v node >/dev/null 2>&1; then
   node --check static/app-render.js
   echo "==> node --check static/app.js"
   node --check static/app.js
+  echo "==> node --check static/report.js"
+  node --check static/report.js
 fi

@@ -1608,20 +1608,28 @@ webAssetRoutesSmokeTest =
   TestCase $ do
     testApplication <- buildTestApplication
     homeResponse <- runRequest testApplication methodGet "/" BL.empty []
+    reportResponse <- runRequest testApplication methodGet "/report" BL.empty []
     stylesResponse <- runRequest testApplication methodGet "/styles.css" BL.empty []
     scriptResponse <- runRequest testApplication methodGet "/app.js" BL.empty []
+    reportScriptResponse <- runRequest testApplication methodGet "/report.js" BL.empty []
     renderScriptResponse <- runRequest testApplication methodGet "/assets/app-render.js" BL.empty []
     let homeBody = BL8.unpack (simpleBody homeResponse)
+        reportBody = BL8.unpack (simpleBody reportResponse)
         stylesBody = BL8.unpack (simpleBody stylesResponse)
         scriptBody = BL8.unpack (simpleBody scriptResponse)
+        reportScriptBody = BL8.unpack (simpleBody reportScriptResponse)
         renderScriptBody = BL8.unpack (simpleBody renderScriptResponse)
     assertEqual "home route returns 200" status200 (simpleStatus homeResponse)
+    assertEqual "report route returns 200" status200 (simpleStatus reportResponse)
     assertEqual "styles route returns 200" status200 (simpleStatus stylesResponse)
     assertEqual "script route returns 200" status200 (simpleStatus scriptResponse)
+    assertEqual "report script route returns 200" status200 (simpleStatus reportScriptResponse)
     assertEqual "render script route returns 200" status200 (simpleStatus renderScriptResponse)
     assertBool "home route contains the simulation form" ("sim-form" `contains` homeBody)
+    assertBool "report route contains the summary grid" ("summary-grid" `contains` reportBody)
     assertBool "styles route serves CSS" ("body" `contains` stylesBody)
     assertBool "script route serves the frontend bootstrap" ("loadVehiclePresets" `contains` scriptBody)
+    assertBool "report script serves the dedicated report bootstrap" ("runScenarioReport" `contains` reportScriptBody)
     assertBool "render script route serves the extracted renderer" ("renderInitialResultsState" `contains` renderScriptBody)
 
 homepageHeadRouteTest :: Test
@@ -1993,14 +2001,18 @@ buildTestApplication :: IO Application
 buildTestApplication = do
   vehicleCatalog <- loadDefaultVehicleCatalog
   indexHtmlPath <- getDataFileName "static/index.html"
+  reportHtmlPath <- getDataFileName "static/report.html"
   stylesCssPath <- getDataFileName "static/styles.css"
   appJsPath <- getDataFileName "static/app.js"
+  reportJsPath <- getDataFileName "static/report.js"
   appRenderJsPath <- getDataFileName "static/app-render.js"
   let staticAssets =
         StaticAssetPaths
           { assetIndexHtml = indexHtmlPath,
+            assetReportHtml = reportHtmlPath,
             assetStylesCss = stylesCssPath,
             assetAppJs = appJsPath,
+            assetReportJs = reportJsPath,
             assetAppRenderJs = appRenderJsPath
           }
   buildApplication vehicleCatalog staticAssets

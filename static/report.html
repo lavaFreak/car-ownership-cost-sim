@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <!--
+      Dedicated report page for the simulator UI.
+
+      This shell loads a scenario from the URL, runs the backend simulation,
+      and focuses entirely on presenting the results and comparison tools.
+    -->
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Car Ownership Report</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <main class="page-shell page-shell--report">
+      <section class="hero panel hero-layout">
+        <div>
+          <p class="eyebrow">Monte Carlo Cost Explorer</p>
+          <h1 id="report-title">Ownership cost report</h1>
+          <p id="report-subtitle" class="hero-copy">
+            This page runs the scenario from the URL and turns it into a dedicated report with summary ranges, a sampled breakdown, and a yearly timeline.
+          </p>
+        </div>
+
+        <aside class="hero-sidecard">
+          <span class="hero-sidecard-label">Report actions</span>
+          <div class="report-toolbar">
+            <a id="edit-scenario-link" class="button-secondary page-link" href="/">Edit inputs</a>
+            <a id="new-scenario-link" class="button-secondary page-link" href="/">Start over</a>
+            <button id="save-comparison-button" type="button" class="button-secondary" disabled>
+              Save current as baseline
+            </button>
+            <button id="clear-comparison-button" type="button" class="button-secondary" disabled>
+              Clear baseline
+            </button>
+            <button id="copy-link-button" type="button" class="button-secondary">Copy report link</button>
+          </div>
+          <p id="tool-feedback" class="tool-feedback" hidden aria-live="polite"></p>
+        </aside>
+      </section>
+
+      <section class="workspace report-workspace">
+        <section class="panel report-context-panel">
+          <div class="panel-heading">
+            <h2>Scenario Context</h2>
+            <p id="status-line">Preparing the requested scenario.</p>
+          </div>
+
+          <div class="builder-preview-card">
+            <h3 id="report-context-title">Opening the scenario</h3>
+            <p id="report-context-copy">
+              The simulator is reading the scenario from the URL, then it will
+              run the sampled ownership paths and summarize the results here.
+            </p>
+          </div>
+
+          <div id="results-feedback" class="feedback-panel" hidden aria-live="polite"></div>
+        </section>
+
+        <section class="panel results-panel report-results-panel">
+          <div class="results-callout">
+            <h3 id="results-callout-title">How to read the results</h3>
+            <p id="results-callout-copy">
+              Average cost is the across-run mean. Median is the middle outcome.
+              The 10th to 90th percentile band gives a practical low-to-high
+              range, not a guarantee.
+            </p>
+          </div>
+
+          <div id="summary-grid" class="summary-grid"></div>
+
+          <div class="chart-shell">
+            <canvas id="distribution-chart" width="800" height="320" aria-label="Simulated cost distribution"></canvas>
+          </div>
+
+          <div class="analysis-shell">
+            <h3>Scenario signals</h3>
+            <div id="insight-grid" class="summary-grid"></div>
+          </div>
+
+          <div class="analysis-shell comparison-shell">
+            <div class="comparison-heading">
+              <h3>Scenario comparison</h3>
+              <p id="comparison-status">
+                Save a successful run as a baseline, then tweak the scenario on the builder page and return here to compare them.
+              </p>
+            </div>
+            <div id="comparison-grid" class="comparison-grid"></div>
+          </div>
+
+          <div class="breakdown-shell">
+            <h3>One sampled scenario</h3>
+            <div id="breakdown-grid" class="breakdown-grid"></div>
+          </div>
+
+          <div class="breakdown-shell">
+            <h3>Year-by-year snapshot</h3>
+            <div id="yearly-grid" class="yearly-grid"></div>
+          </div>
+
+          <div class="chart-shell">
+            <canvas id="yearly-chart" width="800" height="320" aria-label="Year-by-year ownership cost chart"></canvas>
+          </div>
+        </section>
+      </section>
+    </main>
+
+    <script src="/assets/app-render.js" defer></script>
+    <script src="/report.js" defer></script>
+  </body>
+</html>

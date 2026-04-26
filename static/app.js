@@ -1,11 +1,11 @@
 /*
- * Browser entrypoint for the simulator UI.
+ * Browser entrypoint for the scenario-builder page.
  *
  * Responsibilities in this file:
  * - translate form inputs into the backend JSON payload shape
  * - validate inputs early so common mistakes never hit the API
- * - keep URL-backed share links in sync with the current scenario
- * - coordinate the shared render helpers in static/app-render.js
+ * - keep the scenario-builder state in sync with the URL
+ * - open a dedicated report page once the scenario is ready
  */
 const form = document.getElementById("sim-form");
 const vehicleYearSelect = document.getElementById("vehicle-year");
@@ -29,8 +29,6 @@ const highwayEfficiencyLabel = document.getElementById("highway-efficiency-label
 const energyPriceMeanLabel = document.getElementById("energy-price-mean-label");
 const energyPriceStdDevLabel = document.getElementById("energy-price-stddev-label");
 const submitButton = form.querySelector('button[type="submit"]');
-const saveComparisonButton = document.getElementById("save-comparison-button");
-const clearComparisonButton = document.getElementById("clear-comparison-button");
 const copyLinkButton = document.getElementById("copy-link-button");
 const resetFormButton = document.getElementById("reset-form-button");
 const toolFeedback = document.getElementById("tool-feedback");
@@ -47,8 +45,8 @@ const breakdownGrid = document.getElementById("breakdown-grid");
 const yearlyGrid = document.getElementById("yearly-grid");
 const canvas = document.getElementById("distribution-chart");
 const yearlyChart = document.getElementById("yearly-chart");
-const context = canvas.getContext("2d");
-const yearlyChartContext = yearlyChart.getContext("2d");
+const context = canvas ? canvas.getContext("2d") : null;
+const yearlyChartContext = yearlyChart ? yearlyChart.getContext("2d") : null;
 
 const currency = new Intl.NumberFormat("en-US", {
   style: "currency",
@@ -938,7 +936,7 @@ function applyVehiclePreset(preset) {
   hideFeedback(formFeedback);
   hideToolFeedback();
   presetDescription.textContent = presetDescriptionText(preset);
-  statusLine.textContent = `Loaded ${preset.presetName}. Review the assumptions, make any manual edits you want, then run the simulation.`;
+  statusLine.textContent = `Loaded ${preset.presetName}. Review the assumptions, make any manual edits you want, then generate the report.`;
 }
 
 function applyVehicleCatalogSelectionById(vehicleId) {
@@ -1069,6 +1067,12 @@ function buildScenarioSearchParams() {
   return params;
 }
 
+function buildReportUrl() {
+  const params = buildScenarioSearchParams();
+  const queryString = params.toString();
+  return queryString ? `/report?${queryString}` : "/report";
+}
+
 function replaceUrlWithCurrentScenario() {
   const params = buildScenarioSearchParams();
   const queryString = params.toString();
@@ -1107,7 +1111,7 @@ function applyScenarioFromQuery() {
 
   if (hasFieldOverrides) {
     statusLine.textContent = "Loaded a shared scenario from the URL.";
-    showToolFeedback("This page opened with a shared scenario. Run it as-is or tweak the inputs first.");
+    showToolFeedback("This page opened with a shared scenario. Generate a report as-is or tweak the inputs first.");
   }
 }
 
@@ -1248,9 +1252,6 @@ function buildRequestPayload(values) {
   };
 }
 
-// Result rendering and charts live in static/app-render.js so this controller
-// can stay focused on scenario state, validation, and API interaction.
-
 function resetScenarioForm() {
   form.reset();
   applyFuelTypeLabels(fuelTypeSelect.value);
@@ -1265,9 +1266,7 @@ function resetScenarioForm() {
   hideToolFeedback();
   pendingPresetSelection = { presetId: "", hasFieldOverrides: false, hasFuelTypeOverride: false };
   window.history.replaceState({}, "", window.location.pathname);
-  statusLine.textContent = hasSuccessfulRun
-    ? "Starter inputs restored. Run the simulation again to compare with the last result."
-    : "Starter inputs restored. Run the simulation when you are ready.";
+  statusLine.textContent = "Starter inputs restored. Generate a report when you are ready.";
 }
 
 function pushValidationError(errors, field, message) {
@@ -2006,7 +2005,26 @@ function maybeApplyVehicleLookupSelection() {
 
 form.addEventListener("submit", (event) => {
   event.preventDefault();
-  runSimulation();
+  const values = collectFormValues();
+  const validationErrors = validateFormValues(values);
+
+  hideFeedback(formFeedback);
+  clearFieldErrors();
+  hideToolFeedback();
+
+  if (validationErrors.length > 0) {
+    renderValidationErrors(validationErrors);
+    statusLine.textContent = "Fix the highlighted inputs before generating the report.";
+    const firstField = validationErrors[0]?.field;
+    if (firstField && form.elements[firstField]) {
+      form.elements[firstField].focus();
+    }
+    return;
+  }
+
+  replaceUrlWithCurrentScenario();
+  statusLine.textContent = "Opening the dedicated report page...";
+  window.location.assign(buildReportUrl());
 });
 
 copyLinkButton.addEventListener("click", async () => {
@@ -2022,28 +2040,19 @@ copyLinkButton.addEventListener("click", async () => {
     return;
   }
 
-  const shareUrl = new URL(window.location.origin + window.location.pathname);
-  shareUrl.search = buildScenarioSearchParams().toString();
+  const shareUrl = new URL(window.location.origin + buildReportUrl());
 
   try {
     await navigator.clipboard.writeText(shareUrl.toString());
-    showToolFeedback("Share link copied. Anyone opening it will get this scenario prefilled.");
+    showToolFeedback("Report link copied. Anyone opening it will land on the dedicated report page for this scenario.");
     replaceUrlWithCurrentScenario();
   } catch (error) {
-    showToolFeedback(`Copy failed, but this is the share URL: ${shareUrl.toString()}`, true);
+    showToolFeedback(`Copy failed, but this is the report URL: ${shareUrl.toString()}`, true);
   }
 });
 
 resetFormButton.addEventListener("click", () => {
   resetScenarioForm();
-});
-
-saveComparisonButton.addEventListener("click", () => {
-  saveLatestRunAsBaseline();
-});
-
-clearComparisonButton.addEventListener("click", () => {
-  clearSavedBaseline();
 });
 
 vehicleYearSelect.addEventListener("change", () => {
@@ -2109,14 +2118,11 @@ vehiclePresetSelect.addEventListener("change", (event) => {
 });
 
 async function initializeApp() {
-  loadPersistedComparisonBaseline();
-  renderInitialResultsState();
   applyScenarioFromQuery();
   applyFuelTypeLabels(fuelTypeSelect.value);
   await Promise.all([loadVehicleCatalog(), loadVehiclePresets(), loadRegionProfiles()]);
   syncPresetSelectionFromQuery();
   applyRegionCalibrationState(false);
-  runSimulation();
 }
 
 initializeApp();

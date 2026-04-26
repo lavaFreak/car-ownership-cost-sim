@@ -20,16 +20,20 @@ main :: IO ()
 main = do
   catalogPath <- getDataFileName defaultVehicleCatalogRelativePath
   indexHtmlPath <- getDataFileName "static/index.html"
+  reportHtmlPath <- getDataFileName "static/report.html"
   stylesCssPath <- getDataFileName "static/styles.css"
   appJsPath <- getDataFileName "static/app.js"
+  reportJsPath <- getDataFileName "static/report.js"
   appRenderJsPath <- getDataFileName "static/app-render.js"
   vehicleCatalog <- loadVehicleCatalog catalogPath
   port <- readServerPort
   let staticAssets =
         StaticAssetPaths
           { assetIndexHtml = indexHtmlPath,
+            assetReportHtml = reportHtmlPath,
             assetStylesCss = stylesCssPath,
             assetAppJs = appJsPath,
+            assetReportJs = reportJsPath,
             assetAppRenderJs = appRenderJsPath
           }
   application <- buildApplication vehicleCatalog staticAssets
