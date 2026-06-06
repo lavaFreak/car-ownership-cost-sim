@@ -153,6 +153,8 @@ bash scripts/expand-roster-batch.sh catalog/roster-batches/2024-mainstream.txt 1
   Local checks, CI workflow, and catalog refresh commands.
 - [docs/vehicle-data-sourcing.md](docs/vehicle-data-sourcing.md)
   Data-source strategy and rationale.
+- [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)
+  Publication-oriented license and data-source audit notes.
 
 ## Status and Limitations
 
