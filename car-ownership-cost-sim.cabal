@@ -7,8 +7,10 @@ build-type:         Simple
 license:            MIT
 license-file:       LICENSE
 author:             Garion
-maintainer:         garion@example.com
+maintainer:         gemilazzo@gmail.com
 category:           Web
+homepage:           https://github.com/lavaFreak/car-ownership-cost-sim
+bug-reports:        https://github.com/lavaFreak/car-ownership-cost-sim/issues
 extra-source-files:
     README.md
     docs/architecture-overview.md
@@ -67,6 +69,10 @@ data-files:
     test/fixtures/fueleconomy/vehicle-49014.xml
     test/fixtures/vpic/honda-2024-models.json
     test/fixtures/vpic/toyota-2024-models.json
+
+source-repository head
+    type:     git
+    location: https://github.com/lavaFreak/car-ownership-cost-sim.git
 
 common shared-properties
     default-language: GHC2021

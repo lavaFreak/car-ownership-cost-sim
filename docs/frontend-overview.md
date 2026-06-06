@@ -7,26 +7,37 @@ is responsible for.
 
 The frontend is intentionally lightweight:
 
-- static HTML in [static/index.html](/Users/garion/Work/projects/car-ownership-cost-sim/static/index.html)
-- static CSS in [static/styles.css](/Users/garion/Work/projects/car-ownership-cost-sim/static/styles.css)
-- one controller script in [static/app.js](/Users/garion/Work/projects/car-ownership-cost-sim/static/app.js)
-- one render and chart helper asset in [static/app-render.js](/Users/garion/Work/projects/car-ownership-cost-sim/static/app-render.js)
+- builder-page HTML in [static/index.html](../static/index.html)
+- report-page HTML in [static/report.html](../static/report.html)
+- shared CSS in [static/styles.css](../static/styles.css)
+- one builder controller in [static/app.js](../static/app.js)
+- one report controller in [static/report.js](../static/report.js)
+- one render and chart helper asset in [static/app-render.js](../static/app-render.js)
 
 There is no framework, build step, or client-side bundler right now.
 
 ## Responsibilities of the frontend scripts
 
-[static/app.js](/Users/garion/Work/projects/car-ownership-cost-sim/static/app.js)
-currently does five jobs:
+[static/app.js](../static/app.js)
+currently does five builder-page jobs:
 
 1. collect form values
 2. validate inputs before sending a request
-3. convert form data into the backend JSON request shape
+3. keep URL-backed builder state in sync with the current scenario
 4. keep catalog-backed vehicle lookup state usable as the local catalog grows
-5. keep shareable URLs in sync with the current scenario
+5. generate report links from the current scenario
 
-[static/app-render.js](/Users/garion/Work/projects/car-ownership-cost-sim/static/app-render.js)
-owns the DOM-heavy results layer:
+[static/report.js](../static/report.js)
+owns the report-page control flow:
+
+1. restore a scenario from the report URL
+2. convert that scenario into the backend JSON request shape
+3. run the simulation request
+4. keep report sharing and baseline comparison controls working
+5. coordinate the shared renderer for the results view
+
+[static/app-render.js](../static/app-render.js)
+owns the DOM-heavy results layer shared by the report page:
 
 1. render summary and breakdown cards
 2. render scenario comparison state
@@ -110,18 +121,15 @@ Validation happens in two places by design:
 The frontend should mirror backend rules closely, but the backend remains the
 final authority.
 
-## Share links
+## Builder/report split
 
-The frontend maintains a URL-backed scenario state:
+The UI is now intentionally split into two pages:
 
-- form fields are serialized into the query string
-- opening a shared link restores the scenario fields
-- presets can be part of that shared state as well
-- region profile defaults can be part of that shared state as well
-- the backend-region-defaults toggle can also be part of shared state
+- the builder page focuses on vehicle selection and scenario setup
+- the report page focuses on simulation output and comparison
 
-This is useful for debugging, demos, and comparing scenarios without requiring
-accounts or persistence.
+The builder serializes the scenario into the report URL. Opening that link
+restores the scenario directly on the report page and reruns the simulation.
 
 ## Comparison mode
 
@@ -153,7 +161,7 @@ what the backend will actually simulate.
 
 ## Results rendering
 
-The frontend currently renders five views of the simulation response:
+The report page currently renders five views of the simulation response:
 
 - summary cards
   - mean, median, percentile band, cost-per-mile, min, max
@@ -170,10 +178,9 @@ The frontend currently renders five views of the simulation response:
   - the yearly cards now also surface cumulative miles, maintenance
     calibration, and repair risk so the wear model is visible from the UI
 
-Two simple canvas charts complement those cards:
+The report also includes one canvas chart:
 
 - histogram of total sampled costs, with a baseline overlay when saved
-- bar chart of one sampled yearly cost path, with a baseline overlay when saved
 
 ## Styling approach
 

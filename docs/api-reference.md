@@ -8,11 +8,15 @@ of the main simulation payloads.
 The app currently serves a very small API:
 
 - `GET /`
-  - returns the main HTML page
+  - returns the builder page
+- `GET /report`
+  - returns the dedicated report page
 - `GET /styles.css`
   - returns the frontend stylesheet
 - `GET /app.js`
-  - returns the frontend controller script
+  - returns the builder-page controller script
+- `GET /report.js`
+  - returns the report-page controller script
 - `GET /api/example`
   - returns a fully populated example `SimulationRequest`
 - `GET /api/catalog`

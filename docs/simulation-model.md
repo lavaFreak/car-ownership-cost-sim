@@ -17,8 +17,8 @@ For one request:
 
 The implementation entrypoints are:
 
-- [simulateMany](/Users/garion/Work/projects/car-ownership-cost-sim/src/CarOwnershipCostSim/Simulation.hs)
-- [simulateRequestWithSeed](/Users/garion/Work/projects/car-ownership-cost-sim/src/CarOwnershipCostSim/Simulation.hs)
+- [simulateMany](../src/CarOwnershipCostSim/Simulation.hs)
+- [simulateRequestWithSeed](../src/CarOwnershipCostSim/Simulation.hs)
 
 ## Deterministic parts of the model
 

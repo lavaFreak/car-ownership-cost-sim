@@ -1,242 +1,97 @@
 # Car Ownership Cost Simulation
 
-This project is a Haskell web app that estimates the cost of owning a car over
-time using a Monte Carlo simulation. Instead of returning one fixed number, the
-app simulates many possible futures and reports a range of outcomes based on
-uncertainty in fuel prices, maintenance, and depreciation.
+Car Ownership Cost Simulation is a Haskell web application for estimating the
+cost of owning a car over time with a Monte Carlo model. Instead of returning a
+single fixed estimate, it samples many possible ownership paths and reports a
+range of outcomes.
 
-## Project Overview
+The application is designed for questions such as:
 
-Most car cost calculators produce a single estimate. That is useful, but it can
-hide how much real ownership costs can vary from one scenario to another. This
-project aims to provide a more realistic answer by modeling uncertainty
-directly.
+- What is the likely total cost of owning this vehicle for the next five years?
+- How sensitive is that estimate to fuel prices, maintenance, and depreciation?
+- How does one vehicle compare with another under the same assumptions?
 
-The app asks for values such as:
+## Overview
 
-- purchase price
-- down payment and loan details
-- starting vehicle age and starting odometer for used-car scenarios
-- miles driven per year
-- annual mileage change over time
-- city-driving share plus city and highway efficiency
-- fuel / powertrain type
-- plug-in hybrid electric-driving share plus EV-mode efficiency when relevant
-- plug-in charging mix, separate home/public electricity pricing, and charging loss
-- region-aware starter defaults for tax, registration, and energy pricing
-- yearly insurance, registration, parking, tolls, and inspection
-- tire replacement assumptions
-- assumptions about energy price, maintenance, and depreciation
+The simulator combines deterministic cost formulas with stochastic inputs. A
+scenario can include:
 
-It then runs many simulations and summarizes the results with statistics such
-as:
+- purchase price, tax, fees, and financing terms
+- starting vehicle age and odometer for used-car scenarios
+- annual mileage, mileage growth, and city/highway driving mix
+- gasoline, diesel, hybrid, plug-in hybrid, and battery-electric powertrains
+- home/public charging mix and charging losses for plug-in vehicles
+- insurance, registration, parking, tolls, inspection, and tire replacement
+- maintenance, repair-shock, depreciation, and resale assumptions
+- optional region-based defaults for tax, registration, and energy pricing
 
-- average total cost
-- median total cost
-- lower and upper percentile ranges
-- sample breakdowns for one simulated ownership path
+The report page summarizes the simulation with:
 
-## Goals
+- mean and median total cost
+- percentile ranges
+- cost per mile
+- a sampled category breakdown
+- a year-by-year example ownership path
+- baseline comparison against a previously saved scenario
 
-- Build a reusable simulation engine in Haskell.
-- Expose that engine through a small web app.
-- Show a range of possible ownership costs instead of one point estimate.
-- Keep the first version simple enough to explain, test, and extend.
+## Current Model
 
-## Why Monte Carlo Simulation
+The current implementation models:
 
-Car ownership cost depends on variables that are not fixed in advance. Fuel
-prices change, maintenance costs can spike unexpectedly, and resale value is
-never guaranteed. A Monte Carlo approach is a good fit because it lets the app
-explore many possible combinations of those variables and summarize the spread
-of outcomes.
+- upfront purchase costs, financing, and remaining loan balance at sale
+- annual operating costs with inflation
+- city/highway fuel or energy use
+- plug-in hybrid electric/gasoline splits
+- EV charging economics with home/public charging mix
+- age- and mileage-based maintenance and repair calibration
+- depreciation with a first-year bonus, mileage penalty, and residual floor
+- resale value and end-of-ownership equity
 
-This makes the result more realistic than a single deterministic calculation,
-especially for medium-term ownership decisions like a 3-year to 7-year horizon.
+Uncertain variables are represented with bounded normal distributions and
+sampled independently during each run. The backend returns both the simulation
+summary and the resolved scenario input used after any optional region-default
+overrides.
 
-## Tech Stack
+## Vehicle Data
 
-- Haskell for the simulation engine and backend
-- `aeson` for JSON encoding and decoding
-- `random` for simulation sampling
-- `scotty` for the initial web server
-- plain HTML, CSS, and JavaScript for the frontend
+The repository includes a local catalog that supports browser lookup and
+autofill. The catalog is rebuilt from:
 
-Scotty is the current choice because it keeps the HTTP layer lightweight while
-the simulation model is still evolving. If the API becomes larger or more
-strictly typed later, the web layer can be migrated to Servant without changing
-the core simulation code.
+- project-owned source seeds and roster rows
+- official vehicle identity data from NHTSA `vPIC`
+- fuel-economy data from `FuelEconomy.gov`
+- checked-in baseline and calibration datasets used to generate ownership
+  defaults
 
-## Project Structure
+The current checked-in catalog contains `1006` entries spanning model years
+`2023` through `2026`.
 
-- `src/CarOwnershipCostSim/Types.hs`
-  Defines simulation inputs, outputs, and JSON-facing types.
-- `src/CarOwnershipCostSim/RegionProfiles.hs`
-  Defines the shared region calibration profiles used by both the API and the
-  simulation engine.
-- `src/CarOwnershipCostSim/VehicleCatalogBaselines.hs`
-  Loads the checked-in class, fuel, and drive bucket baselines that feed the
-  scalable generated ownership assumptions.
+## Project Layout
+
 - `src/CarOwnershipCostSim/Simulation.hs`
-  Contains the Monte Carlo engine and ownership cost calculations.
-- `src/CarOwnershipCostSim/Statistics.hs`
-  Provides summary helpers such as mean and percentile calculations.
-- `src/CarOwnershipCostSim/VehicleCatalog.hs`
-  Defines the normalized local vehicle catalog and shared catalog-facing types.
-- `src/CarOwnershipCostSim/VehicleCatalogCalibrations.hs`
-  Loads the checked-in make and trim calibration anchors that feed generated
-  ownership defaults.
-- `src/CarOwnershipCostSim/VehicleCatalogDefaults.hs`
-  Generates baseline ownership assumptions from objective vehicle attributes
-  and then applies the data-backed bucket and make/trim calibration datasets.
-- `src/CarOwnershipCostSim/VehicleCatalogImport.hs`
-  Parses official `vPIC` and `FuelEconomy.gov` payloads into catalog entries,
-  supports both curated source seeds and lightweight roster rows, and merges
-  optional overrides on top of generated defaults.
+  Core simulation logic, yearly modeling, and validation.
+- `src/CarOwnershipCostSim/Types.hs`
+  Shared request and response types.
 - `src/CarOwnershipCostSim/WebApp.hs`
-  Defines the Scotty routes in a testable form so the API and static assets can
-  be exercised without booting a separate server process.
+  Scotty routes for the browser UI and JSON API.
+- `src/CarOwnershipCostSim/VehicleCatalog*.hs`
+  Local catalog types, defaults, calibrations, and import logic.
 - `app/Main.hs`
-  Runs the Scotty server and exposes the web routes and API endpoints.
+  Server entrypoint.
 - `app/BuildCatalog.hs`
-  Rebuilds the local vehicle catalog from API-backed source seeds, the
-  lightweight roster file, with the checked-in ownership baseline/calibration
-  datasets applied during generated-default resolution.
+  Catalog rebuild CLI.
 - `app/DiscoverVehicleRoster.hs`
-  Queries official FuelEconomy.gov menus and prints model lists or paste-ready
-  lightweight roster rows for faster catalog growth.
+  Catalog discovery and roster-generation CLI.
 - `static/`
-  Contains the browser UI.
+  Builder page, report page, styles, and browser scripts.
+- `catalog/`
+  Checked-in catalog inputs and generated runtime catalog.
 - `test/Spec.hs`
-  Holds deterministic tests for the simulation model and data-import pipeline.
-- `catalog/ownership-calibrations.json`
-  Stores the checked-in make and trim calibration anchors used by the scalable
-  catalog-default pipeline.
-- `catalog/ownership-baselines.json`
-  Stores the checked-in fuel, class, and drive bucket baselines used by the
-  scalable catalog-default pipeline.
-- `catalog/region-profiles.json`
-  Stores the checked-in region defaults used by the API and simulation engine.
-
-## Documentation Guide
-
-Start with the README for the project overview, then use the focused docs below
-for deeper context:
-
-- [docs/architecture-overview.md](/Users/garion/Work/projects/car-ownership-cost-sim/docs/architecture-overview.md)
-  Explains how the backend, importer, web layer, frontend, and tests fit
-  together.
-- [docs/simulation-model.md](/Users/garion/Work/projects/car-ownership-cost-sim/docs/simulation-model.md)
-  Explains the current Monte Carlo model, deterministic formulas, stochastic
-  inputs, and modeling limits.
-- [docs/api-reference.md](/Users/garion/Work/projects/car-ownership-cost-sim/docs/api-reference.md)
-  Documents the current HTTP endpoints and the main request and response
-  payloads.
-- [docs/frontend-overview.md](/Users/garion/Work/projects/car-ownership-cost-sim/docs/frontend-overview.md)
-  Explains how the static browser UI is structured and how it maps onto the API.
-- [docs/testing-and-workflows.md](/Users/garion/Work/projects/car-ownership-cost-sim/docs/testing-and-workflows.md)
-  Documents the local development commands, CI checks, and catalog refresh flow.
-- [docs/vehicle-data-sourcing.md](/Users/garion/Work/projects/car-ownership-cost-sim/docs/vehicle-data-sourcing.md)
-  Explains the current strategy for acquiring vehicle data and why the project
-  favors APIs plus a local catalog over scraping-first approaches.
-
-## Current Cost Model
-
-The current MVP models uncertainty with bounded normal distributions for:
-
-- liquid-fuel price
-- home charging price for plug-in vehicles
-- public charging price for plug-in vehicles
-- annual maintenance
-- annual depreciation rate
-- annual repair shock cost when a repair shock occurs
-
-The current catalog-backed resale model also includes deterministic resale
-inputs for:
-
-- a first-year depreciation bonus
-- a residual value floor as a percent of purchase price
-- an expected annual mileage baseline for resale
-- an extra-mile resale penalty for driving above that baseline
-
-For each simulation run, the app estimates total ownership cost as:
-
-```text
-upfront payment
-+ purchase tax
-+ upfront fees
-+ loan payments made during ownership
-+ remaining loan balance at sale
-+ fuel
-+ maintenance
-+ repair shocks
-+ insurance
-+ registration
-+ parking
-+ tolls and road fees
-+ inspection and emissions
-+ tire replacements
-- resale value
-```
-
-The yearly model now also applies:
-
-- purchase tax and upfront one-time fees
-- annual inflation to recurring costs such as fuel, maintenance, insurance, registration, parking, tolls, inspection, tires, and repair shocks
-- annual mileage change so fuel use and tire wear can grow or shrink over time
-- city/highway energy use using a configurable city-driving share instead of one flat efficiency assumption
-- EV charging cost modeling that uses electricity price per kWh instead of gasoline price, including home/public charging mix and charging-loss overhead
-- plug-in hybrid cost modeling that splits miles between electricity and gasoline using EV-mode MPGe plus a configurable electric-driving share
-- separate pricing for plug-in-hybrid gasoline, home charging, and public charging instead of forcing all energy through one price assumption
-- optional backend region calibration that can override sales tax, registration, fuel price, charging price, home-charging share, and charging-loss assumptions from the selected location profile
-- age- and mileage-aware maintenance calibration that ramps baseline upkeep costs over the ownership timeline
-- age- and mileage-aware repair-shock calibration that increases both expected repair frequency and repair severity as wear accumulates
-- starting vehicle age and odometer inputs so wear, tires, and mileage-sensitive resale can begin from a used-car state instead of always assuming a fresh purchase
-- loan amortization with interest tracked separately from principal in the yearly breakdown
-- a first-year resale hit on top of the sampled annual depreciation rate
-- a residual value floor so resale cannot fall below a configured minimum
-- a mileage-based resale penalty when the ownership path runs above expected miles
-- year-by-year sampled traces for the example scenario
-
-This is still intentionally compact, but it now captures more of the front
-loaded and tail-risk behavior that matters in real ownership decisions.
-Region profiles are now also part of the backend contract instead of only a
-browser helper. The UI can still run in fully manual mode, but when backend
-region defaults are enabled the simulator resolves sales tax, registration,
-fuel or electricity pricing, and charging assumptions from the selected region
-before validation and sampling.
-The yearly response now also returns explicit electric miles, liquid-fuel
-miles, purchased charging energy, home/public charging splits, and charging
-loss overhead so the frontend does not have to infer those values from the
-original request. It also now includes cumulative miles plus the applied
-maintenance and repair-shock calibration factors so one sampled path is easier
-to explain. The response also now echoes the fully resolved input after backend
-region defaults are applied, and the yearly timeline distinguishes between cash
-spent during the year and the net contribution to the final total after sale
-adjustments.
-
-## Current API
-
-The backend currently exposes:
-
-- `GET /`
-  Serves the frontend.
-- `GET /api/example`
-  Returns a sample request payload.
-- `GET /api/catalog`
-  Returns the normalized local vehicle catalog entries used by the app.
-- `GET /api/regions`
-  Returns the backend-owned region calibration profiles used by the UI and
-  simulation engine.
-- `GET /api/presets`
-  Returns vehicle presets derived from the local vehicle catalog.
-- `POST /api/simulate`
-  Runs the simulation and returns summary statistics, the resolved input used by
-  the backend, sample totals, and a yearly example path.
+  Model, importer, and route-level tests.
 
 ## Getting Started
 
-From the project directory:
+From the repository root:
 
 ```bash
 cabal build
@@ -244,152 +99,65 @@ cabal test
 cabal run car-ownership-cost-sim
 ```
 
-Then open `http://localhost:3000`.
+Then open [http://localhost:3000](http://localhost:3000).
 
-For a quick local verification pass:
+For the standard local verification pass:
 
 ```bash
 ./scripts/run-checks.sh
 ```
 
-The check script now prefers a temporary `/tmp` Cabal home when it already has
-an index, but it automatically falls back to the normal user Cabal home when
-that temporary cache is empty.
+## Catalog Workflows
 
-To rebuild the local catalog from the current API-backed source seeds and
-roster:
+Rebuild the checked-in catalog:
 
 ```bash
 cabal run build-vehicle-catalog
 ```
 
-To write a preview catalog somewhere else without touching the checked-in file:
+Write a preview catalog to a separate file:
 
 ```bash
 cabal run build-vehicle-catalog -- /tmp/vehicle-catalog.json
 ```
 
-To list official model names for a make and year:
+List official model names for a make and year:
 
 ```bash
 cabal run discover-vehicle-roster -- 2024 Toyota
 ```
 
-To generate paste-ready lightweight roster rows for a model:
+Generate roster-ready rows for a specific model:
 
 ```bash
 cabal run discover-vehicle-roster -- 2024 Toyota "Prius Prime"
 ```
 
-To expand the lightweight roster in a large batch using a curated model list:
+Expand the lightweight roster from a curated batch:
 
 ```bash
 bash scripts/expand-roster-batch.sh catalog/roster-batches/2024-mainstream.txt 1
 ```
 
-To expand different year batches:
+## Documentation
 
-```bash
-bash scripts/expand-roster-batch.sh catalog/roster-batches/2023-mainstream.txt 20
-bash scripts/expand-roster-batch.sh catalog/roster-batches/2025-mainstream.txt 50
-bash scripts/expand-roster-batch.sh catalog/roster-batches/2026-mainstream.txt 50
-```
+- [docs/architecture-overview.md](docs/architecture-overview.md)
+  System structure, request flow, and catalog refresh flow.
+- [docs/simulation-model.md](docs/simulation-model.md)
+  Deterministic logic, stochastic inputs, and current modeling limits.
+- [docs/api-reference.md](docs/api-reference.md)
+  HTTP routes and request/response payloads.
+- [docs/frontend-overview.md](docs/frontend-overview.md)
+  Builder/report page structure and browser responsibilities.
+- [docs/testing-and-workflows.md](docs/testing-and-workflows.md)
+  Local checks, CI workflow, and catalog refresh commands.
+- [docs/vehicle-data-sourcing.md](docs/vehicle-data-sourcing.md)
+  Data-source strategy and rationale.
 
-## Development Plan
+## Status and Limitations
 
-### Phase 1: Core simulation
-
-- finalize the input model
-- validate inputs before running the simulation
-- improve financing, depreciation, and resale assumptions
-- expand automated tests for deterministic scenarios
-
-### Phase 2: Web integration
-
-- keep the simulation engine separate from the web layer
-- expose simulation results through JSON endpoints
-- provide a simple form-based UI for entering assumptions
-- show summary statistics and a visual distribution of outcomes
-
-### Phase 3: Better analysis
-
-- add yearly breakdowns and cost-per-mile metrics
-- compare multiple vehicles side by side
-- allow saving or sharing scenarios
-- improve charting and result explanations
-
-### Phase 4: Data enrichment
-
-- connect to a reliable API or curated dataset for vehicle information
-- prefill fuel economy or baseline depreciation assumptions
-- reduce manual entry for common car models
-
-## Potential Extensions
-
-- inflation-adjusted costs
-- taxes and fees by state
-- repair shock events instead of only smooth maintenance variation
-- separate city and highway driving assumptions
-- EV-specific modeling such as charging and battery-related costs
-- confidence intervals or scenario labels like optimistic, typical, and expensive
-
-## Current Status
-
-The repository already includes an initial simulation engine, a Scotty-based web
-server, a lightweight frontend, curated vehicle presets, and a growing test
-suite. The current app can now model taxes and fees, inflation, repair-shock
-tail risk, yearly sample traces, annual mileage change, tire replacement
-timing, local recurring costs, and a richer resale path with first-year
-depreciation, mileage penalties, and floor-limited residual value while keeping
-the web layer lightweight. The frontend now also supports side-by-side
-comparison by letting users pin a baseline run, compare later scenarios against
-it with delta cards, and overlay the baseline on the distribution and yearly
-charts. The energy model now also distinguishes city and highway efficiency,
-using the catalog's official FuelEconomy.gov values when presets are applied,
-so vehicle comparisons are no longer forced through one blended MPG input. EV
-scenarios now switch to charging-cost math and electricity-price assumptions
-instead of being treated like gasoline vehicles. It also now
-includes a first importer layer that uses curated source seeds plus official
-`vPIC` and `FuelEconomy.gov` payloads to refresh the local vehicle catalog, and
-that catalog now carries resale defaults and city/highway fuel-economy data all
-the way through to the browser presets. The automated checks now cover
-simulation invariants, API routes, financing edge cases, deterministic mileage
-and wear logic, resale-floor behavior, mileage-based resale penalties, the new
-city/highway fuel split, and a lightweight in-process smoke test for the web
-assets.
-
-The catalog importer now supports two project-owned input files:
-
-- [catalog/vehicle-source-seeds.json](/Users/garion/Work/projects/car-ownership-cost-sim/catalog/vehicle-source-seeds.json)
-  for curated vehicles where we want hand-tuned assumptions or overrides
-- [catalog/vehicle-roster.json](/Users/garion/Work/projects/car-ownership-cost-sim/catalog/vehicle-roster.json)
-  for lighter-weight rows that rely on generated defaults from official vehicle
-  attributes
-- [catalog/ownership-calibrations.json](/Users/garion/Work/projects/car-ownership-cost-sim/catalog/ownership-calibrations.json)
-  for the checked-in make and trim anchors that tune those generated defaults
-
-That split is the first real scaling step toward broader `2020+` coverage,
-because not every vehicle now needs a fully hand-authored maintenance,
-depreciation, repair-risk, and insurance profile before it can appear in the
-app. The current checked-in runtime catalog now covers `1006` vehicles across
-`2023` through `2026`, built from `10` curated source seeds plus `996`
-lighter-weight roster rows. The biggest makes in the current catalog are now
-`Ford`, `Kia`, `Chevrolet`, `Toyota`, `Hyundai`, and `Honda`, which is a much
-better foundation for continuing toward broader mainstream coverage.
-
-The repository also includes a basic GitHub Actions workflow that runs the main
-build and test checks on pushes and pull requests.
-
-The documentation is now split across source-level comments plus dedicated docs
-for architecture, model behavior, and vehicle-data sourcing so the codebase is
-easier to navigate as the project grows.
-
-## Near-Term Next Tasks
-
-- expand comparison mode beyond one saved baseline into richer multi-vehicle workflows
-- support alternative probability distributions
-- calibrate resale defaults from richer market-value inputs instead of only curated heuristics
-- extend the fuel model beyond a fixed city-driving share into commute, weekend, or seasonal usage patterns
-- add state-specific taxes and registration rules
-- expand the importer beyond curated vehicle IDs into richer discovery flows
-- broaden automated testing with API-contract, route, and browser-level coverage
+The application is functional and test-covered, but several parts of the model
+are still heuristic rather than market-calibrated. The local catalog is broad
+enough to support many mainstream scenarios, but coverage quality still varies
+by make, trim, and model year. For more detail on current assumptions and
+limitations, see [docs/simulation-model.md](docs/simulation-model.md).

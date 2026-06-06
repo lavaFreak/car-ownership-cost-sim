@@ -27,6 +27,7 @@ The check script currently runs:
 2. `cabal test`
 3. `node --check static/app-render.js`
 4. `node --check static/app.js`
+5. `node --check static/report.js`
 
 It also defaults Cabal state into `/tmp`-backed directories so the command
 works more reliably in sandboxed or ephemeral environments. If that temporary
@@ -35,7 +36,7 @@ the normal user Cabal home automatically.
 
 ## What the test suite covers
 
-The Haskell test suite in [test/Spec.hs](/Users/garion/Work/projects/car-ownership-cost-sim/test/Spec.hs)
+The Haskell test suite in [test/Spec.hs](../test/Spec.hs)
 covers three categories:
 
 - simulation model tests
@@ -53,7 +54,7 @@ GitHub Actions runs the same main verification flow as local development so the
 signals stay aligned:
 
 - pushes and pull requests use the repository workflow in
-  [.github/workflows/ci.yml](/Users/garion/Work/projects/car-ownership-cost-sim/.github/workflows/ci.yml)
+  [.github/workflows/ci.yml](../.github/workflows/ci.yml)
 - the workflow delegates to `./scripts/run-checks.sh`
 
 That means the best local reproduction step for CI breakage is usually the same
@@ -103,15 +104,15 @@ bash scripts/expand-roster-batch.sh catalog/roster-batches/2026-mainstream.txt 5
 ```
 
 This workflow depends on the curated source seeds in
-[catalog/vehicle-source-seeds.json](/Users/garion/Work/projects/car-ownership-cost-sim/catalog/vehicle-source-seeds.json),
+[catalog/vehicle-source-seeds.json](../catalog/vehicle-source-seeds.json),
 the lightweight roster in
-[catalog/vehicle-roster.json](/Users/garion/Work/projects/car-ownership-cost-sim/catalog/vehicle-roster.json),
+[catalog/vehicle-roster.json](../catalog/vehicle-roster.json),
 the checked-in ownership baselines in
-[catalog/ownership-baselines.json](/Users/garion/Work/projects/car-ownership-cost-sim/catalog/ownership-baselines.json),
+[catalog/ownership-baselines.json](../catalog/ownership-baselines.json),
 the checked-in ownership calibration anchors in
-[catalog/ownership-calibrations.json](/Users/garion/Work/projects/car-ownership-cost-sim/catalog/ownership-calibrations.json),
+[catalog/ownership-calibrations.json](../catalog/ownership-calibrations.json),
 plus the importer logic in
-[src/CarOwnershipCostSim/VehicleCatalogImport.hs](/Users/garion/Work/projects/car-ownership-cost-sim/src/CarOwnershipCostSim/VehicleCatalogImport.hs).
+[src/CarOwnershipCostSim/VehicleCatalogImport.hs](../src/CarOwnershipCostSim/VehicleCatalogImport.hs).
 Source seeds can now omit many ownership-cost assumptions; the importer will
 fill them with generated defaults derived from official vehicle attributes plus
 the checked-in baseline and calibration datasets, and curated values only need
@@ -125,8 +126,9 @@ When changing simulation behavior:
 
 1. update the model in `Simulation.hs`
 2. update shared types in `Types.hs` if the request or response changed
-3. update the frontend in `static/app.js`, `static/app-render.js`, and
-   `static/index.html` if needed
+3. update the frontend in `static/app.js`, `static/report.js`,
+   `static/app-render.js`, `static/index.html`, and `static/report.html` if
+   needed
 4. extend tests in `test/Spec.hs`
 5. update the relevant docs page if the user-facing model changed
 
