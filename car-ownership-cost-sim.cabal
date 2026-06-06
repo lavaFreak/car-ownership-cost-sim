@@ -6,7 +6,7 @@ description:        A Haskell web app for exploring realistic car ownership cost
 build-type:         Simple
 license:            MIT
 license-file:       LICENSE
-author:             Garion
+author:             Garion Milazzo
 maintainer:         gemilazzo@gmail.com
 category:           Web
 homepage:           https://github.com/lavaFreak/car-ownership-cost-sim
