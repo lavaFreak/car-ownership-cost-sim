@@ -239,7 +239,6 @@ The backend currently exposes:
 From the project directory:
 
 ```bash
-cd /Users/garion/Work/projects/car-ownership-cost-sim
 cabal build
 cabal test
 cabal run car-ownership-cost-sim
