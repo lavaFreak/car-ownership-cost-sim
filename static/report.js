@@ -49,6 +49,7 @@ const preciseCurrency = new Intl.NumberFormat("en-US", {
 
 const comparisonStorageKey = "carOwnershipComparisonBaseline.v1";
 const shareFieldNames = [
+  "purchaseMethod",
   "purchasePrice",
   "downPayment",
   "salesTaxPercent",
@@ -100,6 +101,7 @@ const shareFieldNames = [
   "seed",
 ];
 const knownFuelTypes = ["gasoline", "hybrid-gasoline", "plug-in-hybrid", "diesel", "electric"];
+const knownPurchaseMethods = ["finance", "cash"];
 
 let latestRun = null;
 let comparisonBaseline = null;
@@ -116,6 +118,19 @@ function normalizedFuelType(value) {
   }
 
   return knownFuelTypes.includes(normalized) ? normalized : "gasoline";
+}
+
+function normalizedPurchaseMethod(value) {
+  if (!value) {
+    return "finance";
+  }
+
+  const normalized = value.trim().toLowerCase();
+  return knownPurchaseMethods.includes(normalized) ? normalized : "finance";
+}
+
+function isCashPurchaseMethod(value) {
+  return normalizedPurchaseMethod(value) === "cash";
 }
 
 function isElectricFuelType(value) {
@@ -296,6 +311,7 @@ function checkboxScenarioValue(params, name) {
 
 function scenarioValuesFromSearchParams(params) {
   return {
+    purchaseMethod: normalizedPurchaseMethod(params.get("purchaseMethod") || "finance"),
     purchasePrice: numericScenarioValue(params, "purchasePrice"),
     downPayment: numericScenarioValue(params, "downPayment"),
     salesTaxPercent: numericScenarioValue(params, "salesTaxPercent"),
@@ -354,6 +370,11 @@ function buildRequestPayload(values) {
   const depreciationStdDev = values.depreciationStdDevPercent / 100;
   const cityDrivingShare = values.cityDrivingSharePercent / 100;
   const fuelType = normalizedFuelType(values.fuelType);
+  const purchaseMethod = normalizedPurchaseMethod(values.purchaseMethod);
+  const isCashPurchase = isCashPurchaseMethod(purchaseMethod);
+  const downPayment = isCashPurchase ? values.purchasePrice : values.downPayment;
+  const loanAprPercent = isCashPurchase ? 0 : values.loanAprPercent;
+  const loanTermMonths = isCashPurchase ? 0 : values.loanTermMonths;
   const combinedMilesPerGallon = calculateCombinedMpg(
     cityDrivingShare,
     values.cityMilesPerGallon,
@@ -375,7 +396,7 @@ function buildRequestPayload(values) {
     requestSeed: values.seed,
     requestInput: {
       simulationPurchasePrice: values.purchasePrice,
-      simulationDownPayment: values.downPayment,
+      simulationDownPayment: downPayment,
       simulationSalesTaxRate: values.salesTaxPercent / 100,
       simulationUpfrontFees: values.upfrontFees,
       simulationYearsOwned: values.yearsOwned,
@@ -401,8 +422,8 @@ function buildRequestPayload(values) {
       simulationAnnualTolls: values.annualTolls,
       simulationAnnualInspection: values.annualInspection,
       simulationAnnualInflationRate: values.annualInflationPercent / 100,
-      simulationLoanApr: values.loanAprPercent / 100,
-      simulationLoanTermMonths: values.loanTermMonths,
+      simulationLoanApr: loanAprPercent / 100,
+      simulationLoanTermMonths: loanTermMonths,
       simulationTireReplacementCost: values.tireReplacementCost,
       simulationTireLifeMiles: values.tireLifeMiles,
       simulationFirstYearDepreciationBonus: values.firstYearDepreciationBonusPercent / 100,
@@ -517,13 +538,15 @@ function updateReportContext(values, catalogEntry, resolvedInput = null) {
   const resolvedFuelType = normalizedFuelType(
     resolvedInput?.simulationFuelType || values.fuelType || "gasoline"
   );
+  const purchaseMethod = normalizedPurchaseMethod(values.purchaseMethod);
+  const purchaseMethodLabel = isCashPurchaseMethod(purchaseMethod) ? "cash purchase" : "financed purchase";
   const regionName = resolvedInput?.simulationRegionProfile || values.locationProfile || "national";
   const reportLabel = buildScenarioLabel(values, catalogEntry);
 
   reportTitle.textContent = catalogEntry ? catalogEntry.catalogName : "Ownership cost report";
   reportSubtitle.textContent = `Report scenario: ${reportLabel}. This page focuses on the simulated outcomes, not the input form.`;
   reportContextTitle.textContent = catalogEntry ? catalogEntry.catalogName : "Custom scenario";
-  reportContextCopy.textContent = `Powertrain: ${resolvedFuelType}. Region profile: ${regionName}. Ownership window: ${values.yearsOwned} years. Purchase price: ${currency.format(values.purchasePrice)}. Use "Edit inputs" if you want to adjust assumptions and regenerate the report.`;
+  reportContextCopy.textContent = `Powertrain: ${resolvedFuelType}. Purchase method: ${purchaseMethodLabel}. Region profile: ${regionName}. Ownership window: ${values.yearsOwned} years. Purchase price: ${currency.format(values.purchasePrice)}. Use "Edit inputs" if you want to adjust assumptions and regenerate the report.`;
   editScenarioLink.href = window.location.search ? `/${window.location.search}` : "/";
   newScenarioLink.href = "/";
 }

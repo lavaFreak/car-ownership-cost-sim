@@ -240,6 +240,11 @@ select:disabled {
   cursor: not-allowed;
 }
 
+label.is-disabled,
+fieldset.is-disabled {
+  opacity: 0.72;
+}
+
 input:focus,
 select:focus {
   outline: 2px solid rgba(184, 95, 54, 0.25);

@@ -106,12 +106,20 @@
               <legend>Vehicle and usage</legend>
 
               <label>
+                Purchase method
+                <select id="purchase-method" name="purchaseMethod">
+                  <option value="finance" selected>Finance / loan</option>
+                  <option value="cash">Pay cash / buy outright</option>
+                </select>
+              </label>
+
+              <label>
                 Purchase price
                 <input name="purchasePrice" type="number" min="0" step="100" value="32000" required />
               </label>
 
-              <label>
-                Down payment
+              <label id="down-payment-field">
+                <span id="down-payment-label">Down payment</span>
                 <input name="downPayment" type="number" min="0" step="100" value="5000" required />
               </label>
 
@@ -311,8 +319,12 @@
               </label>
             </fieldset>
 
-            <fieldset>
+            <fieldset id="financing-fieldset">
               <legend>Financing</legend>
+
+              <p id="financing-fieldset-copy" class="field-group-copy">
+                Choose loan assumptions for financed purchases. If you switch to a cash purchase, the simulator treats the full purchase price as an upfront payment and ignores these fields.
+              </p>
 
               <label>
                 Loan APR (%)

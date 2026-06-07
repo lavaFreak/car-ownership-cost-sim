@@ -18,6 +18,11 @@ const vehicleLookupStatus = document.getElementById("vehicle-lookup-status");
 const vehicleMatchCount = document.getElementById("vehicle-match-count");
 const presetDescription = document.getElementById("preset-description");
 const fuelTypeSelect = document.getElementById("fuel-type");
+const purchaseMethodSelect = document.getElementById("purchase-method");
+const downPaymentField = document.getElementById("down-payment-field");
+const downPaymentLabel = document.getElementById("down-payment-label");
+const financingFieldset = document.getElementById("financing-fieldset");
+const financingFieldsetCopy = document.getElementById("financing-fieldset-copy");
 const locationProfileSelect = document.getElementById("location-profile");
 const applyRegionDefaultsCheckbox = document.getElementById("apply-region-defaults");
 const plugInHybridFieldset = document.getElementById("plug-in-hybrid-fieldset");
@@ -80,7 +85,10 @@ const defaultPresetDescription =
 
 const currentCalendarYear = new Date().getFullYear();
 
+let financingInputCache = null;
+
 const shareFieldNames = [
+  "purchaseMethod",
   "purchasePrice",
   "downPayment",
   "salesTaxPercent",
@@ -133,6 +141,7 @@ const shareFieldNames = [
 ];
 
 const knownFuelTypes = ["gasoline", "hybrid-gasoline", "plug-in-hybrid", "diesel", "electric"];
+const knownPurchaseMethods = ["finance", "cash"];
 const regionManagedFieldNames = [
   "salesTaxPercent",
   "annualRegistration",
@@ -190,6 +199,19 @@ function normalizedFuelType(value) {
   return knownFuelTypes.includes(normalized) ? normalized : "gasoline";
 }
 
+function normalizedPurchaseMethod(value) {
+  if (!value) {
+    return "finance";
+  }
+
+  const normalized = value.trim().toLowerCase();
+  return knownPurchaseMethods.includes(normalized) ? normalized : "finance";
+}
+
+function isCashPurchaseMethod(value) {
+  return normalizedPurchaseMethod(value) === "cash";
+}
+
 function isElectricFuelType(value) {
   return normalizedFuelType(value) === "electric";
 }
@@ -200,6 +222,94 @@ function isPlugInHybridFuelType(value) {
 
 function usesChargingFuelType(value) {
   return isElectricFuelType(value) || isPlugInHybridFuelType(value);
+}
+
+function currentFinancingInputs() {
+  return {
+    downPayment: numericValue("downPayment"),
+    loanAprPercent: numericValue("loanAprPercent"),
+    loanTermMonths: numericValue("loanTermMonths"),
+  };
+}
+
+function rememberFinancingInputs() {
+  const values = currentFinancingInputs();
+  if (
+    Number.isFinite(values.downPayment) &&
+    Number.isFinite(values.loanAprPercent) &&
+    Number.isFinite(values.loanTermMonths)
+  ) {
+    financingInputCache = values;
+  }
+}
+
+function restoreFinancingInputs() {
+  if (!financingInputCache) {
+    return;
+  }
+
+  setNumericField("downPayment", financingInputCache.downPayment);
+  setNumericField("loanAprPercent", financingInputCache.loanAprPercent);
+  setNumericField("loanTermMonths", financingInputCache.loanTermMonths);
+}
+
+function syncCashPurchaseDownPayment() {
+  if (!isCashPurchaseMethod(purchaseMethodSelect.value)) {
+    return;
+  }
+
+  const purchasePrice = numericValue("purchasePrice");
+  if (Number.isFinite(purchasePrice)) {
+    setNumericField("downPayment", Math.max(0, purchasePrice));
+  }
+}
+
+function setFinancingInputsEnabled(isEnabled) {
+  const downPaymentInput = form.elements.downPayment;
+  const loanAprInput = form.elements.loanAprPercent;
+  const loanTermInput = form.elements.loanTermMonths;
+
+  if (downPaymentField) {
+    downPaymentField.classList.toggle("is-disabled", !isEnabled);
+  }
+
+  if (financingFieldset) {
+    financingFieldset.classList.toggle("is-disabled", !isEnabled);
+  }
+
+  if (downPaymentInput) {
+    downPaymentInput.disabled = !isEnabled;
+  }
+
+  if (loanAprInput) {
+    loanAprInput.disabled = !isEnabled;
+  }
+
+  if (loanTermInput) {
+    loanTermInput.disabled = !isEnabled;
+  }
+}
+
+function applyPurchaseMethodState(announce = true) {
+  const isCashPurchase = isCashPurchaseMethod(purchaseMethodSelect.value);
+
+  if (isCashPurchase) {
+    syncCashPurchaseDownPayment();
+    setNumericField("loanAprPercent", 0);
+    setNumericField("loanTermMonths", 0);
+  }
+
+  setFinancingInputsEnabled(!isCashPurchase);
+  downPaymentLabel.textContent = isCashPurchase ? "Paid upfront" : "Down payment";
+  financingFieldsetCopy.textContent = isCashPurchase
+    ? "Cash purchase selected. The simulator treats the full purchase price as an upfront payment, so APR and loan term are ignored."
+    : "Choose loan assumptions for financed purchases. If you switch to a cash purchase, the simulator treats the full purchase price as an upfront payment and ignores these fields.";
+
+  if (announce) {
+    statusLine.textContent = isCashPurchase
+      ? "Cash purchase selected. The full purchase price will be treated as an upfront payment."
+      : "Financed purchase selected. Loan assumptions remain part of the scenario.";
+  }
 }
 
 function regionOptionLabel(regionProfile) {
@@ -766,6 +876,7 @@ function updateComparisonControls() {
 
 function collectFormValues() {
   return {
+    purchaseMethod: normalizedPurchaseMethod(fieldValue("purchaseMethod")),
     purchasePrice: numericValue("purchasePrice"),
     downPayment: numericValue("downPayment"),
     salesTaxPercent: numericValue("salesTaxPercent"),
@@ -906,6 +1017,7 @@ function applyVehiclePreset(preset) {
       preset.presetElectricHighwayMilesPerGallonEquivalent.toFixed(1)
     );
   }
+  syncCashPurchaseDownPayment();
   setNumericField("annualInsurance", Math.round(preset.presetAnnualInsurance));
   setNumericField("annualRegistration", Math.round(preset.presetAnnualRegistration));
   setNumericField("maintenanceMean", Math.round(preset.presetAnnualMaintenance.boundedNormalMean));
@@ -1156,6 +1268,11 @@ function buildRequestPayload(values) {
   const depreciationStdDev = values.depreciationStdDevPercent / 100;
   const cityDrivingShare = values.cityDrivingSharePercent / 100;
   const fuelType = normalizedFuelType(values.fuelType);
+  const purchaseMethod = normalizedPurchaseMethod(values.purchaseMethod);
+  const isCashPurchase = isCashPurchaseMethod(purchaseMethod);
+  const downPayment = isCashPurchase ? values.purchasePrice : values.downPayment;
+  const loanAprPercent = isCashPurchase ? 0 : values.loanAprPercent;
+  const loanTermMonths = isCashPurchase ? 0 : values.loanTermMonths;
   const combinedMilesPerGallon = calculateCombinedMpg(
     cityDrivingShare,
     values.cityMilesPerGallon,
@@ -1177,7 +1294,7 @@ function buildRequestPayload(values) {
     requestSeed: values.seed,
     requestInput: {
       simulationPurchasePrice: values.purchasePrice,
-      simulationDownPayment: values.downPayment,
+      simulationDownPayment: downPayment,
       simulationSalesTaxRate: values.salesTaxPercent / 100,
       simulationUpfrontFees: values.upfrontFees,
       simulationYearsOwned: values.yearsOwned,
@@ -1203,8 +1320,8 @@ function buildRequestPayload(values) {
       simulationAnnualTolls: values.annualTolls,
       simulationAnnualInspection: values.annualInspection,
       simulationAnnualInflationRate: values.annualInflationPercent / 100,
-      simulationLoanApr: values.loanAprPercent / 100,
-      simulationLoanTermMonths: values.loanTermMonths,
+      simulationLoanApr: loanAprPercent / 100,
+      simulationLoanTermMonths: loanTermMonths,
       simulationTireReplacementCost: values.tireReplacementCost,
       simulationTireLifeMiles: values.tireLifeMiles,
       simulationFirstYearDepreciationBonus: values.firstYearDepreciationBonusPercent / 100,
@@ -1255,6 +1372,8 @@ function buildRequestPayload(values) {
 function resetScenarioForm() {
   form.reset();
   applyFuelTypeLabels(fuelTypeSelect.value);
+  applyPurchaseMethodState(false);
+  rememberFinancingInputs();
   vehicleSearchInput.value = "";
   vehiclePresetSelect.value = "";
   refreshVehicleLookupOptions();
@@ -1306,18 +1425,32 @@ function validateRequiredInteger(errors, values, field, label) {
 function validateFormValues(values) {
   const errors = [];
   const fuelType = normalizedFuelType(values.fuelType);
+  const purchaseMethod = normalizedPurchaseMethod(values.purchaseMethod);
+  const isCashPurchase = isCashPurchaseMethod(purchaseMethod);
+
+  if (!knownPurchaseMethods.includes(purchaseMethod)) {
+    pushValidationError(errors, "purchaseMethod", "Purchase method must be financed or cash.");
+  }
 
   if (validateRequiredNumber(errors, values, "purchasePrice", "Purchase price") && values.purchasePrice <= 0) {
     pushValidationError(errors, "purchasePrice", "Purchase price must be greater than 0.");
   }
 
-  if (validateRequiredNumber(errors, values, "downPayment", "Down payment")) {
+  if (validateRequiredNumber(errors, values, "downPayment", isCashPurchase ? "Upfront payment" : "Down payment")) {
     if (values.downPayment < 0) {
-      pushValidationError(errors, "downPayment", "Down payment cannot be negative.");
+      pushValidationError(
+        errors,
+        "downPayment",
+        isCashPurchase ? "Upfront payment cannot be negative." : "Down payment cannot be negative."
+      );
     }
 
     if (Number.isFinite(values.purchasePrice) && values.downPayment > values.purchasePrice) {
-      pushValidationError(errors, "downPayment", "Down payment cannot exceed purchase price.");
+      pushValidationError(
+        errors,
+        "downPayment",
+        isCashPurchase ? "Upfront payment cannot exceed purchase price." : "Down payment cannot exceed purchase price."
+      );
     }
   }
 
@@ -1513,7 +1646,7 @@ function validateFormValues(values) {
     }
   }
 
-  if (validateRequiredNumber(errors, values, "loanAprPercent", "Loan APR")) {
+  if (!isCashPurchase && validateRequiredNumber(errors, values, "loanAprPercent", "Loan APR")) {
     if (values.loanAprPercent < 0) {
       pushValidationError(errors, "loanAprPercent", "Loan APR cannot be negative.");
     }
@@ -1524,6 +1657,7 @@ function validateFormValues(values) {
   }
 
   if (
+    !isCashPurchase &&
     validateRequiredInteger(errors, values, "loanTermMonths", "Loan term") &&
     values.loanTermMonths < 0
   ) {
@@ -2077,6 +2211,20 @@ vehicleModelSelect.addEventListener("change", () => {
   maybeApplyVehicleLookupSelection();
 });
 
+purchaseMethodSelect.addEventListener("change", () => {
+  if (isCashPurchaseMethod(purchaseMethodSelect.value)) {
+    rememberFinancingInputs();
+  } else {
+    restoreFinancingInputs();
+  }
+
+  applyPurchaseMethodState();
+});
+
+form.elements.purchasePrice.addEventListener("input", () => {
+  syncCashPurchaseDownPayment();
+});
+
 vehicleTrimSelect.addEventListener("change", () => {
   maybeApplyVehicleLookupSelection();
 });
@@ -2120,6 +2268,10 @@ vehiclePresetSelect.addEventListener("change", (event) => {
 async function initializeApp() {
   applyScenarioFromQuery();
   applyFuelTypeLabels(fuelTypeSelect.value);
+  applyPurchaseMethodState(false);
+  if (!isCashPurchaseMethod(purchaseMethodSelect.value)) {
+    rememberFinancingInputs();
+  }
   await Promise.all([loadVehicleCatalog(), loadVehiclePresets(), loadRegionProfiles()]);
   syncPresetSelectionFromQuery();
   applyRegionCalibrationState(false);
