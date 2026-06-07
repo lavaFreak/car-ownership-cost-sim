@@ -89,23 +89,62 @@ The current checked-in catalog contains `1006` entries spanning model years
 - `test/Spec.hs`
   Model, importer, and route-level tests.
 
-## Getting Started
+## Prerequisites
 
-From the repository root:
+Install these tools on the host machine before working with the repository:
+
+- `git`
+- `ghc` `9.6.7`
+- `cabal-install` `3.12.1.0`
+- `node` `22` for local JS checks and CI parity
+- `curl` for catalog refresh and discovery commands
+
+Cabal installs the Haskell package dependencies during `cabal build` and
+`cabal test`.
+
+If you only want to run the web app locally, `git`, `ghc`, and
+`cabal-install` are the essential prerequisites. `node` and `curl` are part of
+the full contributor workflow.
+
+## Quick Start
 
 ```bash
+git clone https://github.com/lavaFreak/car-ownership-cost-sim.git
+cd car-ownership-cost-sim
+cabal update
 cabal build
-cabal test
 cabal run car-ownership-cost-sim
 ```
 
 Then open [http://localhost:3000](http://localhost:3000).
 
-For the standard local verification pass:
+## Contributor Checks
+
+Before opening a pull request, run:
 
 ```bash
+cabal test
 ./scripts/run-checks.sh
 ```
+
+`./scripts/run-checks.sh` is the main local reproduction path for CI. It runs
+`cabal build`, `cabal test`, and JavaScript syntax checks for the browser
+scripts.
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the full contributor setup and pull
+request workflow.
+
+The short version is:
+
+1. branch from `main`
+2. make and test your changes locally
+3. push the branch
+4. open a pull request
+
+The `main` branch is protected. Pull requests must pass the `build-and-test`
+GitHub Actions check before merge.
 
 ## Catalog Workflows
 
@@ -141,6 +180,8 @@ bash scripts/expand-roster-batch.sh catalog/roster-batches/2024-mainstream.txt 1
 
 ## Documentation
 
+- [CONTRIBUTING.md](CONTRIBUTING.md)
+  Contributor setup, branch workflow, and local verification expectations.
 - [docs/architecture-overview.md](docs/architecture-overview.md)
   System structure, request flow, and catalog refresh flow.
 - [docs/simulation-model.md](docs/simulation-model.md)
