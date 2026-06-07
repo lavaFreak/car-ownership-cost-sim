@@ -1,7 +1,8 @@
 # Testing and Workflows
 
-This document explains the main local development and verification workflows for
-the project.
+This document explains the recurring verification and maintenance workflows for
+the project. For first-time contributor setup, see
+[CONTRIBUTING.md](../CONTRIBUTING.md).
 
 ## Everyday commands
 
@@ -31,19 +32,20 @@ The check script currently runs:
 
 It also defaults Cabal state into `/tmp`-backed directories so the command
 works more reliably in sandboxed or ephemeral environments. If that temporary
-Cabal home does not already have a package index, the script now falls back to
-the normal user Cabal home automatically.
+Cabal home does not already have a package index, the script falls back to the
+normal user Cabal home automatically.
 
 ## What the test suite covers
 
-The Haskell test suite in [test/Spec.hs](../test/Spec.hs)
-covers three categories:
+The Haskell test suite in [test/Spec.hs](../test/Spec.hs) covers three
+categories:
 
 - simulation model tests
-  - financing, taxes, inflation, mileage growth, tire wear, validation, and
-    backend region calibration
+  - financing, taxes, inflation, mileage growth, tire wear, validation, region
+    calibration, and powertrain behavior
 - importer tests
-  - fixture decoding and source-seed normalization
+  - fixture decoding, source-seed normalization, roster generation, and catalog
+    default calibration
 - route tests
   - API responses, region-profile payloads, and basic static asset boot
     behavior
@@ -53,12 +55,13 @@ covers three categories:
 GitHub Actions runs the same main verification flow as local development so the
 signals stay aligned:
 
-- pushes and pull requests use the repository workflow in
+- pushes to `main` and pull requests use the workflow in
   [.github/workflows/ci.yml](../.github/workflows/ci.yml)
 - the workflow delegates to `./scripts/run-checks.sh`
+- the required GitHub status check is named `build-and-test`
 
-That means the best local reproduction step for CI breakage is usually the same
-single command.
+That makes `./scripts/run-checks.sh` the best local reproduction step for most
+CI failures.
 
 ## Catalog refresh workflow
 
@@ -104,21 +107,19 @@ bash scripts/expand-roster-batch.sh catalog/roster-batches/2026-mainstream.txt 5
 ```
 
 This workflow depends on the curated source seeds in
-[catalog/vehicle-source-seeds.json](../catalog/vehicle-source-seeds.json),
-the lightweight roster in
-[catalog/vehicle-roster.json](../catalog/vehicle-roster.json),
+[catalog/vehicle-source-seeds.json](../catalog/vehicle-source-seeds.json), the
+lightweight roster in [catalog/vehicle-roster.json](../catalog/vehicle-roster.json),
 the checked-in ownership baselines in
-[catalog/ownership-baselines.json](../catalog/ownership-baselines.json),
-the checked-in ownership calibration anchors in
+[catalog/ownership-baselines.json](../catalog/ownership-baselines.json), the
+checked-in ownership calibration anchors in
 [catalog/ownership-calibrations.json](../catalog/ownership-calibrations.json),
 plus the importer logic in
 [src/CarOwnershipCostSim/VehicleCatalogImport.hs](../src/CarOwnershipCostSim/VehicleCatalogImport.hs).
-Source seeds can now omit many ownership-cost assumptions; the importer will
-fill them with generated defaults derived from official vehicle attributes plus
-the checked-in baseline and calibration datasets, and curated values only need
-to be supplied when we want to override those generated assumptions. Roster rows go one step lighter and can omit the
-ownership-cost tuning entirely, using only identity fields plus an optional
-price anchor.
+Source seeds can omit many ownership-cost assumptions; the importer fills them
+with generated defaults derived from official vehicle attributes plus the
+checked-in baseline and calibration datasets. Roster rows can omit ownership
+cost tuning entirely and use only identity fields plus an optional price
+anchor.
 
 ## Recommended change workflow
 
@@ -137,8 +138,8 @@ When changing catalog or importer behavior:
 1. update the relevant catalog/import modules
 2. use `discover-vehicle-roster` if you need to expand the lightweight roster
 3. use `scripts/expand-roster-batch.sh` if you want to add a larger batch of
-   official models in one pass
-   : the checked-in batch inputs currently live in `catalog/roster-batches/`
+   official models in one pass; the checked-in batch inputs live in
+   `catalog/roster-batches/`
 4. refresh or verify fixtures plus source-seed or roster expectations
 5. run `cabal test`
 6. rebuild the local catalog if the checked-in runtime data should change
