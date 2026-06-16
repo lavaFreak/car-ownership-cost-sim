@@ -1,0 +1,745 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>YouTube Short Sample — Rankings Channel</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      background: #111;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+      min-height: 100vh;
+      font-family: 'Arial Black', Arial, sans-serif;
+      padding: 20px 10px 40px;
+      color: #fff;
+    }
+
+    h1.page-title {
+      font-size: 1.1rem;
+      color: #aaa;
+      margin-bottom: 6px;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+    }
+
+    .episode-picker {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 18px;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+
+    .ep-btn {
+      background: #222;
+      border: 2px solid #444;
+      color: #ccc;
+      padding: 6px 14px;
+      border-radius: 20px;
+      cursor: pointer;
+      font-size: 0.8rem;
+      font-weight: bold;
+      transition: all .2s;
+    }
+    .ep-btn.active, .ep-btn:hover {
+      background: #e50914;
+      border-color: #e50914;
+      color: #fff;
+    }
+
+    /* ── Phone frame ── */
+    .phone-frame {
+      width: 320px;
+      height: 568px;
+      border-radius: 36px;
+      border: 4px solid #333;
+      overflow: hidden;
+      position: relative;
+      background: #000;
+      box-shadow: 0 0 60px rgba(229,9,20,.3);
+    }
+
+    /* ── Short container ── */
+    .short {
+      width: 100%;
+      height: 100%;
+      position: relative;
+      overflow: hidden;
+      display: none;
+    }
+    .short.active { display: block; }
+
+    .bg-gradient {
+      position: absolute;
+      inset: 0;
+    }
+
+    /* theme gradients per episode */
+    .short-nba .bg-gradient    { background: linear-gradient(160deg,#0a1628 0%,#1a3a6b 50%,#c8a400 100%); }
+    .short-celebs .bg-gradient { background: linear-gradient(160deg,#1a0030 0%,#6b0080 50%,#ff69b4 100%); }
+    .short-talk .bg-gradient   { background: linear-gradient(160deg,#001a0a 0%,#006b2b 50%,#ffd700 100%); }
+
+    .noise {
+      position: absolute;
+      inset: 0;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.04'/%3E%3C/svg%3E");
+      opacity: .4;
+      pointer-events: none;
+    }
+
+    /* ── Channel badge ── */
+    .badge {
+      position: absolute;
+      top: 14px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      z-index: 10;
+    }
+    .badge-icon {
+      width: 28px; height: 28px;
+      border-radius: 50%;
+      background: #e50914;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 14px;
+    }
+    .badge-name {
+      font-size: 0.62rem;
+      font-weight: 900;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      text-shadow: 0 1px 4px rgba(0,0,0,.8);
+    }
+
+    /* ── Title block ── */
+    .short-title {
+      position: absolute;
+      top: 52px;
+      left: 0; right: 0;
+      text-align: center;
+      padding: 0 12px;
+      z-index: 10;
+    }
+    .short-title .eyebrow {
+      font-size: 0.55rem;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      opacity: .7;
+      margin-bottom: 4px;
+    }
+    .short-title h2 {
+      font-size: 1.15rem;
+      line-height: 1.2;
+      text-shadow: 0 2px 10px rgba(0,0,0,.9);
+    }
+    .short-title .accent { color: #ffd700; }
+    .short-celebs .short-title .accent { color: #ff69b4; }
+    .short-talk .short-title .accent   { color: #7fff7f; }
+
+    /* ── Rankings list ── */
+    .rankings {
+      position: absolute;
+      top: 130px;
+      left: 10px; right: 10px;
+      z-index: 10;
+      display: flex;
+      flex-direction: column;
+      gap: 7px;
+    }
+
+    .rank-card {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(0,0,0,.55);
+      border: 1px solid rgba(255,255,255,.12);
+      border-radius: 12px;
+      padding: 7px 10px;
+      backdrop-filter: blur(8px);
+      opacity: 0;
+      transform: translateX(-30px);
+      transition: opacity .4s ease, transform .4s ease;
+    }
+    .rank-card.visible {
+      opacity: 1;
+      transform: translateX(0);
+    }
+
+    .rank-num {
+      font-size: 1.5rem;
+      font-weight: 900;
+      min-width: 36px;
+      text-align: center;
+      line-height: 1;
+    }
+    .rank-num.gold   { color: #ffd700; text-shadow: 0 0 12px rgba(255,215,0,.6); }
+    .rank-num.silver { color: #c0c0c0; }
+    .rank-num.bronze { color: #cd7f32; }
+    .rank-num.fourth { color: #9bb5ff; }
+    .rank-num.fifth  { color: #c8a4ff; }
+
+    .rank-info { flex: 1; min-width: 0; }
+    .rank-name {
+      font-size: 0.78rem;
+      font-weight: 900;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .rank-sub  {
+      font-size: 0.6rem;
+      opacity: .65;
+      margin-top: 1px;
+    }
+
+    .rank-score {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 2px;
+    }
+    .score-val {
+      font-size: 0.9rem;
+      font-weight: 900;
+      color: #ffd700;
+    }
+    .short-celebs .score-val { color: #ff69b4; }
+    .short-talk   .score-val { color: #7fff7f; }
+
+    .stars {
+      font-size: 0.55rem;
+      letter-spacing: 1px;
+    }
+
+    /* ── Stat bar ── */
+    .stat-bar-wrap {
+      position: absolute;
+      bottom: 72px;
+      left: 10px; right: 10px;
+      z-index: 10;
+    }
+    .stat-label {
+      font-size: 0.55rem;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      opacity: .6;
+      margin-bottom: 4px;
+    }
+    .stat-bar {
+      height: 4px;
+      background: rgba(255,255,255,.15);
+      border-radius: 4px;
+      overflow: hidden;
+    }
+    .stat-bar-fill {
+      height: 100%;
+      width: 0%;
+      border-radius: 4px;
+      background: linear-gradient(90deg, #ffd700, #e50914);
+      transition: width 1.8s ease 2.5s;
+    }
+    .short-celebs .stat-bar-fill { background: linear-gradient(90deg,#ff69b4,#9b00ff); }
+    .short-talk   .stat-bar-fill { background: linear-gradient(90deg,#7fff7f,#ffd700); }
+
+    /* ── Bottom CTA ── */
+    .cta {
+      position: absolute;
+      bottom: 12px;
+      left: 0; right: 0;
+      text-align: center;
+      z-index: 10;
+    }
+    .cta p {
+      font-size: 0.65rem;
+      opacity: .7;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+    }
+    .cta .follow {
+      font-size: 0.75rem;
+      font-weight: 900;
+      color: #e50914;
+      margin-top: 2px;
+    }
+
+    /* ── Overlay number stamp ── */
+    .stamp {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%,-50%) scale(3);
+      font-size: 5rem;
+      font-weight: 900;
+      opacity: 0;
+      color: rgba(255,255,255,.06);
+      pointer-events: none;
+      user-select: none;
+      transition: all .6s;
+      z-index: 1;
+    }
+
+    /* ── Play button overlay ── */
+    .play-btn {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(0,0,0,.4);
+      cursor: pointer;
+      z-index: 20;
+      transition: opacity .3s;
+    }
+    .play-btn:hover { background: rgba(0,0,0,.3); }
+    .play-btn.hidden { opacity: 0; pointer-events: none; }
+
+    .play-circle {
+      width: 60px; height: 60px;
+      border-radius: 50%;
+      background: rgba(255,255,255,.9);
+      display: flex; align-items: center; justify-content: center;
+    }
+    .play-triangle {
+      width: 0; height: 0;
+      border-top: 14px solid transparent;
+      border-bottom: 14px solid transparent;
+      border-left: 22px solid #e50914;
+      margin-left: 4px;
+    }
+
+    /* ── Replay ── */
+    .replay-btn {
+      position: absolute;
+      bottom: 45px; left: 50%; transform: translateX(-50%);
+      background: rgba(255,255,255,.15);
+      border: 1px solid rgba(255,255,255,.3);
+      color: #fff;
+      padding: 5px 16px;
+      border-radius: 20px;
+      cursor: pointer;
+      font-size: 0.7rem;
+      font-weight: bold;
+      z-index: 25;
+      display: none;
+    }
+    .replay-btn.visible { display: block; }
+
+    /* ── Progress bar ── */
+    .progress-bar {
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 3px;
+      background: rgba(255,255,255,.2);
+      z-index: 30;
+    }
+    .progress-fill {
+      height: 100%;
+      width: 0%;
+      background: #e50914;
+      transition: width linear;
+    }
+
+    /* ── Info panel below phone ── */
+    .info-panel {
+      width: 320px;
+      margin-top: 16px;
+      background: #1a1a1a;
+      border-radius: 14px;
+      padding: 14px 16px;
+      font-size: 0.75rem;
+      line-height: 1.6;
+      color: #ccc;
+    }
+    .info-panel h3 { color: #ffd700; font-size: 0.8rem; margin-bottom: 6px; }
+    .info-panel ul { padding-left: 16px; }
+    .info-panel li { margin-bottom: 2px; }
+    .info-panel .tag {
+      display: inline-block;
+      background: #333;
+      border-radius: 10px;
+      padding: 2px 8px;
+      margin: 2px;
+      font-size: 0.65rem;
+      color: #aaa;
+    }
+  </style>
+</head>
+<body>
+
+<h1 class="page-title">🎬 Rankings Channel — YouTube Short Samples</h1>
+
+<div class="episode-picker">
+  <button class="ep-btn active" onclick="switchEpisode('nba')">🏀 NBA on Talk Shows</button>
+  <button class="ep-btn"       onclick="switchEpisode('celebs')">⭐ Celebrity Rankings</button>
+  <button class="ep-btn"       onclick="switchEpisode('talk')">🎤 Best Talk Show Hosts</button>
+</div>
+
+<div class="phone-frame">
+
+  <!-- ═══ EPISODE 1: NBA on Talk Shows ═══ -->
+  <div class="short short-nba active" id="short-nba">
+    <div class="bg-gradient"></div>
+    <div class="noise"></div>
+    <div class="progress-bar"><div class="progress-fill" id="prog-nba"></div></div>
+
+    <div class="badge">
+      <div class="badge-icon">🏆</div>
+      <span class="badge-name">RankIt</span>
+    </div>
+
+    <div class="short-title">
+      <div class="eyebrow">Episode 1 · NBA Edition</div>
+      <h2>Top <span class="accent">5</span> NBA Stars<br>Who <span class="accent">Owned</span> Talk Shows</h2>
+    </div>
+
+    <div class="rankings" id="ranks-nba">
+      <div class="rank-card" data-delay="400">
+        <div class="rank-num fifth">#5</div>
+        <div class="rank-info">
+          <div class="rank-name">Kevin Durant</div>
+          <div class="rank-sub">The Tonight Show · Calm &amp; Calculated</div>
+        </div>
+        <div class="rank-score">
+          <div class="score-val">82</div>
+          <div class="stars">★★★★☆</div>
+        </div>
+      </div>
+      <div class="rank-card" data-delay="850">
+        <div class="rank-num fourth">#4</div>
+        <div class="rank-info">
+          <div class="rank-name">Stephen Curry</div>
+          <div class="rank-sub">Jimmy Fallon · Viral Moments</div>
+        </div>
+        <div class="rank-score">
+          <div class="score-val">88</div>
+          <div class="stars">★★★★☆</div>
+        </div>
+      </div>
+      <div class="rank-card" data-delay="1300">
+        <div class="rank-num bronze">#3</div>
+        <div class="rank-info">
+          <div class="rank-name">Draymond Green</div>
+          <div class="rank-sub">Kimmel · Unfiltered Takes</div>
+        </div>
+        <div class="rank-score">
+          <div class="score-val">91</div>
+          <div class="stars">★★★★★</div>
+        </div>
+      </div>
+      <div class="rank-card" data-delay="1750">
+        <div class="rank-num silver">#2</div>
+        <div class="rank-info">
+          <div class="rank-name">Charles Barkley</div>
+          <div class="rank-sub">Letterman Legacy · Legend Status</div>
+        </div>
+        <div class="rank-score">
+          <div class="score-val">96</div>
+          <div class="stars">★★★★★</div>
+        </div>
+      </div>
+      <div class="rank-card" data-delay="2200">
+        <div class="rank-num gold">#1</div>
+        <div class="rank-info">
+          <div class="rank-name">LeBron James</div>
+          <div class="rank-sub">All Shows · King of the Couch</div>
+        </div>
+        <div class="rank-score">
+          <div class="score-val">99</div>
+          <div class="stars">★★★★★</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="stat-bar-wrap">
+      <div class="stat-label">Entertainment Score Index</div>
+      <div class="stat-bar"><div class="stat-bar-fill" id="bar-nba" style="width:0%"></div></div>
+    </div>
+
+    <div class="cta">
+      <p>Agree? Drop your ranking 👇</p>
+      <div class="follow">@RankItShorts · Follow for more</div>
+    </div>
+
+    <div class="play-btn" id="play-nba" onclick="startShort('nba')">
+      <div class="play-circle"><div class="play-triangle"></div></div>
+    </div>
+    <button class="replay-btn" id="replay-nba" onclick="replayShort('nba')">↺ Replay</button>
+  </div>
+
+  <!-- ═══ EPISODE 2: Celebrity Rankings ═══ -->
+  <div class="short short-celebs" id="short-celebs">
+    <div class="bg-gradient"></div>
+    <div class="noise"></div>
+    <div class="progress-bar"><div class="progress-fill" id="prog-celebs"></div></div>
+
+    <div class="badge">
+      <div class="badge-icon">🏆</div>
+      <span class="badge-name">RankIt</span>
+    </div>
+
+    <div class="short-title">
+      <div class="eyebrow">Episode 2 · Celebrity Edition</div>
+      <h2>Most <span class="accent">Charismatic</span><br>Celebs of <span class="accent">2025</span></h2>
+    </div>
+
+    <div class="rankings" id="ranks-celebs">
+      <div class="rank-card" data-delay="400">
+        <div class="rank-num fifth">#5</div>
+        <div class="rank-info">
+          <div class="rank-name">Ryan Reynolds</div>
+          <div class="rank-sub">Deadpool Energy · Always On</div>
+        </div>
+        <div class="rank-score">
+          <div class="score-val">85</div>
+          <div class="stars">★★★★☆</div>
+        </div>
+      </div>
+      <div class="rank-card" data-delay="850">
+        <div class="rank-num fourth">#4</div>
+        <div class="rank-info">
+          <div class="rank-name">Zendaya</div>
+          <div class="rank-sub">Press Tours · Effortless Cool</div>
+        </div>
+        <div class="rank-score">
+          <div class="score-val">90</div>
+          <div class="stars">★★★★★</div>
+        </div>
+      </div>
+      <div class="rank-card" data-delay="1300">
+        <div class="rank-num bronze">#3</div>
+        <div class="rank-info">
+          <div class="rank-name">Keanu Reeves</div>
+          <div class="rank-sub">Internet's Beloved · Humble King</div>
+        </div>
+        <div class="rank-score">
+          <div class="score-val">93</div>
+          <div class="stars">★★★★★</div>
+        </div>
+      </div>
+      <div class="rank-card" data-delay="1750">
+        <div class="rank-num silver">#2</div>
+        <div class="rank-info">
+          <div class="rank-name">Dwayne Johnson</div>
+          <div class="rank-sub">The Rock Effect · Global Reach</div>
+        </div>
+        <div class="rank-score">
+          <div class="score-val">95</div>
+          <div class="stars">★★★★★</div>
+        </div>
+      </div>
+      <div class="rank-card" data-delay="2200">
+        <div class="rank-num gold">#1</div>
+        <div class="rank-info">
+          <div class="rank-name">Beyoncé</div>
+          <div class="rank-sub">Era of Eras · Undisputed #1</div>
+        </div>
+        <div class="rank-score">
+          <div class="score-val">100</div>
+          <div class="stars">★★★★★</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="stat-bar-wrap">
+      <div class="stat-label">Charisma &amp; Cultural Impact Score</div>
+      <div class="stat-bar"><div class="stat-bar-fill" id="bar-celebs" style="width:0%"></div></div>
+    </div>
+
+    <div class="cta">
+      <p>Who's missing from the list? 👇</p>
+      <div class="follow">@RankItShorts · Follow for more</div>
+    </div>
+
+    <div class="play-btn" id="play-celebs" onclick="startShort('celebs')">
+      <div class="play-circle"><div class="play-triangle"></div></div>
+    </div>
+    <button class="replay-btn" id="replay-celebs" onclick="replayShort('celebs')">↺ Replay</button>
+  </div>
+
+  <!-- ═══ EPISODE 3: Talk Show Hosts ═══ -->
+  <div class="short short-talk" id="short-talk">
+    <div class="bg-gradient"></div>
+    <div class="noise"></div>
+    <div class="progress-bar"><div class="progress-fill" id="prog-talk"></div></div>
+
+    <div class="badge">
+      <div class="badge-icon">🏆</div>
+      <span class="badge-name">RankIt</span>
+    </div>
+
+    <div class="short-title">
+      <div class="eyebrow">Episode 3 · Talk Show Edition</div>
+      <h2><span class="accent">Greatest</span> Late Night<br>Hosts of <span class="accent">All Time</span></h2>
+    </div>
+
+    <div class="rankings" id="ranks-talk">
+      <div class="rank-card" data-delay="400">
+        <div class="rank-num fifth">#5</div>
+        <div class="rank-info">
+          <div class="rank-name">Conan O'Brien</div>
+          <div class="rank-sub">Comedy King · Cult Following</div>
+        </div>
+        <div class="rank-score">
+          <div class="score-val">87</div>
+          <div class="stars">★★★★☆</div>
+        </div>
+      </div>
+      <div class="rank-card" data-delay="850">
+        <div class="rank-num fourth">#4</div>
+        <div class="rank-info">
+          <div class="rank-name">Jimmy Fallon</div>
+          <div class="rank-sub">Tonight Show · Games &amp; Energy</div>
+        </div>
+        <div class="rank-score">
+          <div class="score-val">89</div>
+          <div class="stars">★★★★☆</div>
+        </div>
+      </div>
+      <div class="rank-card" data-delay="1300">
+        <div class="rank-num bronze">#3</div>
+        <div class="rank-info">
+          <div class="rank-name">Oprah Winfrey</div>
+          <div class="rank-sub">Daytime Legend · The Standard</div>
+        </div>
+        <div class="rank-score">
+          <div class="score-val">94</div>
+          <div class="stars">★★★★★</div>
+        </div>
+      </div>
+      <div class="rank-card" data-delay="1750">
+        <div class="rank-num silver">#2</div>
+        <div class="rank-info">
+          <div class="rank-name">Craig Ferguson</div>
+          <div class="rank-sub">Late Late Show · Most Underrated</div>
+        </div>
+        <div class="rank-score">
+          <div class="score-val">96</div>
+          <div class="stars">★★★★★</div>
+        </div>
+      </div>
+      <div class="rank-card" data-delay="2200">
+        <div class="rank-num gold">#1</div>
+        <div class="rank-info">
+          <div class="rank-name">Johnny Carson</div>
+          <div class="rank-sub">The Tonight Show · The GOAT</div>
+        </div>
+        <div class="rank-score">
+          <div class="score-val">99</div>
+          <div class="stars">★★★★★</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="stat-bar-wrap">
+      <div class="stat-label">All-Time Host Performance Index</div>
+      <div class="stat-bar"><div class="stat-bar-fill" id="bar-talk" style="width:0%"></div></div>
+    </div>
+
+    <div class="cta">
+      <p>Change the ranking! Comment below 👇</p>
+      <div class="follow">@RankItShorts · Follow for more</div>
+    </div>
+
+    <div class="play-btn" id="play-talk" onclick="startShort('talk')">
+      <div class="play-circle"><div class="play-triangle"></div></div>
+    </div>
+    <button class="replay-btn" id="replay-talk" onclick="replayShort('talk')">↺ Replay</button>
+  </div>
+
+</div><!-- /phone-frame -->
+
+<div class="info-panel">
+  <h3>Channel Concept: RankIt Shorts</h3>
+  <ul>
+    <li><strong>Format:</strong> 30–45 sec vertical countdown, #5 → #1</li>
+    <li><strong>Cadence:</strong> 2–3 Shorts/week across topic buckets</li>
+    <li><strong>Hook:</strong> Debate bait — deliberately controversial rankings</li>
+    <li><strong>CTA:</strong> "Drop your #1 in the comments" drives engagement</li>
+  </ul>
+  <div style="margin-top:8px">
+    <span class="tag">#NBA</span>
+    <span class="tag">#TalkShows</span>
+    <span class="tag">#Celebrities</span>
+    <span class="tag">#Rankings</span>
+    <span class="tag">#Shorts</span>
+    <span class="tag">#GOAT</span>
+  </div>
+</div>
+
+<script>
+  let timers = {};
+  let current = 'nba';
+
+  function switchEpisode(id) {
+    document.querySelectorAll('.short').forEach(s => s.classList.remove('active'));
+    document.querySelectorAll('.ep-btn').forEach(b => b.classList.remove('active'));
+    document.getElementById('short-' + id).classList.add('active');
+    event.currentTarget.classList.add('active');
+    current = id;
+    resetShort(id);
+  }
+
+  function resetShort(id) {
+    clearTimers(id);
+    const ranks = document.querySelectorAll('#ranks-' + id + ' .rank-card');
+    ranks.forEach(c => c.classList.remove('visible'));
+    document.getElementById('prog-' + id).style.transition = 'none';
+    document.getElementById('prog-' + id).style.width = '0%';
+    document.getElementById('bar-' + id).style.transition = 'none';
+    document.getElementById('bar-' + id).style.width = '0%';
+    document.getElementById('play-' + id).classList.remove('hidden');
+    document.getElementById('replay-' + id).classList.remove('visible');
+  }
+
+  function clearTimers(id) {
+    if (timers[id]) timers[id].forEach(t => clearTimeout(t));
+    timers[id] = [];
+  }
+
+  function startShort(id) {
+    document.getElementById('play-' + id).classList.add('hidden');
+    const cards = document.querySelectorAll('#ranks-' + id + ' .rank-card');
+    clearTimers(id);
+    const t = timers[id];
+
+    const duration = 3200;
+    const prog = document.getElementById('prog-' + id);
+    prog.style.transition = 'none';
+    prog.style.width = '0%';
+    requestAnimationFrame(() => {
+      prog.style.transition = `width ${duration}ms linear`;
+      prog.style.width = '100%';
+    });
+
+    cards.forEach(card => {
+      const delay = parseInt(card.dataset.delay, 10);
+      t.push(setTimeout(() => card.classList.add('visible'), delay));
+    });
+
+    // trigger stat bar
+    t.push(setTimeout(() => {
+      const bar = document.getElementById('bar-' + id);
+      bar.style.transition = 'width 1.4s ease';
+      bar.style.width = '94%';
+    }, 2500));
+
+    // show replay
+    t.push(setTimeout(() => {
+      document.getElementById('replay-' + id).classList.add('visible');
+    }, duration + 200));
+  }
+
+  function replayShort(id) {
+    resetShort(id);
+    setTimeout(() => startShort(id), 80);
+  }
+</script>
+</body>
+</html>
